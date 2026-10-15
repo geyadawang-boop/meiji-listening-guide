@@ -1,0 +1,45 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "types": [
+      "node"
+    ]
+  },
+  "include": [
+    "scripts/run-integration.mts",
+    "scripts/runtime-manifest.mts",
+    "scripts/release.mts",
+    "scripts/audit-language-migration.mts",
+    "scripts/language-migration-smoke.mts",
+    "scripts/acquire-asr-model.mts",
+    "scripts/asr-inference-smoke.mts",
+    "scripts/asr-process-smoke.mts",
+    "scripts/acquire-embedding-model.mts",
+    "scripts/knowledge-process-smoke.mts",
+    "scripts/media-mux-smoke.mts",
+    "scripts/media-download-runner-smoke.mts",
+    "scripts/media-download-process-smoke.mts",
+    "scripts/research-store-smoke.mts",
+    "scripts/research-sources-smoke.mts",
+    "scripts/research-engine-smoke.mts",
+    "scripts/research-process-smoke.mts",
+    "scripts/research-mcp-smoke.mts",
+    "scripts/media-guardian-smoke.mts",
+    "scripts/windows-native-smoke.mts",
+    "scripts/im-napcat-smoke.mts",
+    "scripts/im-service-smoke.mts",
+    "scripts/research-fulltext-smoke.mts",
+    "scripts/im-ilink-smoke.mts",
+    "scripts/transcript-smoke.mts",
+    "scripts/im-weixin-web-smoke.mts",
+    "scripts/im-weixin-process-smoke.mts",
+    "scripts/im-weixin-local-smoke.mts"
+  ]
+}

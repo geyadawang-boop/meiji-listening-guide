@@ -1,0 +1,16 @@
+node_modules/
+out/
+release/
+test-results/
+tmp/
+课程数据/
+资料/
+*.db
+*.db-*
+*.sqlite*
+.env*
+*.log
+resources/asr/
+resources/codex/
+resources/knowledge/
+resources/video/
