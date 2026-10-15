@@ -65,6 +65,14 @@ export class NativeResearchStore{
    return {...task,status:'legacy_saved',original_status:task.status,note:task.status==='completed'?task.note:'',turns:0,events:[{kind:'legacy',message:'旧后台保存时记录，只读展示；尚未按新原生来源代际重新核验，不自动继续旧模型或工具调用。'}],error_code:'旧记录仅供回顾，请选择当前原文建立新研究后再核验。',memory_candidates:[],limitations:task.limitations+' 本记录尚未按原生知识库重新核验。'}
   })
  }
+ legacyWorkflows(){
+  const nativeIds=new Set(this.list<{workflow_id:string}>('workflow').map(flow=>flow.workflow_id))
+  return this.list<{state_json:string}>('legacy:grounded_workflows').map(record=>{
+   const raw=z.object({workflow_id:opSchema,kb_root_id:z.literal(this.rootId),question:z.string().max(800),status:z.string().max(40),revision:z.number().int().nonnegative(),fence:z.number().int().nonnegative(),steps:z.array(z.object({name:z.string().max(100),status:z.string().max(40),answer:z.string().max(200000),answer_sha256:z.string().nullable()})).max(10)}).parse(JSON.parse(z.string().max(4000000).parse(record.state_json)))
+   const steps=raw.steps.map(step=>({...step,hash_verified:step.answer_sha256!==null&&step.answer_sha256===createHash('sha256').update(step.answer).digest('hex')}))
+   return {workflow_id:raw.workflow_id,question:raw.question,status:'legacy_saved' as const,original_status:raw.status,revision:raw.revision,fence:raw.fence,outcome_unknown:false,steps,reference_status:'not_revalidated' as const,notice:'旧工作流仅显示保存时的内容；原资料和来源版本尚未重新核验。'+(steps.some(step=>step.status==='completed'&&!step.hash_verified)?' 部分已完成步骤的正文校验值不符，请核对历史文件。':'')}
+  }).filter(flow=>!nativeIds.has(flow.workflow_id))
+ }
  conversation(id:string){conversationId.parse(id);const row=conversationSchema.parse(this.read('conversation',id));const historical=this.list<Record<string,unknown>>('legacy:kb_conversation_turns').filter(turn=>turn.conversation_id===id);return {...row,turns:[...historical,...this.list<{conversation_id:string}>('turn').filter(turn=>turn.conversation_id===id)],research_tasks:[...this.list<{conversation_id?:string;conversation?:{conversation_id:string}}>('task'),...this.list<{conversation_id?:string;conversation?:{conversation_id:string}}>('legacy-task')].filter(task=>task.conversation_id===id||task.conversation?.conversation_id===id)}}
  organizeConversation(input:unknown){
   const value=z.object({id:conversationId,op:opSchema,revision:z.number().int().nonnegative(),title:z.string().trim().min(1).max(80),pinned:z.boolean()}).parse(input)

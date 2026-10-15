@@ -1,6 +1,6 @@
 {
   "name": "listening-assistant",
-  "version": "0.1.83",
+  "version": "0.1.85",
   "private": true,
   "description": "听课助手：课堂字幕、教师重点与课后练习",
   "author": "Listening Assistant contributors",
@@ -21,7 +21,9 @@
     "test:transcript": "node scripts/transcript-smoke.mts",
     "release:full": "node scripts/release.mts full",
     "release:lite": "node scripts/release.mts lite",
-    "release:components": "node scripts/release.mts components"
+    "release:components": "node scripts/release.mts components",
+    "audit:typescript": "node scripts/audit-typescript.mts --check",
+    "release:source": "node scripts/source-package.mts"
   },
   "dependencies": {
     "@huggingface/transformers": "4.3.1",

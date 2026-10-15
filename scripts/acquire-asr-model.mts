@@ -8,6 +8,12 @@ import { z } from 'zod';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const revision = '36050c46d777d46dc4b5f43f6d90574fc38f8732', repository = 'onnx-community/whisper-small';
 const target = join(root, 'resources/asr/onnx-small');
+if(process.argv.includes('--verify-local')){
+ const acquired=z.object({repository:z.literal(repository),revision:z.literal(revision),files:z.array(z.object({path:z.string(),size:z.number().int().nonnegative(),sha256:z.string().regex(/^[a-f0-9]{64}$/)})).min(1)}).parse(JSON.parse(await readFile(join(target,'acquisition.json'),'utf8')))
+ for(const file of acquired.files){const path=resolve(target,file.path);if(!path.startsWith(target+sep))throw new Error('模型记录路径越界');const item=await lstat(path);if(!item.isFile()||item.isSymbolicLink()||item.size!==file.size)throw new Error('本地模型大小或类型不符：'+file.path);const hash=createHash('sha256');for await(const bytes of createReadStream(path))hash.update(bytes);if(hash.digest('hex')!==file.sha256)throw new Error('本地模型哈希不符：'+file.path)}
+ const license=await readFile(join(target,'VAD-LICENSE.txt'),'utf8');if(!license.includes('MIT License'))throw new Error('缺少语音检测模型原许可')
+ console.log(JSON.stringify({localOnly:true,verifiedFiles:acquired.files.length,legacyPythonResourcesRequired:false}));process.exit(0)
+}
 const weights: Record<string, { size: number; sha256: string }> = {
   'onnx/encoder_model_quantized.onnx': { size: 92326160, sha256: 'a43a83f3c5361cd591cfa7c36f14b43cf7cb22f47a415cc14a8d557be800fa92' },
   'onnx/decoder_model_merged_quantized.onnx': { size: 156750845, sha256: 'ec07c3cbb64172c39791e26ee870a65ac22b458c36722bfe2776b3dbf741e0c9' },
@@ -63,11 +69,13 @@ const license = z.object({ id: z.literal('openai/whisper-small'), cardData: z.ob
 const licenseText = await readFile(join(root, 'node_modules/@huggingface/transformers/LICENSE'), 'utf8');
 if (!licenseText.includes('Apache License')) throw new Error('缺少 Apache 2.0 许可全文');
 await writeFile(join(target, 'MODEL-LICENSE.txt'), licenseText);
-const vad = await readFile(join(root, 'resources/asr/runtime/faster_whisper/assets/silero_vad_v6.onnx'));
+// VAD is a standalone ONNX resource. Restoring a clean checkout uses the native release component,
+// never a Python wheel or an old interpreter directory.
+const vad = await readFile(join(target, 'silero-vad-v6.onnx'));
 const vadHash = createHash('sha256').update(vad).digest('hex');
 if (vadHash !== '4cbf549b8326f60f80f2536d9eefeb450a9abe83365a098031c89719f1be17d2') throw new Error('已有语音检测模型校验失败');
 await writeFile(join(target, 'silero-vad-v6.onnx'), vad);
-await writeFile(join(target, 'VAD-LICENSE.txt'), await readFile(join(root, 'resources/asr/runtime/faster_whisper-1.2.1.dist-info/LICENSE')));
+const vadLicense=await readFile(join(target,'VAD-LICENSE.txt'),'utf8');if(!vadLicense.includes('MIT License'))throw new Error('缺少独立语音检测模型许可，请恢复同版本原生模型组件');
 files.push({ path: 'silero-vad-v6.onnx', size: vad.length, sha256: vadHash });
 await writeFile(join(target, 'acquisition.json'), JSON.stringify({ repository, revision, baseModel: license.id, license: license.cardData.license, dtype: 'q8', files, transcriptionVerified: false }, null, 2));
 console.log(JSON.stringify({ target, verifiedBytes: files.reduce((sum, file) => sum + file.size, 0), transcriptionVerified: false }));

@@ -14,7 +14,7 @@ describe('native platform catalogs',()=>{
   let calls=0;const catalog=new NativePlatformCatalog(api,async(url,init)=>{calls++;expect(url).toBe('https://player.vimeo.com/video/123456/config');expect(init?.redirect).toBe('error');return Response.json({video:{id:123456,title:'合成课程',duration:2,thumbs:{640:'https://i.vimeocdn.com/cover.jpg'}},request:{files:{progressive:[{height:360,url:'https://fixture.vimeocdn.com/360.mp4'},{height:720,url:'https://fixture.vimeocdn.com/720.mp4'}]}}})})
   const source=await catalog.read('https://vimeo.com/123456',false,signal());expect('streams'in source).toBe(true);if(!('streams'in source))throw new Error()
   expect(selectBiliStreams(source,mediaOptions({height:480}))[0].height).toBe(360);expect(source.identity).toBe('vimeo:123456');expect(source.catalog.formats).toHaveLength(2)
-  await expect(catalog.read('https://vimeo.com/123456',true,signal())).rejects.toThrow('播放列表');await expect(catalog.read('https://vimeo.com/123456',false,signal(),{subtitles:true})).rejects.toThrow('字幕');expect(calls).toBe(1)
+  await expect(catalog.read('https://vimeo.com/123456',true,signal())).rejects.toThrow('播放列表');await expect(catalog.read('https://vimeo.com/123456',false,signal(),{subtitles:true})).rejects.toThrow('字幕');expect(calls).toBe(2)
  })
  it('rejects identity changes and an untrusted media address supplied by metadata',async()=>{
   for(const row of [{id:999,url:'https://fixture.vimeocdn.com/file.mp4'},{id:123456,url:'http://127.0.0.1/private'},{id:123456,url:'https://vimeocdn.com.evil.test/private'}]){

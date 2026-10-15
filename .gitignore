@@ -8,6 +8,8 @@ tmp/
 *.db
 *.db-*
 *.sqlite*
+*.dpapi
+历史参考/
 .env*
 *.log
 resources/asr/

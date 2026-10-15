@@ -55,3 +55,8 @@ fonts and icons are retained in resources/licenses/THIRD_PARTY_NOTICES.txt.
 Font-family names such as Segoe UI, Microsoft YaHei, Consolas, Cascadia Code and
 SFMono-Regular are operating-system font fallbacks only; their font files are
 not distributed by this repository or its Windows package.
+
+Meiji Listening Guide modifications and TypeScript implementation:
+Corresponding current source: https://github.com/mikudeshuo/meiji-listening-guide
+Original ElecKoi and BiliSum notices above and in THIRD_PARTY_NOTICES.md remain applicable.
+

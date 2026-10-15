@@ -5,6 +5,7 @@ import {mkdir,lstat,readFile,readdir,realpath,rename,writeFile,unlink} from 'nod
 import {isAbsolute,join,relative,resolve,sep} from 'node:path'
 import {z} from 'zod'
 import {mediaOptions} from './media-options'
+import {windowsProtect} from './windows-native'
 
 const idSchema=z.string().regex(/^[a-f0-9]{32}$/)
 const receipt=z.object({relative:z.string().min(1),bytes:z.number().int().positive().safe(),hash:z.string().regex(/^[a-f0-9]{64}$/)}).strict()
@@ -25,17 +26,21 @@ export class NativeDownloadJobs{
  private async base(){const base=resolve(this.root,'native-downloads');await mkdir(base,{recursive:true});if((await lstat(base)).isSymbolicLink()||resolve(await realpath(base)).toLowerCase()!==base.toLowerCase())throw new Error('下载记录目录无效');return base}
  private async directory(id:string){idSchema.parse(id);const base=await this.base(),path=join(base,id);await mkdir(path,{recursive:true});if((await lstat(path)).isSymbolicLink()||(await realpath(path)).toLowerCase()!==path.toLowerCase())throw new Error('下载任务目录无效');return path}
  private async save(job:NativeDownloadJob){
-  const directory=await this.directory(job.id),path=join(directory,'job.json'),tmp=join(directory,'job.writing')
+  const directory=await this.directory(job.id),encrypted=job.recipe.privacy===true,path=join(directory,encrypted?'job.dpapi':'job.json'),tmp=join(directory,encrypted?'job.writing.dpapi':'job.writing')
   for(const target of [path,tmp]){try{const item=await lstat(target);if(item.isSymbolicLink()||!item.isFile())throw new Error('下载记录文件无效')}catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT')throw error}}
-  await writeFile(tmp,JSON.stringify(job));await rename(tmp,path);this.records.set(job.id,job)
+  const serialized=Buffer.from(JSON.stringify(job));await writeFile(tmp,encrypted?windowsProtect(serialized):serialized);await rename(tmp,path);this.records.set(job.id,job)
  }
  initialize(){return this.initialized??=this.exclusive(async()=>{
   const base=await this.base()
   for(const entry of await readdir(base,{withFileTypes:true})){
    if(!idSchema.safeParse(entry.name).success||!entry.isDirectory()||entry.isSymbolicLink())continue
-   const directory=await this.directory(entry.name),path=join(directory,'job.json')
+   const directory=await this.directory(entry.name),privatePath=join(directory,'job.dpapi'),publicPath=join(directory,'job.json')
+   let encrypted=false;try{await lstat(privatePath);encrypted=true}catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT')throw error}
+   if(encrypted){try{await lstat(publicPath);throw new Error('下载任务同时存在明文与加密记录，未选择其中一个覆盖')}catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT')throw error}}
+   const path=encrypted?privatePath:publicPath
    const item=await lstat(path);if(item.isSymbolicLink()||!item.isFile())throw new Error('下载恢复记录文件无效')
-   const row=schema.parse(JSON.parse(await readFile(path,'utf8')))
+   const bytes=await readFile(path),row=schema.parse(JSON.parse((encrypted?windowsProtect(bytes,true):bytes).toString('utf8')))
+   if(encrypted!==(row.recipe.privacy===true))throw new Error('下载记录加密方式与任务设置不一致')
    if(row.id!==entry.name||row.recipeHash!==hashRecipe(row.identity,row.source_url,mediaOptions(row.recipe)))throw new Error('下载恢复记录与任务不一致')
    const locks=await recoverDownloadLocks(directory,row.identity)
    if(locks.preserved.length)row.warning='保留无法确认归属的分段锁，请核对原下载进程后再继续'
@@ -67,7 +72,7 @@ export class NativeDownloadJobs{
  }
  private async ownedFile(id:string,name:string){
   const directory=await this.directory(id),path=resolve(directory,name),part=relative(directory,path)
-  if(isAbsolute(name)||!part||part==='..'||part.startsWith('..'+sep)||isAbsolute(part)||part.split(/[\\/]/).some(piece=>['job.json','job.writing'].includes(piece.toLowerCase())))throw new Error('成果路径不属于下载任务')
+  if(isAbsolute(name)||!part||part==='..'||part.startsWith('..'+sep)||isAbsolute(part)||part.split(/[\\/]/).some(piece=>['job.json','job.writing','job.dpapi','job.writing.dpapi'].includes(piece.toLowerCase())))throw new Error('成果路径不属于下载任务')
   const info=await lstat(path)
   if(!info.isFile()||info.isSymbolicLink()||(await realpath(path)).toLowerCase()!==path.toLowerCase())throw new Error('下载成果文件不可用')
   return {path,info}
@@ -84,7 +89,7 @@ export class NativeDownloadJobs{
    await this.save(next);return structuredClone(next)
   })
  }
- private checkCleanup(names:string[],outputs:Receipt[]){if(names.some(name=>!name||/[\\/:\x00-\x1f]/.test(name)||/[. ]$/.test(name)||name.trim()!==name||['job.json','job.writing'].includes(name.toLowerCase())||outputs.some(output=>output.relative.toLowerCase()===name.toLowerCase())))throw new Error('清理清单包含非中间文件')}
+ private checkCleanup(names:string[],outputs:Receipt[]){if(names.some(name=>!name||/[\\/:\x00-\x1f]/.test(name)||/[. ]$/.test(name)||name.trim()!==name||['job.json','job.writing','job.dpapi','job.writing.dpapi'].includes(name.toLowerCase())||outputs.some(output=>output.relative.toLowerCase()===name.toLowerCase())))throw new Error('清理清单包含非中间文件')}
  private async clearIntermediates(row:NativeDownloadJob){
   this.checkCleanup(row.cleanup,row.outputs)
   for(const expected of row.outputs){const actual=await this.evidence(row.id,expected.relative);if(actual.bytes!==expected.bytes||actual.hash!==expected.hash)throw new Error('成果已改变，原中间文件保留')}

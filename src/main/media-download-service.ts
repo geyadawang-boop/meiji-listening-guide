@@ -10,6 +10,7 @@ import {mediaOptionChoices,mediaOptions} from './media-options'
 import type {BiliResources} from './bili-resources'
 import type {MediaCatalog,MediaJob} from '../shared/media'
 import {z} from 'zod'
+import {NativeMediaAuth} from './media-auth'
 const idSchema=z.string().regex(/^[a-f0-9]{32}$/)
 type Fetcher=(url:string,init?:RequestInit)=>Promise<Response>
 /** Queue control remains responsive while one native download runs in the background. */
@@ -18,6 +19,7 @@ export class NativeDownloadService{
  private legacy:LegacyDownloads
  private catalog:NativePlatformCatalog
  private runner:NativeBiliDownloadRunner
+ private auth:NativeMediaAuth
  private tokens=new Map<string,{source:NativeMediaSource;expires:number}>()
  private queue:string[]=[]
  private active:{id:string;controller:AbortController;done:Promise<void>}|undefined
@@ -26,7 +28,7 @@ export class NativeDownloadService{
  private stopped=false
  private cancelling=new Set<string>()
  private progress=new Map<string,MediaJob['progress']>()
- constructor(resources:string,private root:string,api:Pick<BiliResources,'readMedia'>,fetcher:Fetcher){this.jobs=new NativeDownloadJobs(root);this.legacy=new LegacyDownloads(root);this.catalog=new NativePlatformCatalog(api,fetcher);this.runner=new NativeBiliDownloadRunner(this.jobs,this.catalog,fetcher,new NativeMediaMux(resources),(id,downloaded,total)=>this.progress.set(id,{downloaded,...total===null?{}:{total}}))}
+ constructor(resources:string,private root:string,api:Pick<BiliResources,'readMedia'>,fetcher:Fetcher){this.jobs=new NativeDownloadJobs(root);this.legacy=new LegacyDownloads(root);this.auth=new NativeMediaAuth(root);this.catalog=new NativePlatformCatalog(api,fetcher,this.auth);this.runner=new NativeBiliDownloadRunner(this.jobs,this.catalog,fetcher,new NativeMediaMux(resources),(id,downloaded,total)=>this.progress.set(id,{downloaded,...total===null?{}:{total}}),this.auth)}
  private mutate<T>(run:()=>Promise<T>){const next=this.control.then(run);this.control=next.catch(()=>{});return next}
  private pump(){
   if(this.pumping||this.stopped)return
@@ -44,6 +46,9 @@ export class NativeDownloadService{
  async execute(action:string,input:unknown={}):Promise<unknown>{
   if(this.stopped)throw new Error('下载工作进程已关闭')
   if(action==='options')return mediaOptionChoices()
+  if(action==='auth-list')return this.auth.list()
+  if(action==='auth-save')return this.auth.save(input)
+  if(action==='auth-remove'){const args=z.object({id:idSchema,confirmed:z.literal(true)}).parse(input);return this.auth.remove(args.id)}
   if(action==='list'){const native=await this.jobs.list(),ids=new Set(native.map(row=>row.id));return [...native.map(row=>this.project(row)),...(await this.legacy.list()).filter(row=>!ids.has(row.id))]}
   const args=z.record(z.string(),z.unknown()).parse(input)
   if(action==='catalog'){
@@ -63,7 +68,6 @@ export class NativeDownloadService{
     const token=idSchema.parse(args.token),saved=this.tokens.get(token)
     if(!saved||saved.expires<Date.now())throw new Error('格式目录已失效，请重新读取')
     const options=mediaOptions(args.options)
-    if(options.privacy||options.cookie_profile||options.use_cookies)throw new Error('原生队列仅使用本应用连接的站点会话')
     const fresh=await this.catalog.read(saved.source.catalog.url,false,AbortSignal.timeout(60000),options)
     if(!('identity' in fresh)||fresh.identity!==saved.source.identity)throw new Error('视频分集身份已改变，请重新读取')
     if(options.skip_existing)for(const row of await this.jobs.list())if(row.state==='completed'&&row.identity===fresh.identity&&row.source_url===fresh.catalog.url&&JSON.stringify(row.recipe)===JSON.stringify(options)){

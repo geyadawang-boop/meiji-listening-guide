@@ -69,9 +69,13 @@ export class NativeResearchService{
    case 'note-source':return this.notes.source(op.parse(args.id))
    case 'note-export':return this.notes.export(op.parse(args.id))
    case 'workflow-create':return this.workflows.create(args)
-   case 'workflow-action':return this.workflows.action(args)
-   case 'workflow-export':{const flow=this.workflows.verify(op.parse(args.id)),text='# '+flow.question+'\n\n'+flow.steps.map(step=>'## '+step.name+'\n\n'+step.answer).join('\n\n')+'\n\n## 来源版本\n\n```json\n'+JSON.stringify(flow.bindings,null,2)+'\n```\n';return this.exportFile('研究成果',flow.workflow_id+'-工作流.md',text)}
-   case 'overview':return {root:this.store.rootId,extensions:this.extensions.list(),mcp:this.mcp.list(),tasks:[...this.engine.list(),...this.store.legacyResearchTasks()],workflows:this.workflows.list(),migration:{complete:false,pending:['微信平台及其余通讯适配','全文阅读与旧研究/扩展适配','多平台下载及完整发行物验收']},runtime:{dependencies:[{id:'typescript',label:'原生 TypeScript 研究后台',state:'detected',version:'native-v1'}]}}
+   case 'workflow-action':{if(this.store.legacyWorkflows().some(flow=>flow.workflow_id===args.id))throw new Error('旧工作流需要重新选择当前资料建立新任务，不会重放旧请求');return this.workflows.action(args)}
+   case 'workflow-export':{
+    const id=op.parse(args.id),old=this.store.legacyWorkflows().find(flow=>flow.workflow_id===id)
+    if(old)return this.exportFile('研究成果',old.workflow_id+'-工作流.md','# '+old.question+'\n\n> 历史工作流导出（未重新核验）\n> '+old.notice+'\n\n'+old.steps.map(step=>'## '+step.name+'\n\n保存状态：'+step.status+'；正文哈希：'+(step.hash_verified?'与保存值一致':'未确认')+'\n\n'+step.answer).join('\n\n'))
+    const flow=this.workflows.verify(id),text='# '+flow.question+'\n\n'+flow.steps.map(step=>'## '+step.name+'\n\n'+step.answer).join('\n\n')+'\n\n## 来源版本\n\n```json\n'+JSON.stringify(flow.bindings,null,2)+'\n```\n';return this.exportFile('研究成果',flow.workflow_id+'-工作流.md',text)
+   }
+   case 'overview':return {root:this.store.rootId,extensions:this.extensions.list(),mcp:this.mcp.list(),tasks:[...this.engine.list(),...this.store.legacyResearchTasks()],workflows:[...this.workflows.list(),...this.store.legacyWorkflows()],migration:{runtimeLanguage:'typescript',legacyRuntimeRequired:false,externalAcceptance:'详见版本说明；本地模拟不代表所有真实账号和站点已验收'},runtime:{dependencies:[{id:'typescript',label:'原生 TypeScript 研究后台',state:'detected',version:'native-v1'}]}}
    default:throw new Error('此研究工具尚未完成原生适配：'+action)
   }
  }

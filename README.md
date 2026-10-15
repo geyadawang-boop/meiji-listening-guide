@@ -1,19 +1,74 @@
 # 梅酱的听课指南
 
-开源软件仓库，当前版本 **0.1.83**。通过 [软件下载页面](https://github.com/mikudeshuo/meiji-listening-guide/releases/latest) 下载 Windows 完整程序包，解压后运行「梅酱的听课指南.exe」。
+[下载 Windows 程序和源码](https://github.com/mikudeshuo/meiji-listening-guide/releases/latest)。分享此链接即可；下载程序 ZIP 后完整解压，运行「梅酱的听课指南.exe」。公开包不包含个人课程、教材或账号。
 
-## 隐私与资料
-
-发布包使用空课程库，不含个人课程、教材、课件、字幕、聊天历史、账号或登录状态。此仓库不用于存放个人资料。
-
-## 功能与版本范围
-
-课程和会话管理、视频下载、字幕转写、笔记、课件 PDF、可编辑教材批注、中文知识库、研究工具及工作流。应用逻辑采用 TypeScript，原生桌面界面；FFmpeg、SQLite、ONNX 等为第三方运行资源。当前 SponsorBlock、部分旧下载高级选项尚未接入；部分平台字幕及真实账号完整流程尚未全面验收。
+Windows x64 桌面应用。业务逻辑、前后端、独立工作进程及现行构建/维护入口使用 TypeScript；界面保持梅酱原有布局和主题。实际版本取 package.json，完成状态和验收范围见 TypeScript迁移清单.json。
 
 ## 开发
 
-Node.js 24，npm ci 后 npm run build。离线模型和原生运行资源体积较大，未提交到 Git；需从同版 Release 提取 resources/asr、resources/codex、resources/knowledge、resources/video。npm run test 执行自动检查。
+需要 Node.js 24 和 npm。依赖由 package-lock.json 固定，SQLite 原生模块须使用 Electron ABI：
 
-## 许可证
+```powershell
+npm ci
+npm run dev
+npm run build
+```
 
-沿用项目现有 AGPL-3.0-only 和各第三方组件许可证；保留 LICENSE、NOTICE、THIRD_PARTY_NOTICES.md 及程序内许可证。
+resources 只包含独立 ONNX 模型、Codex 连接组件、NapCat Node 组件和 FFmpeg/FFprobe 及其许可证。它们是必要第三方资源，不能以 TypeScript 源码代替二进制或权重。源码包不含这些大型文件，需恢复同版本组件。PDF 由应用原生 TypeScript 库处理，不需要 Python。
+
+## 验证
+
+```powershell
+npm run typecheck
+npm test
+node scripts/audit-language-migration.mts --check
+node scripts/media-auth-smoke.mts
+node scripts/media-download-runner-smoke.mts
+node scripts/research-store-smoke.mts
+node scripts/typescript-followup-smoke.mts
+```
+
+界面、集成检查使用隔离示例和本机合成媒体。真实 FFmpeg、SQLite、Windows DPAPI 和 ONNX 推理不等于真实外站、全部账号及云端模型均已验收。按改动做必要专项，不反复全量测试；外部登录失效或限流必须明确显示，不能空结果冒充成功。
+
+## 发布和恢复组件
+
+```powershell
+npm run build
+node scripts/release.mts portable
+npm run release:full
+npm run release:lite
+npm run release:components
+node scripts/source-package.mts
+node scripts/restore-runtime.mts knowledge 同版本组件文件夹
+```
+
+portable 为完整目录，full 为完整安装包，lite 为不含可选离线组件的应用，components 为同版本组件。组件恢复逐文件核对大小、SHA256 和版本，不覆盖改动过的文件；其它组件编号为 asr、codex、video。完整发布须重建 EXE，不能只修改 ASAR。实际安装后验证版本、原生后台、运行资源及课程资料不变后才能清理回退文件。
+
+## 代码目录
+
+| 目录 | 职责 |
+| --- | --- |
+| src/main、src/main/ipc | Electron 主进程、受限原生接口、课程和任务调度 |
+| src/renderer、src/preload | React 页面和最小隔离桥接 |
+| src/shared | 类型、协议和验证规则 |
+| scripts/*.mts | 当前构建、组件恢复、模型维护及验收入口 |
+| scripts/*.ts | 保留的 TypeScript 课程维护工具，需按各脚本范围使用，不能当作自动任务批量执行 |
+| tests | 单元、真实本机资源和模拟外站集成检查 |
+| resources | 原生运行组件及离线模型，不含 Python 或 yt-dlp |
+| 历史参考 | 迁移前源码及一次性旧维护脚本的压缩归档，不能作为应用运行入口 |
+
+out 中的 JavaScript 是 TypeScript 的编译产物；第三方 npm 包、WASM、DLL、FFmpeg、Electron、Codex 和模型并非本项目自写语言迁移对象。HTML 是 React 的挂载入口，CSS 是界面样式。
+
+## 资料与登录保护
+
+软件目录的「课程数据」和「资料」属于用户资料；机器登录和设置位于 userData。不要将这些目录、浏览器分区、Cookies 或真实日志上传 GitHub。发布包使用空课程库，首次运行不迁入本机旧资料。
+
+站点登录档案只读取用户主动选择的 Netscape 文件，经 Windows 当前用户 DPAPI 加密保存；仅按 Cookie 域、路径、Secure 和有效期发往所选站点，不发给 CDN、SponsorBlock 或无关站点。界面仅显示档案名与站点，不显示凭据。下载任务可加密保存任务记录，但最终媒体和用户主动保留的来源文件本身不加密。
+
+旧 aria2c 任务设置会明确改用 TypeScript 原生并行分段；不调用 aria2c 或 yt-dlp。旧工作流仅查看和导出，须重新选择当前来源才能建立新任务，不能重放历史模型请求。教材批注需用户在应用内明确保存。
+
+## 清理和许可
+
+只有最终成果写入、回读、哈希及必要页数/时长核对通过，才删除该任务生成的中间视频、图片等；原教材、源文件、独立下载成果和失败恢复材料保留。开发清理按 AGENTS.md。
+
+沿用 AGPL-3.0-only 和第三方许可，详见 LICENSE、NOTICE、THIRD_PARTY_NOTICES.md。SponsorBlock 社区数据使用 CC BY-NC-SA 4.0，并随对应片段计划保留来源及许可；时长不符不执行裁剪。公开仓库及下载：https://github.com/mikudeshuo/meiji-listening-guide/releases/latest 。

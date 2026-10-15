@@ -41,8 +41,10 @@ export function mediaTuning(value:string){
 }
 export function mediaOptions(input:unknown={}):NativeMediaOptions{
  const v=mediaSchema.parse(input)
+ if(v.cookie_profile&&!v.use_cookies)throw new Error('选择登录档案时需启用使用登录档案')
  if((v.clip_start===null)!==(v.clip_end===null)||v.clip_end!==null&&v.clip_end<=v.clip_start!)throw new Error('片段结束时间必须大于开始时间')
  if(v.sponsorblock&&!v.sponsorblock.split(',').every(value=>mediaSponsors.includes(value)))throw new Error('SponsorBlock 分类无效')
+ if(v.sponsorblock&&(v.subtitle_only||v.split_chapters))throw new Error('片段移除与仅字幕或章节拆分请分别建立任务')
  if(v.proxy){let url:URL;try{url=new URL(v.proxy)}catch{throw new Error('代理地址无效')}
   if(!['http:','https:','socks5:','socks5h:'].includes(url.protocol)||!url.hostname||url.username||url.password||url.search||url.hash||url.pathname&&url.pathname!=='/')throw new Error('代理需为不含密码的 HTTP/SOCKS 地址')}
  if(!v.filename_template||/[\/\\<>:"|?*]/.test(v.filename_template)||v.filename_template.includes('..')||!v.filename_template.endsWith('.%(ext)s'))throw new Error('文件名模板须为单层文件名，以 .%(ext)s 结尾')

@@ -6880,3 +6880,6 @@ better-sqlite3-multiple-ciphers 13.0.3：MIT，Mahesh Bandara Wijerathna、Joshu
 
 youtubei.js 18.1.0：MIT，LuanRT 与贡献者；原生 YouTube 视频/播放列表目录、格式和字幕，不使用 Python。官方来源 https://github.com/LuanRT/YouTube.js ，包内保留 LICENSE。
 quickjs-emscripten 0.32.0：MIT，JustJake 与贡献者；所含 QuickJS 及 Emscripten 构建保留包内许可。仅在无文件/网络宿主接口、内存和时间受限的 WASM 中处理播放器签名，官方来源 https://github.com/justjake/quickjs-emscripten 。
+
+SponsorBlock 社区片段数据：Ajay Ramachandran 与 SponsorBlock 社区贡献者，API 与数据库按 CC BY-NC-SA 4.0 提供。来源 https://sponsor.ajay.app ，许可 https://creativecommons.org/licenses/by-nc-sa/4.0/ ，官方声明 https://github.com/ajayyy/SponsorBlock/wiki/Database-and-API-License 。仅在用户选择片段移除时按视频 ID 的 SHA256 前四位只读查询，不提交标注或浏览反馈；处理时会合并重叠时间、改变时间轴。每个完成成果保留所用标注、分类、来源、许可及哈希到 sponsorblock-plan.json。社区标注不表示已由本应用人工核实，时长不符时拒绝裁剪。
+

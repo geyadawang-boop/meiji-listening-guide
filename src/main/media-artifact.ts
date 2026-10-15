@@ -17,7 +17,7 @@ export class OwnedMediaArtifact{
  private reserve:string
  private proof:string
  constructor(private directory:string,private name:string,private plan:string){
-  if(!name||/[\\/<>:"|?*\x00-\x1f]/.test(name)||name.includes('..')||['job.json','job.writing'].includes(name))throw new Error('媒体成果文件名无效')
+  if(!name||/[\\/<>:"|?*\x00-\x1f]/.test(name)||name.includes('..')||['job.json','job.writing','job.dpapi','job.writing.dpapi'].includes(name))throw new Error('媒体成果文件名无效')
   hash.parse(plan);this.path=join(directory,name);this.reserve=this.path+'.reservation.json';this.proof=this.path+'.receipt.json'
  }
  async prepare(){

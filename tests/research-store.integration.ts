@@ -6,6 +6,7 @@ import {randomUUID,createHash} from 'node:crypto'
 import {NativeResearchStore} from '../src/main/research-store'
 import {NativeResearchExtensions} from '../src/main/research-extensions'
 import {NativeResearchMcp} from '../src/main/research-mcp'
+import {NativeResearchService} from '../src/main/research-service'
 const root=resolve('test-results');mkdirSync(root,{recursive:true});const directory=mkdtempSync(join(root,'research-store-'))
 const op=()=>randomUUID().replaceAll('-',''),memoryRequest={op_id:op(),memory_id:null,revision:0,kind:'preference',title:'复习偏好',body:'先看教材，再核对字幕',source_task:null,paused:false,expires_at:null}
 let store=new NativeResearchStore(directory)
@@ -31,6 +32,10 @@ old.exec('CREATE TABLE document_saved_notes(kb_root_id TEXT,note_id TEXT,markdow
 const noteId=op(),markdown='# 已保存旧笔记\n用户自己的核对结论',bodyHash=createHash('sha256').update(markdown).digest('hex')
 old.prepare('INSERT INTO document_saved_notes VALUES(?,?,?,?,?,?)').run(store.rootId,noteId,markdown,bodyHash,Buffer.byteLength(markdown),JSON.stringify({note_id:noteId,title:'旧版学习笔记',body_sha256:bodyHash,created_at:'2026-09-01T00:00:00Z',verification:'unverified'}))
 old.prepare('INSERT INTO document_note_lifecycle_events VALUES(?,?,?,?,?)').run(store.rootId,noteId,3,'archived',bodyHash)
+old.exec('CREATE TABLE grounded_workflows(kb_root_id TEXT,workflow_id TEXT,state_json TEXT)')
+old.exec('CREATE TABLE kb_generation_catalog(source_id TEXT); CREATE TABLE kb_evidence_membership(evidence_id TEXT,source_id TEXT,kb_root_id TEXT,generation_id TEXT,retired INTEGER); CREATE TABLE kb_delete_tombstones(source_id TEXT,kb_root_id TEXT)')
+const workflowId=op(),legacyAnswer='旧工作流保存的综合回答',legacyWorkflow={workflow_id:workflowId,kb_root_id:store.rootId,question:'旧版课堂复习工作流',status:'completed',revision:7,fence:3,steps:[{name:'综合回答',status:'completed',answer:legacyAnswer,answer_sha256:createHash('sha256').update(legacyAnswer).digest('hex')}],provider:{api_key:'WORKFLOW_SECRET_MUST_NOT_LEAVE'},token:'PRIVATE_LEASE_TOKEN'}
+old.prepare('INSERT INTO grounded_workflows VALUES(?,?,?)').run(store.rootId,workflowId,JSON.stringify(legacyWorkflow))
 old.exec('CREATE TABLE tutor_questions(kb_root_id TEXT,question_id TEXT,question TEXT,created_at TEXT,answer TEXT)')
 const questionId=op();old.prepare('INSERT INTO tutor_questions VALUES(?,?,?,?,?)').run(store.rootId,questionId,'轮轴如何检查？','2026-09-01','THIS_ANSWER_MUST_NOT_LEAVE_THE_DATABASE')
 old.exec('CREATE TABLE learning_agent_extensions(kb_root_id TEXT,root_identity TEXT,revision INTEGER,content_json TEXT);CREATE TABLE learning_mcp_catalog(kb_root_id TEXT,root_identity TEXT,revision INTEGER,content_json TEXT)')
@@ -42,6 +47,7 @@ old.close()
 const hash=()=>createHash('sha256').update(readFileSync(join(directory,'knowledge.sqlite'))).digest('hex'),before=hash()
 const practice=store.practiceQuestions('轮轴检查');assert.equal(practice[0].question_id,questionId);assert.equal(JSON.stringify(practice).includes('THIS_ANSWER_MUST_NOT_LEAVE_THE_DATABASE'),false)
 const baseline=store.baselineLegacy();assert.equal(baseline.imported,true);assert.equal(hash(),before)
+const oldFlow=store.legacyWorkflows()[0];assert.equal(oldFlow.workflow_id,workflowId);assert.equal(oldFlow.status,'legacy_saved');assert.equal(oldFlow.steps[0].hash_verified,true);assert.equal(oldFlow.reference_status,'not_revalidated');assert.equal(JSON.stringify(oldFlow).includes('WORKFLOW_SECRET_MUST_NOT_LEAVE'),false);assert.equal(JSON.stringify(oldFlow).includes('PRIVATE_LEASE_TOKEN'),false)
 assert.equal(store.conversation(cid).turns.length,1);assert.equal(store.conversation(cid).pinned,true);assert.equal(store.conversation(cid).revision,5)
 assert.equal(store.memories().records.length,1);assert.equal(store.memories().records[0].availability,'paused');assert.equal(store.memories().records[0].memory_id,mid)
 const importedNote=store.read<{markdown:string;lifecycle:{state:string;revision:number};legacy:{referenceStatus:string}}>('note',noteId)
@@ -51,6 +57,13 @@ const extensions=new NativeResearchExtensions(store);assert.equal(extensions.lis
 const mcp=new NativeResearchMcp(store);assert.equal(mcp.list().revision,4);assert.equal(mcp.list().servers[0].enabled,false);assert.equal(mcp.list().servers[0].allowed_tools.length,0);assert.equal(mcp.list().servers[0].tools[0].description,'旧工具说明')
 store.changeMemory({op_id:op(),memory_id:mid,revision:2},true)
 assert.equal(store.list<Record<string,unknown>>('legacy:learning_memories').some(row=>row.memory_id===mid),false)
-store.close();store=new NativeResearchStore(directory);assert.deepEqual(store.baselineLegacy(),baseline);assert.equal(hash(),before);assert.equal(store.conversation(session.conversation_id).title,'龋病病因');store.close()
+store.close();store=new NativeResearchStore(directory);assert.deepEqual(store.baselineLegacy(),baseline);assert.equal(hash(),before);assert.equal(store.conversation(session.conversation_id).title,'龋病病因');assert.equal(store.legacyWorkflows()[0].steps[0].answer,legacyAnswer);store.close()
+let legacyModelCalls=0;const legacyService=new NativeResearchService(directory,async()=>{legacyModelCalls++;throw new Error('Legacy request must not run')})
+try{
+ const overview=await legacyService.execute('overview') as {workflows:{workflow_id:string;status:string}[]};assert.equal(overview.workflows.find(row=>row.workflow_id===workflowId)?.status,'legacy_saved')
+ const exported=await legacyService.execute('workflow-export',{id:workflowId}) as string;assert.match(readFileSync(exported,'utf8'),/历史工作流导出（未重新核验）/);assert.ok(readFileSync(exported,'utf8').includes(legacyAnswer))
+ await assert.rejects(()=>legacyService.execute('workflow-action',{id:workflowId}),/重新选择当前资料/);assert.equal(legacyModelCalls,0);assert.equal(hash(),before)
+}finally{await legacyService.dispose()}
 const report={nativeSqlite:true,memoryCasAndIdempotence:true,forgetClearsContents:true,conversationVersioning:true,legacyDatabaseUnchanged:true,legacyConversationIdsTurnsAndPins:true,legacyPausedMemoryPreserved:true,otherRootExcluded:true,restart:true,productionToolsConnected:false,legacyNoteBytesAndArchiveVerified:true,legacyNoteSourceNotOverclaimed:true,forgetClearsNativeLegacySnapshot:true,readOnlyPracticeQuestionWithoutAnswer:true,legacyMethodsResourcesInstructionsPreserved:true,legacyMcpRequiresFreshDiscovery:true,legacyResearchReadOnlyAndCredentialsExcluded:true,fullResearchMigration:false}
+Object.assign(report,{legacyWorkflowListAndExport:true,legacyWorkflowHashAndCredentialsProtected:true,legacyWorkflowRequiresCurrentSources:true,noLegacyModelReplay:true})
 writeFileSync(join(directory,'report.json'),JSON.stringify(report,null,2));console.log(JSON.stringify({directory,...report}))

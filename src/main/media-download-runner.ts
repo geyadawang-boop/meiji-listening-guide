@@ -11,11 +11,13 @@ import {createMediaTransport,mediaDelay} from './media-transport'
 import {mediaSidecars} from './media-sidecars'
 import {publishMediaLayout} from './media-layout'
 import {mediaFilename} from './media-filenames'
+import {sponsorBlockPlan} from './media-sponsorblock'
+import type {NativeMediaAuth} from './media-auth'
 
 type Fetcher=(url:string,init?:RequestInit)=>Promise<Response>
-/** Native executor is staged until remaining advanced options and old queue compatibility are ready. */
+/** Native queue executor; each final output is verified before task intermediates are cleaned. */
 export class NativeBiliDownloadRunner{
- constructor(private jobs:NativeDownloadJobs,private catalog:NativeMediaCatalog,private fetcher:Fetcher,private mux:NativeMediaMux,private progress?:(id:string,downloaded:number,total:number|null)=>void){}
+ constructor(private jobs:NativeDownloadJobs,private catalog:NativeMediaCatalog,private fetcher:Fetcher,private mux:NativeMediaMux,private progress?:(id:string,downloaded:number,total:number|null)=>void,private auth?:NativeMediaAuth){}
  async run(id:string,signal:AbortSignal){
   let row=await this.jobs.read(id)
   if(row.state!=='queued')throw new Error('任务不在等待队列中')
@@ -25,28 +27,34 @@ export class NativeBiliDownloadRunner{
 
   row=await this.jobs.transition(id,row.revision,'running',{stage:'重新核对分集身份'})
   try{
-   supported.add('custom_args');supported.add('format_sort');supported.add('folder_layout')
+   supported.add('custom_args');supported.add('format_sort');supported.add('folder_layout');supported.add('sponsorblock');supported.add('cookie_profile');supported.add('use_cookies');supported.add('privacy');supported.add('downloader')
    for(const key of Object.keys(options) as (keyof typeof options)[])if(!supported.has(key)&&options[key]!==defaults[key])throw new Error('原生执行器尚未接入此选项：'+key)
    const tuning=mediaTuning(options.custom_args),allowedTuning=new Set(['--sleep-requests','--sleep-interval','--max-sleep-interval','--socket-timeout','--prefer-free-formats','--force-keyframes-at-cuts','--write-description','--write-link','--no-mtime','--buffer-size','--http-chunk-size'])
    for(const key of Object.keys(tuning))if(!allowedTuning.has(key))throw new Error('原生执行器尚未接入此调节参数：'+key)
    const minimum=Number(tuning['--sleep-interval']||0),maximum=Number(tuning['--max-sleep-interval']||minimum)
    if(maximum<minimum)throw new Error('最长等待间隔不能小于最短间隔')
    await mediaDelay((minimum+(maximum-minimum)*Math.random())*1000,signal)
-   transport=createMediaTransport(this.fetcher,options);const fetcher=transport.fetcher
+   if(options.cookie_profile&&!this.auth)throw new Error('登录档案存储不可用')
+   const scoped=this.auth?await this.auth.scoped(row.source_url,options,this.fetcher):this.fetcher
+   transport=createMediaTransport(scoped,options);const fetcher=transport.fetcher
+   if(options.downloader==='aria2c')row=await this.jobs.transition(id,row.revision,'running',{warning:[row.warning,'旧 aria2c 设置已改用 TypeScript 原生并行分段，不再调用外部下载器'].filter(Boolean).join('；')})
    signal.throwIfAborted()
    const result=await this.catalog.read(row.source_url,false,signal,options)
    if(!('identity' in result)||result.identity!==row.identity)throw new Error('分集身份已改变，请重新读取视频')
    const source=result,directory=await this.jobs.taskDirectory(id)
    const sidecars=await mediaSidecars(directory,source,tuning)
+   const removal=options.sponsorblock?await sponsorBlockPlan(source,options,directory,fetcher,signal):undefined
+   const keepSegments=removal&&(removal.removed.length||options.clip_start!==null)?removal.kept:undefined
+   if(removal){sidecars.push(removal.relative);row=await this.jobs.transition(id,row.revision,'running',{warning:removal.warning,stage:'已核验片段移除计划'})}
    if(options.split_chapters&&!source.chapters?.length)throw new Error('此分集没有站点章节，无法按章节拆分；可指定时间片段')
-   const subtitles=options.subtitles?await downloadNativeSubtitles(source,options,directory,fetcher,signal):[]
+   const subtitles=options.subtitles?await downloadNativeSubtitles(source,options,directory,fetcher,signal,keepSegments):[]
    let cover:Awaited<ReturnType<NativeMediaMux['prepareCover']>>|undefined
    if(options.thumbnail||options.embed_thumbnail){
     if(!source.thumbnail)throw new Error('此视频未提供封面，恢复资料保留')
     const bytes=await boundedMediaResponse(await fetcher(source.thumbnail,{signal:AbortSignal.any([signal,AbortSignal.timeout(30000)]),redirect:'error',credentials:'omit'}),8_000_000)
     cover=await this.mux.prepareCover(directory,bytes,options.crop_artwork,signal)
    }
-   if(subtitles.some(t=>t.automatic))row=await this.jobs.transition(id,row.revision,'running',{stage:'字幕已保存',warning:'包含站点自动字幕，可能存在识别错误'})
+   if(subtitles.some(t=>t.automatic))row=await this.jobs.transition(id,row.revision,'running',{stage:'字幕已保存',warning:[row.warning,'包含站点自动字幕，可能存在识别错误'].filter(Boolean).join('；')})
    if(options.subtitle_only){
     signal.throwIfAborted()
     const layout=await publishMediaLayout(directory,[...subtitles.map(s=>s.relative),...sidecars,...options.thumbnail&&cover?[cover.relative]:[]],options,row.created)
@@ -70,7 +78,7 @@ export class NativeBiliDownloadRunner{
      signal.throwIfAborted()
      // Mirrors for DASH are alternatives. Progressive segments are handled separately above.
      const url=urls[attempt%urls.length]
-     try{transfer=await transferMediaRanges({directory,key,identity,url,fetcher,signal,writeBufferBytes:Number(tuning['--buffer-size']||65536),chunkBytes:Number(tuning['--http-chunk-size']||0),headers:source.downloadHeaders||{Referer:'https://www.bilibili.com/','User-Agent':'Mozilla/5.0'},progress:(downloaded,total)=>this.progress?.(id,downloaded,total)},options.concurrent_fragments)}catch(reason){error=reason;signal.throwIfAborted();if(attempt<options.retries)await new Promise<void>((resolve,reject)=>{const timer=setTimeout(done,Math.min(5000,500*(attempt+1)));function done(){signal.removeEventListener('abort',abort);resolve()}function abort(){clearTimeout(timer);reject(new Error('下载已取消'))}signal.addEventListener('abort',abort,{once:true});if(signal.aborted)abort()})}
+     try{transfer=await transferMediaRanges({directory,key,identity,url,fetcher,signal,writeBufferBytes:Number(tuning['--buffer-size']||65536),chunkBytes:Number(tuning['--http-chunk-size']||0),headers:source.downloadHeaders||{Referer:'https://www.bilibili.com/','User-Agent':'Mozilla/5.0'},progress:(downloaded,total)=>this.progress?.(id,downloaded,total)},options.downloader==='aria2c'?Math.max(4,options.concurrent_fragments):options.concurrent_fragments)}catch(reason){error=reason;signal.throwIfAborted();if(attempt<options.retries)await new Promise<void>((resolve,reject)=>{const timer=setTimeout(done,Math.min(5000,500*(attempt+1)));function done(){signal.removeEventListener('abort',abort);resolve()}function abort(){clearTimeout(timer);reject(new Error('下载已取消'))}signal.addEventListener('abort',abort,{once:true});if(signal.aborted)abort()})}
     }
     if(!transfer)throw error||new Error('轨道下载失败')
     concatFiles.push(...transfer.intermediates)
@@ -85,7 +93,7 @@ export class NativeBiliDownloadRunner{
    const extension=options.audio_only?({best:'mka',vorbis:'ogg'} as Record<string,string>)[options.audio_format]||options.audio_format:options.container
    // Existing default task paths remain compatible. Explicit templates and simplified names are applied.
    const outputName=options.filename_template!==defaults.filename_template||options.restrict_filenames?mediaFilename(options,row.title,source.sourceId||row.identity.replace(/[^A-Za-z0-9_-]/g,'-'),extension):undefined
-   const output=await this.mux.mux({directory,tracks,options,expectedDuration:source.catalog.duration||0,title:row.title,signal,chapters:source.chapters,subtitles:subtitles.filter(s=>s.embedRelative).map(s=>({path:join(directory,s.embedRelative!),language:s.language})),cover:options.embed_thumbnail?cover?.path:undefined,outputName})
+   const output=await this.mux.mux({directory,tracks,options,expectedDuration:source.catalog.duration||0,title:row.title,signal,chapters:source.chapters,subtitles:subtitles.filter(s=>s.embedRelative).map(s=>({path:join(directory,s.embedRelative!),language:s.language})),cover:options.embed_thumbnail?cover?.path:undefined,outputName,keepSegments})
    concatFiles.push(...output.intermediates)
    const chapterOutputs:string[]=[]
    if(options.split_chapters)for(const [index,chapter]of source.chapters!.entries()){
