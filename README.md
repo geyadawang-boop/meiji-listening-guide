@@ -1,6 +1,6 @@
 # 梅酱的听课指南
 
-个人私有软件仓库，当前版本 **0.1.83**。通过 Releases 下载 Windows 完整程序包，解压后运行「梅酱的听课指南.exe」。
+开源软件仓库，当前版本 **0.1.83**。通过 [软件下载页面](https://github.com/mikudeshuo/meiji-listening-guide/releases/latest) 下载 Windows 完整程序包，解压后运行「梅酱的听课指南.exe」。
 
 ## 隐私与资料
 
@@ -16,4 +16,4 @@ Node.js 24，npm ci 后 npm run build。离线模型和原生运行资源体积�
 
 ## 许可证
 
-私有仓库仅表示访问受限，不改变许可证。沿用项目现有 AGPL-3.0-only 和各第三方组件许可证；保留 LICENSE、NOTICE、THIRD_PARTY_NOTICES.md 及程序内许可证。
+沿用项目现有 AGPL-3.0-only 和各第三方组件许可证；保留 LICENSE、NOTICE、THIRD_PARTY_NOTICES.md 及程序内许可证。
