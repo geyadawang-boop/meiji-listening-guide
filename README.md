@@ -2,7 +2,7 @@
 
 [下载 Windows 程序和源码](https://github.com/mikudeshuo/meiji-listening-guide/releases/latest)。分享此链接即可；下载程序 ZIP 后完整解压，运行「梅酱的听课指南.exe」。公开包不包含个人课程、教材或账号。
 
-Windows x64 桌面应用。业务逻辑、前后端、独立工作进程及现行构建/维护入口使用 TypeScript；界面保持梅酱原有布局和主题。实际版本取 package.json，完成状态和验收范围见 TypeScript迁移清单.json。
+Windows x64 桌面应用。业务逻辑、前后端、独立工作进程及现行构建/维护入口使用 TypeScript；界面保持梅酱原有布局和主题。实际版本取 package.json，验收范围及适用边界见 docs/0.1.85版本说明.md。
 
 ## 开发
 
@@ -16,19 +16,14 @@ npm run build
 
 resources 只包含独立 ONNX 模型、Codex 连接组件、NapCat Node 组件和 FFmpeg/FFprobe 及其许可证。它们是必要第三方资源，不能以 TypeScript 源码代替二进制或权重。源码包不含这些大型文件，需恢复同版本组件。PDF 由应用原生 TypeScript 库处理，不需要 Python。
 
-## 验证
+## 检查
 
 ```powershell
 npm run typecheck
-npm test
 node scripts/audit-language-migration.mts --check
-node scripts/media-auth-smoke.mts
-node scripts/media-download-runner-smoke.mts
-node scripts/research-store-smoke.mts
-node scripts/typescript-followup-smoke.mts
 ```
 
-界面、集成检查使用隔离示例和本机合成媒体。真实 FFmpeg、SQLite、Windows DPAPI 和 ONNX 推理不等于真实外站、全部账号及云端模型均已验收。按改动做必要专项，不反复全量测试；外部登录失效或限流必须明确显示，不能空结果冒充成功。
+当前版本按用户要求删除测试脚本、测试配置和测试启动入口。此前的验收记录仍保留；历史验收不代表全部真实账号和外部站点可用。
 
 ## 发布和恢复组件
 
@@ -53,7 +48,6 @@ portable 为完整目录，full 为完整安装包，lite 为不含可选离线�
 | src/shared | 类型、协议和验证规则 |
 | scripts/*.mts | 当前构建、组件恢复、模型维护及验收入口 |
 | scripts/*.ts | 保留的 TypeScript 课程维护工具，需按各脚本范围使用，不能当作自动任务批量执行 |
-| tests | 单元、真实本机资源和模拟外站集成检查 |
 | resources | 原生运行组件及离线模型，不含 Python 或 yt-dlp |
 | 历史参考 | 迁移前源码及一次性旧维护脚本的压缩归档，不能作为应用运行入口 |
 
@@ -72,3 +66,4 @@ out 中的 JavaScript 是 TypeScript 的编译产物；第三方 npm 包、WASM�
 只有最终成果写入、回读、哈希及必要页数/时长核对通过，才删除该任务生成的中间视频、图片等；原教材、源文件、独立下载成果和失败恢复材料保留。开发清理按 AGENTS.md。
 
 沿用 AGPL-3.0-only 和第三方许可，详见 LICENSE、NOTICE、THIRD_PARTY_NOTICES.md。SponsorBlock 社区数据使用 CC BY-NC-SA 4.0，并随对应片段计划保留来源及许可；时长不符不执行裁剪。公开仓库及下载：https://github.com/mikudeshuo/meiji-listening-guide/releases/latest 。
+
