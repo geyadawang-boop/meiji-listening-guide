@@ -41,7 +41,7 @@ export function createKnowledgeHandler(context: Pick<ApplicationContext, "api" |
                     return { ...source, selection };
                 });
                 case 'knowledge:citation': return knowledge.request('citation', { evidenceId: z.string().regex(/^evi_[0-9a-f]{32}$/).parse(object.evidenceId) });
-                case 'knowledge:delete': return knowledge.request('delete', { id: z.string().regex(/^LV[0-9a-f]{64}$/).parse(object.id) });
+                case 'knowledge:delete': return knowledge.request('delete', { id: z.string().regex(/^LV[0-9a-f]{64}$/).parse(object.id), generation:z.string().min(1).parse(object.generation) });
                 case 'knowledge:organize': return job('知识库分类', () => knowledge.request('organize', z.object({ target: z.string().trim().max(100), items: z.array(z.object({ id: z.string().regex(/^LV[0-9a-f]{64}$/), generation: z.string().min(1) })).min(1).max(5000) }).parse(object)));
                 case 'knowledge:rebuild': return job('知识库索引', () => knowledge.request('rebuild'));
                 case 'knowledge:vector-status': return knowledge.request('vector-status');

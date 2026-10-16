@@ -93,12 +93,14 @@ export class NativeKnowledgeStore {
     if (!status.active || status.index !== 'ready') return { ...lexical, trace: { ...lexical.trace, vector: { state: status.index, note: '资料或语义索引尚未就绪，本次使用当前关键词结果。' } } };
     if (vector.length !== 512 || vector.some(value => !Number.isFinite(value))) throw new Error('查询向量无效');
     const scope = ids ? ids.length ? ' WHERE c.source_id IN (' + ids.map(() => '?').join(',') + ')' : ' WHERE 0' : '';
-    const rows = this.db.prepare('SELECT v.evidence_id,v.vector FROM native_vectors v JOIN native_chunks c ON c.evidence_id=v.evidence_id' + scope).all(...(ids || [])) as { evidence_id: string; vector: string }[];
-    const semantic = rows.map(row => { const values = JSON.parse(row.vector) as number[]; return { id: row.evidence_id, score: values.reduce((sum, value, index) => sum + value * vector[index], 0) }; }).sort((a, b) => b.score - a.score).slice(0, 16);
+    const rows = this.db.prepare('SELECT v.evidence_id,v.vector,c.source_id FROM native_vectors v JOIN native_chunks c ON c.evidence_id=v.evidence_id' + scope).all(...(ids || [])) as { evidence_id: string; vector: string;source_id:string }[];
+    const semantic = rows.map(row => { const values = JSON.parse(row.vector) as number[]; return { id: row.evidence_id, source_id:row.source_id, score: values.reduce((sum, value, index) => sum + value * vector[index], 0) }; }).sort((a, b) => b.score - a.score).slice(0, 16);
     const ranked = new Map<string, number>();
     for (const [index, row] of semantic.entries()) ranked.set(row.id, 1 / (60 + index));
     for (const [index, row] of lexical.hits.entries()) ranked.set(row.evidence_id, (ranked.get(row.evidence_id) || 0) + 1 / (60 + index));
-    return { hits: [...ranked].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([id]) => this.citation(id)), trace: { ...lexical.trace, vector: { state: 'ready', note: '本地中文语义与关键词合并检索，引用已核验。' } } };
+    const sources=new Map(rows.map(row=>[row.evidence_id,row.source_id]));for(const hit of lexical.hits)sources.set(hit.evidence_id,hit.bvid)
+    const rankedHits=[...ranked].sort((a, b) => b[1] - a[1]).map(([evidence_id])=>({evidence_id,source_id:sources.get(evidence_id)})).filter((row):row is {evidence_id:string;source_id:string}=>!!row.source_id);
+    return { hits: this.diverse(rankedHits,8).map(row=>this.citation(row.evidence_id)), trace: { ...lexical.trace, vector: { state: 'ready', note: '本地中文语义与关键词合并检索；优先覆盖不同资料来源，引用已核验。' } } };
   }
   import(input: KnowledgeImport) {
     const request = z.object({ title: z.string().trim().min(1).max(300), text: z.string().min(1).max(2000000), locator: z.string().min(1).max(2000), sourceHash: z.string().regex(/^[a-f0-9]{64}$/), category: z.string().trim().max(100).default(''), sourceMethod: z.string().optional(), origin: z.enum(['local', 'bilibili-subtitle', 'bilibili-discussion']).default('local'), expectedGeneration: z.string().nullable().optional() }).parse(input);
@@ -134,19 +136,31 @@ export class NativeKnowledgeStore {
     if (entry.generation_id !== row.generation_id || entry.source_revision_id !== row.source_revision_id || sha(row.content) !== row.digest) throw new Error('引用来源已改变，请重新检索');
     return { bvid: row.source_id, title: entry.title, content: row.content, evidence_id: row.evidence_id, digest: row.digest, generation_id: row.generation_id, source_revision_id: row.source_revision_id, chunkIndex: row.chunk_index, locator: row.locator };
   }
+  private diverse<T extends {source_id:string}>(hits:T[],limit:number){
+    const bySource=new Map<string,T[]>();for(const hit of hits){const bucket=bySource.get(hit.source_id)||[];bucket.push(hit);bySource.set(hit.source_id,bucket)}
+    const result:T[]=[]
+    for(let round=0;result.length<limit;round++){let added=false;for(const bucket of bySource.values()){const hit=bucket[round];if(hit){result.push(hit);added=true;if(result.length===limit)break}}if(!added)break}
+    return result
+  }
   search(query: string, ids?: string[]): KnowledgeSearch {
     z.string().trim().min(1).max(2000).parse(query); ids?.forEach(id => sourceId.parse(id));
-    const terms = [...new Set(query.trim().toLowerCase().split(/[\s,，。;；?？!！]+/).filter(Boolean))].slice(0, 30);
+    const terms = [...new Set(query.trim().toLowerCase().split(/[\s,，。;；?？!！]+/).flatMap(part=>{
+      if(!part)return []
+      if(!/[\p{Script=Han}]/u.test(part))return [part]
+      const characters=Array.from(part),result=[part]
+      for(const size of [2,3])for(let index=0;index+size<=characters.length;index++)result.push(characters.slice(index,index+size).join(''))
+      return result
+    }))].slice(0, 30);
     if (!terms.length) return { hits: [], trace: { keyword: { verified: 0 } } };
     const longTerms = terms.filter(term => Array.from(term).length >= 3);
     const condition = terms.map(() => 'instr(lower(content),?)>0').join(' OR ');
     const scope = ids ? ids.length ? ' AND source_id IN (' + ids.map(() => '?').join(',') + ')' : ' AND 0' : '';
     const match = longTerms.map(term => '"' + term.replaceAll('"', '""') + '"').join(' OR ');
     const candidates = longTerms.length === terms.length
-      ? this.db.prepare(`SELECT evidence_id,content FROM native_chunks WHERE rowid IN (SELECT rowid FROM native_chunks_fts WHERE native_chunks_fts MATCH ?) AND chunk_index>=0${scope} LIMIT 500`).all(match, ...(ids || [])) as { evidence_id: string; content: string }[]
-      : this.db.prepare(`SELECT evidence_id,content FROM native_chunks WHERE chunk_index>=0 AND (${condition})${scope} LIMIT 500`).all(...terms, ...(ids || [])) as { evidence_id: string; content: string }[];
+      ? this.db.prepare(`SELECT evidence_id,source_id,content FROM native_chunks WHERE rowid IN (SELECT rowid FROM native_chunks_fts WHERE native_chunks_fts MATCH ?) AND chunk_index>=0${scope} LIMIT 500`).all(match, ...(ids || [])) as { evidence_id: string;source_id:string; content: string }[]
+      : this.db.prepare(`SELECT evidence_id,source_id,content FROM native_chunks WHERE chunk_index>=0 AND (${condition})${scope} LIMIT 500`).all(...terms, ...(ids || [])) as { evidence_id: string;source_id:string; content: string }[];
     candidates.sort((a, b) => terms.filter(term => b.content.toLowerCase().includes(term)).length - terms.filter(term => a.content.toLowerCase().includes(term)).length);
-    const hits = candidates.slice(0, 8).map(row => this.citation(row.evidence_id));
+    const hits = this.diverse(candidates,8).map(row=>this.citation(row.evidence_id));
     return { hits, trace: { keyword: { verified: hits.length }, vector: { state: 'not_built', note: '本次使用当前版本的关键词检索。' } } };
   }
   organize(items: { id: string; generation: string }[], target: string) {
@@ -161,7 +175,7 @@ export class NativeKnowledgeStore {
       return { changed, unchanged, failures: [] };
     }).immediate();
   }
-  delete(id: string) { sourceId.parse(id); const changed = this.db.prepare('DELETE FROM native_sources WHERE id=?').run(id).changes; return { deleted: !!changed }; }
+  delete(id: string, generation:string) { sourceId.parse(id);z.string().min(1).parse(generation);return this.db.transaction(()=>{const entry=this.get(id);if(!entry||entry.generation_id!==generation)throw new Error('资料版本已更新，请刷新后再确认删除');const changed=this.db.prepare('DELETE FROM native_sources WHERE id=? AND generation=?').run(id,generation).changes;if(changed!==1)throw new Error('资料版本已更新，请刷新后再确认删除');return {deleted:true,generation_id:generation}}).immediate(); }
   rebuild() { this.db.prepare("INSERT INTO native_chunks_fts(native_chunks_fts) VALUES('rebuild')").run(); this.db.exec('REINDEX native_chunk_source'); return { rebuilt: true, ...this.list().stats }; }
 
   async importLegacyBaseline() {

@@ -5,7 +5,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { RuntimeFile, RuntimeManifest } from '../src/shared/runtime.ts';
 
-const catalog = [['knowledge', '知识库、研究与通讯后台', 'knowledge'], ['asr', '离线字幕模型', 'asr'], ['codex', 'Codex 与 DeepSeek 连接', 'codex'], ['video', '视频下载与处理工具', 'video']] as const;
+const catalog = [['knowledge', '知识库、研究与通讯后台', 'knowledge'], ['asr', '离线字幕模型', 'asr'], ['video', '视频下载与处理工具', 'video']] as const;
 function included(id:string,path:string){if(id==='knowledge')return path.startsWith('onnx-bge/')||['vendor/NapCat.Shell.Windows.Node.zip','BiliSum-LICENSE'].includes(path);if(id==='asr')return path.startsWith('onnx-small/');if(id==='video')return ['ffmpeg.exe','ffprobe.exe','LICENSE-ffmpeg-static.txt','LICENSE-ffprobe.txt'].includes(path);return !/\.(?:py|pyc)$/i.test(path)}
 export async function generate(root: string): Promise<RuntimeManifest> {
   const pkg = JSON.parse(await readFile(join(root, 'package.json'), 'utf8')) as { version: string };

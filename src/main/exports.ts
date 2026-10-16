@@ -1,9 +1,21 @@
-import { BrowserWindow } from 'electron'
+import { BrowserWindow, app } from 'electron'
 import { writeFile, rm } from 'node:fs/promises'
 import { Document, Packer, Paragraph, TextRun } from 'docx'
 import type { LectureDetail } from '../shared/types'
+import type { Course } from '../shared/types'
+import { buildCourseEvidenceBundle, courseEvidenceMarkdown } from '../shared/course-evidence'
 import { time } from '../shared/srt'
 import { reserveFile } from './library'
+export const exportFormats = {
+  subtitles: ['srt', 'txt'],
+  notes: ['md', 'docx'],
+  practice: ['md', 'docx', 'pdf'],
+  'evidence-bundle': ['json', 'md']
+} as const
+export type ExportKind = keyof typeof exportFormats
+export function validateExportFormat(kind:ExportKind,format:string) {
+  if(!exportFormats[kind].some(candidate=>candidate===format))throw new Error('不支持的导出格式')
+}
 export function markdown(detail:LectureDetail,kind:'notes'|'practice'):string {
   const out=[`# ${detail.lecture.title} · ${kind==='notes'?'听课笔记':'课后练习'}`,'']
   if(kind==='notes') {
@@ -17,16 +29,17 @@ export function markdown(detail:LectureDetail,kind:'notes'|'practice'):string {
   }
   return out.join('\n')
 }
-export async function exportFile(detail:LectureDetail,kind:'subtitles'|'notes'|'practice',format:string,directory:string) {
-  const allowed=kind==='subtitles'?['srt','txt']:kind==='notes'?['md','docx']:['md','docx','pdf']
-  if(!allowed.includes(format))throw new Error('不支持的导出格式')
+export async function exportFile(detail:LectureDetail,kind:ExportKind,format:string,directory:string,course?:Course) {
+  validateExportFormat(kind,format)
   const filename=detail.lecture.title.replace(/[<>:"/\\|?*]/g,'_')
   if(kind==='subtitles'&&!detail.segments.length)throw new Error('没有字幕可导出')
-  const text=kind==='subtitles'?'':markdown(detail,kind)
+  if(kind==='evidence-bundle'&&!course)throw new Error('缺少课程元信息，无法导出课程学习证据包')
+  const bundle=kind==='evidence-bundle'?buildCourseEvidenceBundle(course!,detail,new Date().toISOString(),app.getVersion()):undefined
+  const text=kind==='subtitles'?'':kind==='evidence-bundle'?format==='md'?courseEvidenceMarkdown(bundle!):JSON.stringify(bundle,null,2):markdown(detail,kind)
   const path=await reserveFile(directory,`${filename}-${kind}.${format}`)
   try {
   if(kind==='subtitles'){await writeFile(path,format==='srt'?detail.srt:detail.segments.map(s=>`[${time(s.start,false)}] ${s.text}`).join('\n'),'utf8');return path}
-  if(format==='md')await writeFile(path,text,'utf8')
+  if(format==='md'||format==='json')await writeFile(path,text,'utf8')
   else if(format==='docx') {
     const doc=new Document({sections:[{properties:{},children:text.split('\n').map(line=>new Paragraph({children:[new TextRun({text:line.replace(/^#{1,3} /,''),bold:line.startsWith('#'),size:line.startsWith('# ')?32:22})],spacing:{after:120}}))}]})
     await writeFile(path,await Packer.toBuffer(doc))

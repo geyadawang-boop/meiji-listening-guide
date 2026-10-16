@@ -1,6 +1,5 @@
 import { StudyIcon } from './StudyIcon';
-import { CodexSettings } from './CodexSettings';
-import { DeepSeekSettings } from './DeepSeekSettings';
+import { QwenSettings } from './QwenSettings';
 import { useEffect, useState } from 'react';
 import type { CourseFile, Detail, LectureNotes, PastQuestion, Settings } from '../../shared/types';
 import { invoke, Modal, FilePicker } from './UiParts';
@@ -21,7 +20,7 @@ export function NewLecture({ draft, pptDraft, close, create, busy, courseId }: {
     busy: boolean;
 }) {
     const [title, setTitle] = useState(''), [original, setOriginal] = useState(draft ? [draft] : []), [ppt, setPpt] = useState<string[]>(pptDraft ? [pptDraft] : []);
-    return <Modal title="新建课次" close={close}><form onSubmit={e => { e.preventDefault(); void create(title, original[0], ppt[0] || ''); }}><label>课次标题<input autoFocus required value={title} onChange={e => setTitle(e.target.value)} placeholder="第 1 讲"/></label><FilePicker courseId={courseId} transcript label="语音识别原文（必选）" paths={original} set={p => setOriginal(p.slice(-1))}/><FilePicker courseId={courseId} courseware label="PPT/课件" paths={ppt} set={p => setPpt(p.slice(-1))}/><p className="hint">支持智云原文 Word、TXT、Markdown、SRT。导入 PPTX 后，由 Codex 按需读取页面文字与原始图片，结合语音原文校订，无需单独逐页识别。</p><footer><button type="button" onClick={close}>取消</button><button className="primary" disabled={busy || !title.trim() || !original.length}>添加课次</button></footer></form></Modal>;
+    return <Modal title="新建课次" close={close}><form onSubmit={e => { e.preventDefault(); void create(title, original[0], ppt[0] || ''); }}><label>课次标题<input autoFocus required value={title} onChange={e => setTitle(e.target.value)} placeholder="第 1 讲"/></label><FilePicker courseId={courseId} transcript label="语音识别原文（必选）" paths={original} set={p => setOriginal(p.slice(-1))}/><FilePicker courseId={courseId} courseware label="PPT/课件" paths={ppt} set={p => setPpt(p.slice(-1))}/><p className="hint">支持智云原文 Word、TXT、Markdown、SRT。导入 PPTX 后，软件先在本地提取页面文字与嵌入图片，再交给千问结合语音原文分批校订。</p><footer><button type="button" onClick={close}>取消</button><button className="primary" disabled={busy || !title.trim() || !original.length}>添加课次</button></footer></form></Modal>;
 }
 export function AddTranscript({ courseId, draft, close, save, busy }: {
     courseId: string;
@@ -41,7 +40,7 @@ export function AddCourseware({ draft, close, busy, save, courseId }: {
     save: (path: string) => Promise<boolean>;
 }) {
     const [paths, setPaths] = useState<string[]>(draft ? [draft] : []);
-    return <Modal title="添加 PPT/课件" close={close}><form onSubmit={e => { e.preventDefault(); void save(paths[0]); }}><FilePicker courseId={courseId} courseware label="选择或拖入 PPT/课件" paths={paths} set={p => setPaths(p.slice(-1))}/><p className="hint">课件保存到 PPT 文件夹并关联当前课次。每个课次保留一份当前课件，新添加会替换关联，旧文件仍保留。Codex 按需读取 PPTX 的页面文字和原始图片，与语音原文一起校订。旧 PPT 请另存为 PPTX；PDF 目前读取文字内容。</p><footer><button type="button" onClick={close}>取消</button><button className="primary" disabled={busy || !paths.length}>添加课件</button></footer></form></Modal>;
+    return <Modal title="添加 PPT/课件" close={close}><form onSubmit={e => { e.preventDefault(); void save(paths[0]); }}><FilePicker courseId={courseId} courseware label="选择或拖入 PPT/课件" paths={paths} set={p => setPaths(p.slice(-1))}/><p className="hint">课件保存到 PPT 文件夹并关联当前课次。每个课次保留一份当前课件，新添加会替换关联，旧文件仍保留。软件先在本地提取 PPTX 页面文字与嵌入图片，再交给千问结合语音原文分批校订。旧 PPT 请另存为 PPTX；PDF 目前读取文字内容。</p><footer><button type="button" onClick={close}>取消</button><button className="primary" disabled={busy || !paths.length}>添加课件</button></footer></form></Modal>;
 }
 export function Notes({ notes, jump, save, disabled }: {
     notes: LectureNotes;
@@ -100,14 +99,14 @@ export function SettingsPanel({ onZhiyunLogin, initial, error, close, save, busy
     busy: boolean;
     task: (fn: () => Promise<unknown>) => Promise<boolean>;
 }) {
-    const [value, setValue] = useState(initial), [prompt, setPrompt] = useState('correction'), [section, setSection] = useState(initial.connection === 'deepseek' ? 'deepseek' : 'api'), [saved, setSaved] = useState(false);
+    const [value, setValue] = useState(initial), [prompt, setPrompt] = useState('correction'), [section, setSection] = useState('qwen'), [saved, setSaved] = useState(false);
     const update = (patch: Partial<Settings>) => { setValue(v => ({ ...v, ...patch })); setSaved(false); };
     useEffect(() => { setValue(initial); }, [initial]);
-    useEffect(() => onApiVisible(section === 'api' || section === 'deepseek'), [section, onApiVisible]);
-    const navigation = <>{[['api', 'ChatGPT 账号'], ['deepseek', 'DeepSeek API'], ['search', '搜索与主题'], ['prompts', '提示词']].map(([id, name]) => <button className={section === id ? 'active' : ''} key={id} onClick={() => setSection(id)}>{name}</button>)}</>;
-    if (section === 'api' || section === 'deepseek')
-        return <div className="model-settings-window" style={{ right: rightWidth }} role="dialog" aria-modal="true" aria-label="设置">{section === 'deepseek' ? <DeepSeekSettings value={value} update={update} busy={busy} close={close} save={() => void save({ ...value, connection: 'deepseek', activeProfile: (value.profiles.find(p => p.id === value.activeProfile && p.provider === 'deepseek') || value.profiles.find(p => p.provider === 'deepseek'))?.id || '' }).then(ok => setSaved(ok))} navigation={navigation}/> : <CodexSettings value={value} update={update} busy={busy} close={close} save={() => void save({ ...value, connection: 'codex' }).then(ok => setSaved(ok))} navigation={navigation}/>} {error && <p className="alert">{error}</p>}{saved && <p role="status">已保存</p>}</div>;
-    return <Modal title="设置" close={close}><div className="tabs">{[['api', 'Codex 账号'], ['deepseek', 'DeepSeek API'], ['search', '搜索与主题'], ['prompts', '提示词']].map(([id, name]) => <button key={id} className={section === id ? 'active' : ''} onClick={() => setSection(id)}>{name}</button>)}</div>
+    useEffect(() => onApiVisible(section === 'qwen'), [section, onApiVisible]);
+    const navigation = <>{[['qwen', '通义千问'], ['search', '搜索与主题'], ['prompts', '提示词']].map(([id, name]) => <button className={section === id ? 'active' : ''} key={id} onClick={() => setSection(id)}>{name}</button>)}</>;
+    if (section === 'qwen')
+        return <div className="model-settings-window" style={{ right: rightWidth }} role="dialog" aria-modal="true" aria-label="设置"><QwenSettings value={value} update={update} busy={busy} close={close} onSection={setSection} save={() => void save({ ...value, connection: 'qwen' }).then(ok => setSaved(ok))}/>{error && <p className="alert">{error}</p>}{saved && <p role="status">已保存</p>}</div>;
+    return <Modal title="设置" close={close}><div className="tabs">{[['qwen', '通义千问'], ['search', '搜索与主题'], ['prompts', '提示词']].map(([id, name]) => <button key={id} className={section === id ? 'active' : ''} onClick={() => setSection(id)}>{name}</button>)}</div>
     {section === 'search' && <><label>Tavily 搜索 API Key<input type="password" autoComplete="off" value={value.searchKey || ''} placeholder={value.hasSearchKey ? '已加密保存；留空保持原密钥' : '未配置时显示拓展题差额'} onChange={e => update({ searchKey: e.target.value || undefined })}/></label><label>主题<select value={value.theme} onChange={e => update({ theme: e.target.value as Settings['theme'] })}><option value="light">浅色</option><option value="dark">深色</option></select></label></>}
     {section === 'prompts' && <><select value={prompt} onChange={e => setPrompt(e.target.value)}>{Object.keys(value.prompts).filter(p => p !== 'subtitles').map(p => <option key={p} value={p}>{({ subtitles: '旧字幕提示词', correction: '原文与 PPT 校订', notes: '教师重点', 'past-exam': '历年卷拆题', match: '真题匹配', search: '网上题抽取', answer: '参考解析', chat: '课程追问' } as Record<string, string>)[p] || p}</option>)}</select><textarea className="prompt-editor" value={value.prompts[prompt]} onChange={e => update({ prompts: { ...value.prompts, [prompt]: e.target.value } })}/></>}
     <footer>{error && <div className="alert" role="alert">{error}</div>}<span className="hint" role="status">{saved ? '已保存' : ''}</span><button className="primary" disabled={busy} onClick={() => void save(value).then(ok => setSaved(ok))}>保存设置</button></footer>

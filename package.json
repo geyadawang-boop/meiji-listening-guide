@@ -103,15 +103,6 @@
         ]
       },
       {
-        "from": "resources/codex",
-        "to": "codex",
-        "filter": [
-          "**/*",
-          "!**/__pycache__/**",
-          "!**/*.pyc"
-        ]
-      },
-      {
         "to": "icon.png",
         "from": "resources/icon.png",
         "filter": [

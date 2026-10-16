@@ -24,7 +24,7 @@ export class NativeKnowledgeService {
       case 'import': return this.store.import(z.object({ title: z.string(), text: z.string(), locator: z.string(), sourceHash: z.string(), category: z.string().optional(), sourceMethod: z.string().optional(), origin: z.string().optional(), expectedGeneration: z.string().nullable().optional() }).parse(args));
       case 'read': return this.store.read(z.string().parse(args.id));
       case 'citation': return this.store.citation(z.string().parse(args.evidenceId));
-      case 'delete': return this.store.delete(z.string().parse(args.id));
+      case 'delete': return this.store.delete(z.string().parse(args.id),z.string().min(1).parse(args.generation));
       case 'organize': { const value = z.object({ items: z.array(z.object({ id: z.string(), generation: z.string() })), target: z.string() }).parse(args); return this.store.organize(value.items, value.target); }
       case 'classification-options': return nativeClassificationOptions;
       case 'classification-read': return this.store.classificationRead(z.string().parse(args.id));

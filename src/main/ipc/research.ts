@@ -10,7 +10,7 @@ export function createResearchHandler(context: Pick<ApplicationContext, "api" | 
             switch (action) {
                 case 'tools:request': {
                     const action = z.enum(['note-preview', 'note-save', 'notes', 'note-read', 'note-revise', 'note-lifecycle', 'note-source', 'note-export', 'conversations', 'conversation-create', 'conversation-read', 'conversation-organization', 'conversation-organize', 'memories', 'memory-change', 'memory-accept', 'im', 'overview', 'workflow-create', 'workflow-action', 'workflow-export', 'materials', 'extension-change', 'skill-markdown', 'mcp-change', 'mcp-discover', 'agent-create', 'agent-read', 'agent-stop', 'agent-export']).parse(object.action);
-                    await toolsBackend.request('configure', { connection: visualConnection(), model: (settings.get().connection||'codex') === 'codex' ? 'Codex' : settings.get().profiles.find(item=>item.id===settings.get().activeProfile)?.model||'未配置' });
+                    await toolsBackend.request('configure', { connection: visualConnection(), model: settings.get().profiles.find(item=>item.id===settings.get().activeProfile)?.model||'未配置' });
                     return toolsBackend.request(action, object.args || {});
                 }
                 case 'tools:skill-open': {

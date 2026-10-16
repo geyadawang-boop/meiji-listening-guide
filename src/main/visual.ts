@@ -26,7 +26,7 @@ export class VisualTasks{
   z.string().regex(/^[a-f0-9]{32}$/).parse(id);const task:VisualTask=JSON.parse(await readFile(join(this.root,id+'.json'),'utf8'))
   if(task.id!==id||task.connection!==connection)throw new Error('识别连接已有改变，请用当前配置新建任务；旧成果保留')
   if(!task.frames.length)throw new Error('请先完成画面提取')
-  if(task.output){if(await fileDigest(task.output)!==task.outputHash)throw new Error('识别成果已改变，保留当前文件，请重新建立任务');if(!task.cleaned){await this.media.request('visual-cleanup',{id});task.cleaned=true;await this.save(task)}return task}
+  if(task.output&&await fileDigest(task.output)!==task.outputHash)throw new Error('识别成果已改变，保留当前文件，请重新建立任务')
   const current=async()=>{if(await fileDigest(task.source)!==task.sourceHash)throw new Error('源文件已经改变，请新建画面识别任务')}
   await current()
   for(const [index,frame] of task.frames.entries()){
@@ -36,10 +36,14 @@ export class VisualTasks{
    catch(reason){signal.throwIfAborted();frame.status='失败';frame.error=reason instanceof Error?reason.message:String(reason)}
    await this.save(task)
   }
-  if(task.frames.every(frame=>frame.status==='已完成')){
-   await current();const text=`# 画面文字与内容\n\n来源：${task.source}\n源文件 SHA256：${task.sourceHash}\n\n仅识别所选的 ${task.frames.length} 个画面，不代表视频全部内容。\n\n`+task.frames.map(frame=>`## ${Math.floor(frame.time/60)}:${Math.floor(frame.time%60).toString().padStart(2,'0')}\n\n${frame.text}\n\n画面 SHA256：${frame.hash}`).join('\n\n')
-   const output=join(this.root,task.id+'-画面识别.md');try{await writeFile(output,text,{encoding:'utf8',flag:'wx'})}catch(error){if((error as NodeJS.ErrnoException).code!=='EEXIST')throw error;if(await readFile(output,'utf8')!==text)throw new Error('已有识别成果被修改，保留当前文件')}if(await readFile(output,'utf8')!==text)throw new Error('画面成果保存核验失败');task.output=output;task.outputHash=digest(text);await this.save(task);await this.media.request('visual-cleanup',{id});task.cleaned=true;await this.save(task)
-  }
+  await current()
+  const failed=task.frames.filter(frame=>frame.status!=='已完成'),gapText=task.gaps.length?task.gaps.map(gap=>`- ${JSON.stringify(gap)}`).join('\n'):'- 提取器没有报告缺口；稀疏采样仍不代表识别了未选取的时段。'
+  const text=`# 画面文字与内容\n\n来源：${task.source}\n源文件 SHA256：${task.sourceHash}\n总时长：${task.duration.toFixed(2)} 秒\n\n仅识别所选的 ${task.frames.filter(frame=>frame.status==='已完成').length}/${task.frames.length} 个画面，不代表视频全部内容。\n\n## 抽样缺口\n\n${gapText}\n\n## 识别结果\n\n`+task.frames.map(frame=>`### ${Math.floor(frame.time/60)}:${Math.floor(frame.time%60).toString().padStart(2,'0')} · ${frame.status}\n\n${frame.status==='已完成'?frame.text:`未得到可用识别结果：${frame.error||'仍待处理'}`}\n\n画面 SHA256：${frame.hash}`).join('\n\n')+`\n\n## 未完成项目\n\n${failed.length?failed.map(frame=>`- ${Math.floor(frame.time/60)}:${Math.floor(frame.time%60).toString().padStart(2,'0')}：${frame.error||'仍待处理'}`).join('\n'):'- 无'}`
+  const output=join(this.root,task.id+'-画面识别.md')
+  if(task.output){if(await fileDigest(output)!==task.outputHash)throw new Error('识别成果已改变，保留当前文件');await writeFile(output,text,'utf8')}
+  else try{await writeFile(output,text,{encoding:'utf8',flag:'wx'})}catch(error){if((error as NodeJS.ErrnoException).code!=='EEXIST')throw error;throw new Error('已有识别成果文件，保留当前文件')}
+  if(await readFile(output,'utf8')!==text)throw new Error('画面成果保存核验失败');task.output=output;task.outputHash=digest(text);await this.save(task)
+  if(!failed.length){await this.media.request('visual-cleanup',{id});task.cleaned=true;await this.save(task)}
   return task
  }
 }
