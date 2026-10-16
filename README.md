@@ -14,7 +14,7 @@ npm run dev
 npm run build
 ```
 
-resources 只包含独立 ONNX 模型、Codex 连接组件、NapCat Node 组件和 FFmpeg/FFprobe 及其许可证。它们是必要第三方资源，不能以 TypeScript 源码代替二进制或权重。源码包不含这些大型文件，需恢复同版本组件。PDF 由应用原生 TypeScript 库处理，不需要 Python。
+resources 包含独立 ONNX 模型、NapCat Node 组件和 FFmpeg/FFprobe 及其许可证。它们是必要第三方资源，不能以 TypeScript 源码代替二进制或权重。源码包不含这些大型文件，需恢复同版本组件。PDF 由应用原生 TypeScript 库处理，不需要 Python。
 
 ## 检查
 
@@ -37,7 +37,7 @@ node scripts/source-package.mts
 node scripts/restore-runtime.mts knowledge 同版本组件文件夹
 ```
 
-portable 为完整目录，full 为完整安装包，lite 为不含可选离线组件的应用，components 为同版本组件。组件恢复逐文件核对大小、SHA256 和版本，不覆盖改动过的文件；其它组件编号为 asr、codex、video。完整发布须重建 EXE，不能只修改 ASAR。实际安装后验证版本、原生后台、运行资源及课程资料不变后才能清理回退文件。
+portable 为完整目录，full 为完整安装包，lite 为不含可选离线组件的应用，components 为同版本组件。组件恢复逐文件核对大小、SHA256 和版本，不覆盖改动过的文件；组件编号为 knowledge、asr、video。完整发布须重建 EXE，不能只修改 ASAR。实际安装后验证版本、原生后台、运行资源及课程资料不变后才能清理回退文件。
 
 ## 代码目录
 
@@ -51,7 +51,7 @@ portable 为完整目录，full 为完整安装包，lite 为不含可选离线�
 | resources | 原生运行组件及离线模型，不含 Python 或 yt-dlp |
 | 历史参考 | 迁移前源码及一次性旧维护脚本的压缩归档，不能作为应用运行入口 |
 
-out 中的 JavaScript 是 TypeScript 的编译产物；第三方 npm 包、WASM、DLL、FFmpeg、Electron、Codex 和模型并非本项目自写语言迁移对象。HTML 是 React 的挂载入口，CSS 是界面样式。
+out 中的 JavaScript 是 TypeScript 的编译产物；第三方 npm 包、WASM、DLL、FFmpeg、Electron 和模型并非本项目自写语言迁移对象。HTML 是 React 的挂载入口，CSS 是界面样式。
 
 ## 资料与登录保护
 

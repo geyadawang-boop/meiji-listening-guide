@@ -21,7 +21,7 @@ export class Workflows {
     }
   }
   private coursewareImages(images:{label:string;url:string}[],ppt:string,context:string,batchIndex:number,batchCount:number){
-    if(!images.length)return []
+    if(!images.length)return {images:[] as {label:string;url:string}[],omissions:[] as string[]}
     const pages=new Map<number,string>()
     for(const match of ppt.matchAll(/\[第\s*(\d+)\s*页\]\n([\s\S]*?)(?=\n\s*\[第\s*\d+\s*页\]|$)/g))pages.set(Number(match[1]),match[2])
     const grams=(value:string)=>{
@@ -39,9 +39,14 @@ export class Workflows {
     }).sort((a,b)=>b.score-a.score||a.index-b.index)
     const chosen=ranked.filter(item=>item.score>0).slice(0,3)
     if(!chosen.length){const center=Math.min(images.length-1,Math.floor((batchIndex+.5)*images.length/Math.max(1,batchCount)));chosen.push(...ranked.slice(Math.max(0,center-1),center+2))}
-    const result:{label:string;url:string}[]=[];let bytes=0
-    for(const item of chosen.sort((a,b)=>a.index-b.index)){if(item.bytes>900_000||bytes+item.bytes>1_800_000)continue;result.push(item.image);bytes+=item.bytes}
-    return result
+    const result:{label:string;url:string}[]=[],omissions:string[]=[];let bytes=0
+    for(const item of chosen.sort((a,b)=>a.index-b.index)){
+      const page=/第\s*(\d+)\s*页/.exec(item.image.label)?.[1]||'?'
+      if(item.bytes>900_000){omissions.push(`第 ${page} 页嵌入图片因单张请求预算 ${item.bytes}/900000 字节超限，未附加`);continue}
+      if(bytes+item.bytes>1_800_000){omissions.push(`第 ${page} 页嵌入图片因本批剩余请求预算 ${1_800_000-bytes} 字节不足（图片 ${item.bytes} 字节），未附加`);continue}
+      result.push(item.image);bytes+=item.bytes
+    }
+    return {images:result,omissions}
   }
   async splitExam(courseId:string,fileId:string,signal?:AbortSignal) {
     const file=this.store.detail(courseId).files.find(f=>f.id===fileId && f.kind==='past_exam')
@@ -91,10 +96,12 @@ export class Workflows {
         }
         let corrected:ReturnType<typeof validate>|undefined
         const lectureContext=source.segments.slice(Math.max(0,i-30),Math.min(source.segments.length,i+block.length+30)).map((s,j)=>({id:Math.max(0,i-30)+j,text:s.text}))
-        const images=this.coursewareImages(courseware.images,ppt,block.map(s=>s.text).join('\n')+'\n'+lectureContext.map(s=>s.text).join('\n'),Math.floor(i/batchSize),Math.ceil(source.segments.length/batchSize))
+        const selection=this.coursewareImages(courseware.images,ppt,block.map(s=>s.text).join('\n')+'\n'+lectureContext.map(s=>s.text).join('\n'),Math.floor(i/batchSize),Math.ceil(source.segments.length/batchSize)),images=selection.images
+        const batchLimitations=[...modelLimitations,...selection.omissions]
         if(images.length)report('结合课件页面',`字幕批次 ${Math.floor(i/batchSize)+1} 附带 ${images.length} 张本地择取的页面原图`)
+        if(selection.omissions.length)report('课件图片受限',`字幕批次 ${Math.floor(i/batchSize)+1}：${selection.omissions.join('；')}`)
         for(let attempt=0;attempt<3;attempt++){
-          try{corrected=await this.api.json(prompt,{courseware:extracted,coursewareLimitations:modelLimitations,lectureContext,instructions:'结合课件文字、附加页面图片与相邻原文理解当前批次。扫描 PDF 或没有提取到的图表内容不可猜测。rows 是必须逐条返回的记录；lectureContext 仅作局部上下文，不要额外返回。',rows:block.map((s,j)=>({id:i+j,text:s.text}))},validate,signal,undefined,images.length?{images}:undefined);break}
+          try{corrected=await this.api.json(prompt,{courseware:extracted,coursewareLimitations:batchLimitations,lectureContext,instructions:'结合课件文字、附加页面图片与相邻原文理解当前批次。扫描 PDF 或没有提取到的图表内容不可猜测；limitations 说明未附加的页面及原因。rows 是必须逐条返回的记录；lectureContext 仅作局部上下文，不要额外返回。',rows:block.map((s,j)=>({id:i+j,text:s.text}))},validate,signal,undefined,images.length?{images}:undefined);break}
           catch(error){
             if(signal?.aborted)throw error
             const message=error instanceof Error?error.message:String(error)
@@ -122,10 +129,17 @@ export class Workflows {
     if(!detail.segments.length)throw new Error('请先生成或导入完整字幕')
     const result:LectureNotes={keyPoints:[],notTested:[],uncertain:[]}
     const full=detail.segments.map(s=>`[${time(s.start,false)}] ${s.text}`).join('\n')
-      const parts=chunks(full,16000)
+    const coursewareText=detail.lecture.ppt_text,limitationMarker='[课件提取限制]',markerIndex=coursewareText.lastIndexOf(limitationMarker)
+    let courseware=markerIndex>=0?coursewareText.slice(0,markerIndex).trimEnd():coursewareText
+    const limitations=markerIndex>=0?coursewareText.slice(markerIndex+limitationMarker.length).split(/\r?\n/).map(line=>/^\s*-\s*(.+)$/.exec(line)?.[1]?.trim()).filter((line):line is string=>!!line):[]
+    if(/^\[扫描 PDF[：:]/.test(courseware)){limitations.push('课件为扫描 PDF，未执行 OCR。')}
+    if(courseware.length>12000){courseware=courseware.slice(0,12000);limitations.push('用于笔记生成的课件文字超过 12,000 字，仅发送开头部分。');this.progress({lectureId,stage:'课件文字受限',message:'笔记请求的课件文字限于前 12,000 字；已将截断情况告知模型'})}
+    const coursewareLimitations=[...new Set(limitations)]
+    if(coursewareLimitations.length)this.progress({lectureId,stage:'课件提取限制',message:coursewareLimitations.join('；')})
+    const parts=chunks(full,16000)
     for(let i=0;i<parts.length;i++) {
       this.progress({lectureId,stage:'重点笔记',message:parts.length===1?'结合全课字幕一次提取教师重点、不考与含糊表态':`提取教师明确表态 ${i+1}/${parts.length}`})
-      const notes=await this.api.json(this.settings.prompt('notes'),{subtitles:parts[i],courseware:detail.lecture.ppt_text.slice(0,12000),coursewareLimitations:detail.lecture.ppt_text.startsWith('[扫描 PDF：')?'课件为扫描 PDF，未执行 OCR。':''},v=>notesSchema.parse(v),signal)
+      const notes=await this.api.json(this.settings.prompt('notes'),{subtitles:parts[i],courseware,coursewareLimitations},v=>notesSchema.parse(v),signal)
       result.keyPoints.push(...notes.keyPoints);result.notTested.push(...notes.notTested);result.uncertain!.push(...notes.uncertain)
     }
     const dedupe=<T extends {quote:string;timestamp:string}>(items:T[])=>items.filter((v,i,a)=>a.findIndex(x=>x.quote===v.quote&&x.timestamp===v.timestamp)===i)
