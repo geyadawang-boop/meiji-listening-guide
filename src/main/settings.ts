@@ -100,12 +100,22 @@ export class SettingsStore {
    activeProfile: profile.id
   }
  }
+ private requireSecureStorage() {
+  if (!safeStorage.isEncryptionAvailable()) throw new Error('系统加密存储不可用，未读取或保存密钥')
+  if (
+   process.platform === 'linux' &&
+   !['gnome_libsecret', 'kwallet', 'kwallet5', 'kwallet6'].includes(safeStorage.getSelectedStorageBackend())
+  )
+   throw new Error('系统未提供安全密钥库，未读取或保存密钥')
+ }
  private encrypt(value: string): string {
-  if (!safeStorage.isEncryptionAvailable()) throw new Error('系统加密存储不可用，未保存密钥')
+  this.requireSecureStorage()
   return safeStorage.encryptString(value).toString('base64')
  }
  private decrypt(value?: string): string {
-  return value ? safeStorage.decryptString(Buffer.from(value, 'base64')) : ''
+  if (!value) return ''
+  this.requireSecureStorage()
+  return safeStorage.decryptString(Buffer.from(value, 'base64'))
  }
  public save(settings: Settings): Settings {
   if (!(settings.maxMinutes >= 1 && settings.maxMinutes <= 60) || !(settings.maxGB > 0 && settings.maxGB <= 10))
@@ -142,6 +152,9 @@ export class SettingsStore {
    oldIdentity = old ? endpointIdentity(old) : ''
   if (!input.apiKey?.trim() && old?.encryptedKey && identity !== oldIdentity)
    throw new Error('API 地址已改变。为避免把旧密钥发送到新地址，请重新填写该地址的千问 API Key')
+  // Verify retained credentials before writing any other settings.
+  if (!input.apiKey?.trim()) this.decrypt(old?.encryptedKey)
+  if (settings.searchKey === undefined) this.decrypt(this.value.encryptedSearchKey)
   const profile: StoredProfile = {
    id,
    name,
