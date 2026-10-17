@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- macOS/Linux 的 portable 构建不再随包复制 Windows 专属可选组件，即使本地已有这些资源；Windows portable 保持原行为。
+- macOS/Linux 的 portable 构建不再随包复制 Windows 专属可选组件，即使本地已有这些资源；Windows portable 保持原行为；当前 Windows 组件包拒绝以 macOS/Linux 为目标生成。
 - 通讯凭据与会话通过主进程系统密钥库加密，保留 Windows 原格式；等待加密期间若连接或登录状态改变，会保留原记录并拒绝过期写入。
 
 - 媒体工作进程通过主进程系统密钥库保存 Cookie 和私密任务记录，保留 Windows DPAPI 格式；加密通道失败时拒绝落盘。

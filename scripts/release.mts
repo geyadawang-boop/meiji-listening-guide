@@ -34,6 +34,7 @@ const manifest: RuntimeManifest = process.argv.includes('--prepared')
 if (manifest.schema !== 1 || manifest.productVersion !== pkg.version) throw new Error('运行清单与产品版本不一致')
 const output = join(root, 'release', profile)
 if (profile === 'components') {
+ if (platform !== Platform.WINDOWS) throw new Error('当前组件包仅支持 Windows，未生成其他平台组件包')
  await mkdir(output, {recursive: true})
  for (const component of manifest.components) {
   const directory = join(output, component.id + '-' + pkg.version),
