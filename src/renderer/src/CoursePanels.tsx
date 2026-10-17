@@ -1,5 +1,5 @@
 import {StudyIcon} from './StudyIcon'
-import {QwenSettings} from './QwenSettings'
+import {QwenSettings, SettingsNavigation, type SettingsSection} from './QwenSettings'
 import {useEffect, useState} from 'react'
 import type {CourseFile, Detail, LectureNotes, PastQuestion, Settings} from '@shared/types'
 import {invoke, Modal, FilePicker} from './UiParts'
@@ -513,7 +513,7 @@ export function SettingsPanel({
 }) {
  const [value, setValue] = useState(initial),
   [prompt, setPrompt] = useState('correction'),
-  [section, setSection] = useState('qwen'),
+  [section, setSection] = useState<SettingsSection>('qwen'),
   [saved, setSaved] = useState(false)
  const update = (patch: Partial<Settings>) => {
   setValue(v => ({...v, ...patch}))
@@ -523,97 +523,95 @@ export function SettingsPanel({
   setValue(initial)
  }, [initial])
  useEffect(() => onApiVisible(section === 'qwen'), [section, onApiVisible])
- if (section === 'qwen')
-  return (
-   <div className="model-settings-window" style={{right: rightWidth}} role="dialog" aria-modal="true" aria-label="设置">
-    <QwenSettings
-     value={value}
-     update={update}
-     busy={busy}
-     close={close}
-     onSection={setSection}
-     save={() => void save({...value, connection: 'qwen'}).then(ok => setSaved(ok))}
-    />
-    {error && <p className="alert">{error}</p>}
-    {saved && <p role="status">已保存</p>}
-   </div>
-  )
  return (
-  <Modal title="设置" close={close}>
-   <div className="tabs">
-    {[
-     ['qwen', '通义千问'],
-     ['search', '搜索与主题'],
-     ['prompts', '提示词']
-    ].map(([id, name]) => (
-     <button key={id} className={section === id ? 'active' : ''} onClick={() => setSection(id)}>
-      {name}
-     </button>
-    ))}
-   </div>
-   {section === 'search' && (
+  <div className="model-settings-window" style={{right: rightWidth}} role="dialog" aria-modal="true" aria-label="设置">
+   {section === 'qwen' ? (
     <>
-     <label>
-      Tavily 搜索 API Key
-      <input
-       type="password"
-       autoComplete="off"
-       value={value.searchKey || ''}
-       placeholder={value.hasSearchKey ? '已加密保存；留空保持原密钥' : '未配置时显示拓展题差额'}
-       onChange={e => update({searchKey: e.target.value || undefined})}
-      />
-     </label>
-     <label>
-      主题
-      <select value={value.theme} onChange={e => update({theme: e.target.value as Settings['theme']})}>
-       <option value="light">浅色</option>
-       <option value="dark">深色</option>
-      </select>
-     </label>
-    </>
-   )}
-   {section === 'prompts' && (
-    <>
-     <select value={prompt} onChange={e => setPrompt(e.target.value)}>
-      {Object.keys(value.prompts)
-       .filter(p => p !== 'subtitles')
-       .map(p => (
-        <option key={p} value={p}>
-         {(
-          {
-           subtitles: '旧字幕提示词',
-           correction: '原文与 PPT 校订',
-           notes: '教师重点',
-           'past-exam': '历年卷拆题',
-           match: '真题匹配',
-           search: '网上题抽取',
-           answer: '参考解析',
-           chat: '课程追问'
-          } as Record<string, string>
-         )[p] || p}
-        </option>
-       ))}
-     </select>
-     <textarea
-      className="prompt-editor"
-      value={value.prompts[prompt]}
-      onChange={e => update({prompts: {...value.prompts, [prompt]: e.target.value}})}
+     <QwenSettings
+      value={value}
+      update={update}
+      busy={busy}
+      close={close}
+      onSection={setSection}
+      save={() => void save({...value, connection: 'qwen'}).then(ok => setSaved(ok))}
      />
+     {error && <p className="alert">{error}</p>}
+     {saved && <p role="status">已保存</p>}
     </>
+   ) : (
+    <div className="codex-settings">
+     <SettingsNavigation section={section} onSection={setSection} />
+     <section>
+      <header>
+       <h2>{section === 'search' ? '搜索与主题' : '提示词'}</h2>
+       <button onClick={close}>关闭</button>
+      </header>
+      {section === 'search' && (
+       <>
+        <label>
+         Tavily 搜索 API Key
+         <input
+          type="password"
+          autoComplete="off"
+          value={value.searchKey || ''}
+          placeholder={value.hasSearchKey ? '已加密保存；留空保持原密钥' : '未配置时显示拓展题差额'}
+          onChange={e => update({searchKey: e.target.value || undefined})}
+         />
+        </label>
+        <label>
+         主题
+         <select value={value.theme} onChange={e => update({theme: e.target.value as Settings['theme']})}>
+          <option value="light">浅色</option>
+          <option value="dark">深色</option>
+         </select>
+        </label>
+       </>
+      )}
+      {section === 'prompts' && (
+       <>
+        <select value={prompt} onChange={e => setPrompt(e.target.value)}>
+         {Object.keys(value.prompts)
+          .filter(p => p !== 'subtitles')
+          .map(p => (
+           <option key={p} value={p}>
+            {(
+             {
+              subtitles: '旧字幕提示词',
+              correction: '原文与 PPT 校订',
+              notes: '教师重点',
+              'past-exam': '历年卷拆题',
+              match: '真题匹配',
+              search: '网上题抽取',
+              answer: '参考解析',
+              chat: '课程追问'
+             } as Record<string, string>
+            )[p] || p}
+           </option>
+          ))}
+        </select>
+        <textarea
+         className="prompt-editor"
+         value={value.prompts[prompt]}
+         onChange={e => update({prompts: {...value.prompts, [prompt]: e.target.value}})}
+        />
+       </>
+      )}
+      <footer className="row">
+       {error && (
+        <div className="alert" role="alert">
+         {error}
+        </div>
+       )}
+       <span className="hint" role="status">
+        {saved ? '已保存' : ''}
+       </span>
+       <button className="primary" disabled={busy} onClick={() => void save(value).then(ok => setSaved(ok))}>
+        保存设置
+       </button>
+      </footer>
+     </section>
+    </div>
    )}
-   <footer>
-    {error && (
-     <div className="alert" role="alert">
-      {error}
-     </div>
-    )}
-    <span className="hint" role="status">
-     {saved ? '已保存' : ''}
-    </span>
-    <button className="primary" disabled={busy} onClick={() => void save(value).then(ok => setSaved(ok))}>
-     保存设置
-    </button>
-   </footer>
-  </Modal>
+  </div>
  )
 }
