@@ -10,20 +10,20 @@
   "license": "AGPL-3.0-only",
   "type": "module",
   "main": "out/main/main.js",
+  "packageManager": "pnpm@11.8.0",
   "scripts": {
     "dev": "electron-vite dev",
-    "build": "npm run typecheck && electron-vite build",
-    "typecheck": "tsc --noEmit && tsc -p tsconfig.migrations.json",
-    "rebuild": "electron-builder install-app-deps",
     "start": "electron .",
-    "pack": "npm run build && node scripts/release.mts full",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.migrations.json",
+    "build": "pnpm typecheck && electron-vite build",
     "postinstall": "electron-builder install-app-deps",
-    "release:full": "node scripts/release.mts full",
-    "release:lite": "node scripts/release.mts lite",
-    "release:lite:prepared": "node scripts/release.mts lite --prepared",
-    "release:components": "node scripts/release.mts components",
+    "pack": "pnpm build && pnpm release full",
+    "release": "node scripts/release.mts",
+    "release:source": "node scripts/source-package.mts",
     "audit:typescript": "node scripts/audit-typescript.mts --check",
-    "release:source": "node scripts/source-package.mts"
+    "check": "biome check .",
+    "check:fix": "biome check --write .",
+    "format": "biome check --write --formatter-enabled=true --linter-enabled=false ."
   },
   "dependencies": {
     "@huggingface/transformers": "4.3.1",
@@ -54,6 +54,7 @@
     "zod": "^4.1.12"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.5.15",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^24.10.0",
     "@types/react": "^19.2.0",

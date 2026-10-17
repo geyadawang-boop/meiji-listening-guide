@@ -30,20 +30,21 @@ jobs:
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: npm
+          cache: pnpm
       - name: Verify tag matches package version
         if: startsWith(github.ref, 'refs/tags/v')
         shell: bash
         run: test "v$(node -p "require('./package.json').version")" = "$GITHUB_REF_NAME"
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
       - name: Typecheck and build
-        run: npm run build
+        run: pnpm build
       - name: Package lite installers
-        run: node scripts/release.mts lite --prepared
+        run: pnpm release lite --prepared
       - name: Write SHA256SUMS
         shell: bash
         run: |
