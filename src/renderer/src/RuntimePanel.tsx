@@ -13,13 +13,18 @@ export function RuntimePanel() {
   setRefreshing(true)
   try {
    const result = await window.assistant.invoke<RuntimeStatus>('runtime:status')
-   if (current === generation.current) setData(result)
+   if (current === generation.current) {
+    setData(result)
+    setError('')
+   }
+  } catch (error) {
+   if (current === generation.current) setError(String(error))
   } finally {
    if (current === generation.current) setRefreshing(false)
   }
  }
  useEffect(() => {
-  void refresh().catch(e => setError(String(e)))
+  void refresh()
   return () => {
    generation.current++
   }
@@ -91,7 +96,7 @@ export function RuntimePanel() {
      </button>
     </article>
    ))}
-   <button disabled={busy || refreshing} onClick={() => void refresh().catch(e => setError(String(e)))}>
+   <button disabled={busy || refreshing} onClick={() => void refresh()}>
     {refreshing ? '正在校验组件…' : '刷新组件状态'}
    </button>
   </section>
