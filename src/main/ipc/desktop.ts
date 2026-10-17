@@ -109,6 +109,7 @@ export function createDesktopHandler(
     case 'runtime:status':
      return runtime.status()
     case 'runtime:install':
+     if (process.platform !== 'win32') throw new Error('运行组件目前仅支持 Windows，无法在当前平台安装')
      return job('安装运行组件', async signal => {
       if (toolsBackend.started || media.started || knowledge.started)
        throw new Error('请重启软件后先安装组件，再打开后台任务')
