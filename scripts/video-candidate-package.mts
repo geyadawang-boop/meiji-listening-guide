@@ -135,9 +135,9 @@ export async function packageVideoCandidate(value: unknown) {
   (await lstat(archive)).size > 0 && (await lstat(archive)).size <= 1024 * 1024 * 1024,
   'Candidate archive exceeds size budget'
  )
+ check((await lstat(reportPath)).size <= 4 * 1024 * 1024, 'Build report too large')
  check((await sha(archive)) === request.expectedArchiveSha256, 'Caller archive digest mismatch')
  check((await sha(reportPath)) === request.expectedBuildReportSha256, 'Caller build report digest mismatch')
- check((await lstat(reportPath)).size <= 4 * 1024 * 1024, 'Build report too large')
  const source = JSON.parse(await readFile(reportPath, 'utf8'))
  check(
   source.state === 'source_build_candidate_verified' && source.distribution_status === 'pending',
@@ -239,7 +239,16 @@ export async function packageVideoCandidate(value: unknown) {
      cwd: dirname(fileURLToPath(import.meta.url)),
      encoding: 'utf8'
     }).trim(),
-    sourceSha256: await sha(fileURLToPath(import.meta.url))
+    sourceSha256: await sha(fileURLToPath(import.meta.url)),
+    sourceHashes: Object.fromEntries(
+     await Promise.all(
+      [
+       '../src/shared/runtime-descriptor-v2.ts',
+       '../src/shared/runtime-manifest-v2.ts',
+       './media-build-source-lock.mts'
+      ].map(async path => [path, await sha(fileURLToPath(new URL(path, import.meta.url)))])
+     )
+    )
    },
    state: 'candidate_only',
    distribution_status: 'pending',
