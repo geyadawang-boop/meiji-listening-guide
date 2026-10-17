@@ -4,7 +4,9 @@ import {lstat, mkdir, readFile, realpath, rename, writeFile} from 'node:fs/promi
 import {join, resolve} from 'node:path'
 import {z} from 'zod'
 import {windowsProtect} from './windows-native'
+import type {MediaCrypt} from './media-encryption'
 import type {NativeMediaOptions} from './media-options'
+const vaultLimit = 8 * 1024 * 1024
 const key = z.string().regex(/^[a-f0-9]{32}$/)
 const profile = z
  .object({
@@ -90,10 +92,13 @@ export function parseMediaCookies(text: string, scope: string) {
  if (!rows.length || rows.length > 2000) throw new Error('没有匹配该域名且未过期的 Cookie')
  return {jar, count: rows.length, text: '# Netscape HTTP Cookie File\n' + rows.join('\n') + '\n'}
 }
-/** Current-user DPAPI vault, never a plaintext temporary cookie file. */
+/** System-encrypted vault, never a plaintext temporary cookie file. */
 export class NativeMediaAuth {
  private serial: Promise<unknown> = Promise.resolve()
- constructor(private root: string) {}
+ constructor(
+  private root: string,
+  private crypt: MediaCrypt = windowsProtect
+ ) {}
  private async path() {
   const folder = resolve(this.root, 'download-auth')
   await mkdir(folder, {recursive: true})
@@ -105,8 +110,8 @@ export class NativeMediaAuth {
   const path = await this.path()
   try {
    const info = await lstat(path)
-   if (!info.isFile() || info.isSymbolicLink() || info.size > 8 * 1024 * 1024) throw new Error('登录档案文件无效')
-   return z.record(key, profile).parse(JSON.parse(windowsProtect(await readFile(path), true).toString('utf8')))
+   if (!info.isFile() || info.isSymbolicLink() || info.size > vaultLimit) throw new Error('登录档案文件无效')
+   return z.record(key, profile).parse(JSON.parse((await this.crypt(await readFile(path), true)).toString('utf8')))
   } catch (error) {
    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return {} as Record<string, Profile>
    throw new Error('登录档案不能在当前系统用户下读取，请重新导入')
@@ -125,7 +130,9 @@ export class NativeMediaAuth {
     result = fn(rows),
     path = await this.path(),
     temporary = path + '.' + randomUUID() + '.writing'
-   await writeFile(temporary, windowsProtect(Buffer.from(JSON.stringify(rows))), {flag: 'wx'})
+   const sealed = await this.crypt(Buffer.from(JSON.stringify(rows)))
+   if (sealed.length > vaultLimit) throw new Error('登录档案加密后超过 8 MB，未保存')
+   await writeFile(temporary, sealed, {flag: 'wx'})
    await rename(temporary, path)
    return result
   })

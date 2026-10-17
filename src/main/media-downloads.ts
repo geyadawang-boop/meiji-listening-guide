@@ -1,10 +1,13 @@
 import {utilityProcess, type UtilityProcess} from 'electron'
 import {fileURLToPath} from 'node:url'
 import {z} from 'zod'
+import {mediaCryptRequest, decodeMediaCrypt} from './media-encryption'
+import {systemProtect} from './system-encryption'
 import type {BiliResources} from './bili-resources'
 import {backendRequest, BACKEND_PROTOCOL} from '../shared/backend-protocol'
 const apiPaths = ['/x/web-interface/view', '/x/player/wbi/playurl', '/x/player/v2'] as const
 const replySchema = z.discriminatedUnion('kind', [
+ mediaCryptRequest,
  z.object({
   protocol: z.literal(BACKEND_PROTOCOL),
   kind: z.literal('bili-api'),
@@ -61,11 +64,28 @@ export class NativeDownloads {
    }
    this.pending.clear()
   }
+  let lastCryptKey = 0
   worker.once('exit', fail)
   worker.on('message', (raw: unknown) => {
    void (async () => {
+    if (this.worker !== worker) return
     const reply = replySchema.parse(raw)
-    if (reply.kind === 'bili-api') {
+    if (reply.kind === 'crypt') {
+     if (reply.key <= lastCryptKey) throw new Error('系统加密请求编号无效')
+     lastCryptKey = reply.key
+     try {
+      const data = systemProtect(decodeMediaCrypt(reply.data), reply.decrypt).toString('base64')
+      if (this.worker === worker) worker.postMessage({kind: 'crypt-result', key: reply.key, ok: true, data})
+     } catch {
+      if (this.worker === worker)
+       worker.postMessage({
+        kind: 'crypt-result',
+        key: reply.key,
+        ok: false,
+        error: '系统密钥库不可用或凭据格式无效，未写入凭据'
+       })
+     }
+    } else if (reply.kind === 'bili-api') {
      const controller = new AbortController()
      this.apiCalls.add(controller)
      try {
