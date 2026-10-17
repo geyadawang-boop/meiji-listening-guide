@@ -116,7 +116,7 @@ export function QwenSettings({
   ])
  ]
  return (
-  <div className="codex-settings qwen-settings">
+  <div className="settings-layout qwen-settings">
    <SettingsNavigation section="qwen" onSection={onSection} />
    <section>
     <header>

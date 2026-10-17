@@ -255,13 +255,6 @@
  flex: none;
  background: currentColor;
 }
-.composer-brand.openai {
- mask: url("./assets/openai.svg") center / contain no-repeat;
-}
-.composer-brand.deepseek {
- background: #4d6bfe;
- mask: url("./assets/deepseek.svg") center / contain no-repeat;
-}
 .composer-brand.custom {
  background: none;
  color: var(--chat-accent);
@@ -312,9 +305,6 @@
  .composer-model-name {
   max-width: 150px;
  }
-}
-.composer-brand.openai {
- color: var(--text);
 }
 
 /* ElecKoi ModelPicker: one trigger, model/parameter tabs, explicit save. */

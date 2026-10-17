@@ -59,13 +59,13 @@ portable 为完整目录，full 为完整安装包，lite 为不含可选离线�
 | resources | 原生运行组件及离线模型，不含 Python 或 yt-dlp |
 | 历史参考 | 迁移前源码及一次性旧维护脚本的压缩归档，不能作为应用运行入口 |
 
-out 中的 JavaScript 是 TypeScript 的编译产物；第三方 npm 包、WASM、DLL、FFmpeg、Electron、Codex 和模型并非本项目自写语言迁移对象。HTML 是 React 的挂载入口，CSS 是界面样式。
+out 中的 JavaScript 是 TypeScript 的编译产物；第三方 npm 包、WASM、DLL、FFmpeg、Electron 和模型并非本项目自写语言迁移对象。HTML 是 React 的挂载入口，CSS 是界面样式。
 
 ## 资料与登录保护
 
 软件目录的「课程数据」和「资料」属于用户资料；机器登录和设置位于 userData。不要将这些目录、浏览器分区、Cookies 或真实日志上传 GitHub。发布包使用空课程库，首次运行不迁入本机旧资料。
 
-站点登录档案只读取用户主动选择的 Netscape 文件，经 Windows 当前用户 DPAPI 加密保存；仅按 Cookie 域、路径、Secure 和有效期发往所选站点，不发给 CDN、SponsorBlock 或无关站点。界面仅显示档案名与站点，不显示凭据。下载任务可加密保存任务记录，但最终媒体和用户主动保留的来源文件本身不加密。
+站点登录档案只读取用户主动选择的 Netscape 文件，经主进程系统密钥库加密保存：Windows 保留当前用户 DPAPI 格式，macOS/Linux 使用平台密钥库，密钥库不可用或 Linux 后端不安全时拒绝保存；密文不支持跨系统迁移。仅按 Cookie 域、路径、Secure 和有效期发往所选站点，不发给 CDN、SponsorBlock 或无关站点。界面仅显示档案名与站点，不显示凭据。下载任务可加密保存任务记录，但最终媒体和用户主动保留的来源文件本身不加密。
 
 旧 aria2c 任务设置会明确改用 TypeScript 原生并行分段；不调用 aria2c 或 yt-dlp。旧工作流仅查看和导出，须重新选择当前来源才能建立新任务，不能重放历史模型请求。教材批注需用户在应用内明确保存。
 
