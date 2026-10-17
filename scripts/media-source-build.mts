@@ -137,7 +137,8 @@ try {
  const configs: Record<string, string[]> = {
   x264: ['--enable-static', '--enable-pic', '--disable-cli', '--disable-opencl', '--disable-asm'],
   vpx: [
-   '--target=arm64-darwin-gcc',
+   // In libvpx 1.17, unversioned arm64-darwin selects iphoneos; darwin20+ selects macOS.
+   '--target=arm64-darwin20-gcc',
    '--enable-vp9',
    '--enable-static',
    '--disable-shared',
