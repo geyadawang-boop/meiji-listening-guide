@@ -174,6 +174,30 @@ async function inspectExtracted(base: string, expected: Map<string, {directory: 
  await visit(base, '')
  check(seen.size === expected.size, 'Extracted entry count mismatch')
 }
+async function sourceBinding() {
+ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+ return {
+  commit: execFileSync('git', ['rev-parse', 'HEAD'], {cwd: root, encoding: 'utf8'}).trim(),
+  dirty: !!execFileSync('git', ['status', '--porcelain'], {cwd: root, encoding: 'utf8'}).trim(),
+  platform: process.platform,
+  arch: process.arch,
+  osRelease: release(),
+  osProductVersion:
+   process.platform === 'darwin'
+    ? execFileSync('/usr/bin/sw_vers', ['-productVersion'], {encoding: 'utf8'}).trim()
+    : undefined,
+  sourceHashes: Object.fromEntries(
+   await Promise.all(
+    ['media-build-source-lock.mts', 'media-source-prepare.mts'].map(async file => [
+     file,
+     createHash('sha256')
+      .update(await readFile(join(root, 'scripts', file)))
+      .digest('hex')
+    ])
+   )
+  )
+ }
+}
 export async function prepareBuildSources(request: {sourceIds: string[]; offlineDirectory?: string}) {
  check(
   Object.keys(request).every(key => ['sourceIds', 'offlineDirectory'].includes(key)),
@@ -231,6 +255,7 @@ export async function prepareBuildSources(request: {sourceIds: string[]; offline
   const report = {
    schema: 1,
    state: 'sources_prepared',
+   binding: await sourceBinding(),
    tarVersion: tarVersion.trim(),
    receipts,
    pending: [
@@ -250,29 +275,10 @@ export async function prepareBuildSources(request: {sourceIds: string[]; offline
  }
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
- const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
- const binding = {
-  commit: execFileSync('git', ['rev-parse', 'HEAD'], {cwd: root, encoding: 'utf8'}).trim(),
-  dirty: !!execFileSync('git', ['status', '--porcelain'], {cwd: root, encoding: 'utf8'}).trim(),
-  platform: process.platform,
-  arch: process.arch,
-  osRelease: release(),
-  osProductVersion:
-   process.platform === 'darwin'
-    ? execFileSync('/usr/bin/sw_vers', ['-productVersion'], {encoding: 'utf8'}).trim()
-    : undefined,
-  sourceHashes: Object.fromEntries(
-   await Promise.all(
-    ['media-build-source-lock.mts', 'media-source-prepare.mts'].map(async file => [
-     file,
-     createHash('sha256')
-      .update(await readFile(join(root, 'scripts', file)))
-      .digest('hex')
-    ])
-   )
-  )
- }
+ const binding = await sourceBinding()
  try {
+  if (process.env.GITHUB_ACTIONS === 'true')
+   check(process.platform === 'darwin' && process.arch === 'arm64', 'Source preparation CI requires actual macOS arm64')
   check(
    process.argv.length === 2 || (process.argv.length === 4 && process.argv[2] === '--offline'),
    'Usage: node scripts/media-source-prepare.mts [--offline <canonical archive directory>]'
