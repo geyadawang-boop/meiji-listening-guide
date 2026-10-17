@@ -7,6 +7,11 @@ on:
   pull_request:
   workflow_dispatch:
     inputs:
+      source_prepare:
+        description: Verify and extract fixed source archives on macOS without building
+        required: false
+        type: boolean
+        default: false
       media_candidate:
         description: Run locked third-party FFmpeg candidates in isolated target runners
         required: false
@@ -14,8 +19,31 @@ on:
         default: false
 
 jobs:
+  source-prepare:
+    if: github.event_name == 'workflow_dispatch' && inputs.source_prepare
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Prepare source archives only
+        run: node scripts/media-source-prepare.mts > "${{ runner.temp }}/source-prepare-result.json"
+      - name: Upload preparation result only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-prepare-macos
+          path: ${{ runner.temp }}/source-prepare-result.json
+          if-no-files-found: warn
+
   media-candidate:
-    if: github.event_name == 'workflow_dispatch' && inputs.media_candidate
+    if: github.event_name == 'workflow_dispatch' && inputs.media_candidate && !inputs.source_prepare
     strategy:
       fail-fast: false
       matrix:
@@ -62,7 +90,7 @@ jobs:
         run: pnpm build
 
   runtime-smoke:
-    if: github.event_name == 'workflow_dispatch' && !inputs.media_candidate
+    if: github.event_name == 'workflow_dispatch' && !inputs.media_candidate && !inputs.source_prepare
     strategy:
       fail-fast: false
       matrix:

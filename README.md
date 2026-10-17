@@ -35,6 +35,8 @@ node scripts/audit-language-migration.mts --check
 
 ## 发布和恢复组件
 
+源码准备工具 `node scripts/media-source-prepare.mts` 只下载、核验并安全解包七份固定媒体源码；可用 `--offline <归档目录>` 验证已有源包。它要求 BSD tar，仅写新的系统临时目录，不编译或安装。CI 手动选项 `source_prepare` 在 macOS 检查真实下载与解包，仅上传准备报告；源码来源/构建/许可审核与可分发结论仍分开。
+
 CI 手动运行时可选 `media_candidate`，在匹配的 macOS arm64/Linux x64 runner 下载并核验锁定候选，检查真实生成、转码、探测、取消和 IPC 断开退出。仅上传结果 JSON；许可、对应源码与分发签名仍待审核，不代表组件已可安装或分发。
 
 当前 Mac 候选实测包含 `--enable-nonfree`、ad-hoc 签名且 Gatekeeper 拒绝，已标记仅供研究、禁止分发；运行检查通过不改变此结论。Linux 候选的分发审核仍待完成，两者均未接入安装或发布。
