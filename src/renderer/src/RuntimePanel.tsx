@@ -1,5 +1,5 @@
 import {useEffect, useState} from 'react'
-import type {RuntimeStatus} from '../../shared/runtime'
+import type {RuntimeStatus} from '@shared/runtime'
 export function RuntimePanel() {
  const [data, setData] = useState<RuntimeStatus>(),
   [error, setError] = useState(''),

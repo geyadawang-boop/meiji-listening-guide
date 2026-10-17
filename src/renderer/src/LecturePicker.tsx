@@ -1,5 +1,5 @@
 import {useState} from 'react'
-import type {Lecture} from '../../shared/types'
+import type {Lecture} from '@shared/types'
 import {LectureIcon, TrashIcon} from './ManagementIcons'
 import {DshChevronDownIcon} from './ChatIcons'
 export function LecturePicker({

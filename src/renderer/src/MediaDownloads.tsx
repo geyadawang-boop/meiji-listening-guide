@@ -1,5 +1,5 @@
 import {useEffect, useState} from 'react'
-import type {MediaCatalog, MediaJob} from '../../shared/media'
+import type {MediaCatalog, MediaJob} from '@shared/media'
 const invoke = <T,>(action: string, args?: unknown) => window.assistant.invoke<T>(action, args)
 type Options = Record<string, string | number | boolean | null>
 type LoginProfile = {id: string; name: string; site: string; count: number}

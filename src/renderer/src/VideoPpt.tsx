@@ -1,7 +1,7 @@
 import {SubtitleBatchRecords} from './SubtitleBatchRecords'
 import {learningViews, LearningIcon, type LearningView} from './LearningNav'
 import {VideoMindmap} from './VideoMindmap'
-import type {VideoNoteMode, VideoNoteResult} from '../../shared/video-notes'
+import type {VideoNoteMode, VideoNoteResult} from '@shared/video-notes'
 import ReactMarkdown from 'react-markdown'
 import {useEffect, useRef, useState} from 'react'
 import {
@@ -11,9 +11,9 @@ import {
  type VideoSeries,
  type VideoBatchItem,
  type PendingVideoTask
-} from '../../shared/video-ppt'
-import type {SubtitleSyncTask} from '../../shared/subtitle-sync'
-import type {LibraryFile} from '../../shared/types'
+} from '@shared/video-ppt'
+import type {SubtitleSyncTask} from '@shared/subtitle-sync'
+import type {LibraryFile} from '@shared/types'
 type BiliSubtitle = {
  title: string
  page: number

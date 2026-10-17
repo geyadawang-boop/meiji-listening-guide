@@ -1,7 +1,7 @@
 import {StudyIcon} from './StudyIcon'
 import {QwenSettings} from './QwenSettings'
 import {useEffect, useState} from 'react'
-import type {CourseFile, Detail, LectureNotes, PastQuestion, Settings} from '../../shared/types'
+import type {CourseFile, Detail, LectureNotes, PastQuestion, Settings} from '@shared/types'
 import {invoke, Modal, FilePicker} from './UiParts'
 export function NewCourse({
  close,

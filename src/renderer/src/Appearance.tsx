@@ -1,6 +1,6 @@
 import {useState, useRef, useEffect, type CSSProperties} from 'react'
-import {defaultAppearance, resolveAppearance, type Appearance, type AppearanceState} from '../../shared/appearance'
-import type {Course} from '../../shared/types'
+import {defaultAppearance, resolveAppearance, type Appearance, type AppearanceState} from '@shared/appearance'
+import type {Course} from '@shared/types'
 import {ChatMessage} from './ChatMessage'
 const colors = {default: 'var(--blue)', lavender: '#9279c7', rose: '#ca809c', mint: '#5d9e90', blue: '#6497ca'}
 export function chatStyle(value: Appearance) {
