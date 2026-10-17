@@ -101,6 +101,9 @@ async function navigation() {
    positions = await dialog.getByRole('navigation', {name: '设置导航'}).boundingBox()
   for (const name of ['搜索与主题', '提示词', '通义千问']) {
    await dialog.getByRole('button', {name, exact: true}).click()
+   await dialog.getByRole('heading', {name: name === '通义千问' ? '通义千问连接' : name, exact: true}).waitFor()
+   if ((await dialog.getByRole('button', {name, exact: true}).getAttribute('aria-current')) !== 'page')
+    throw new Error('Settings section did not become current: ' + name)
    await page.evaluate(
     () => new Promise<void>(resolveFrame => requestAnimationFrame(() => requestAnimationFrame(() => resolveFrame())))
    )
@@ -111,7 +114,7 @@ async function navigation() {
     JSON.stringify(await dialog.getByRole('navigation', {name: '设置导航'}).boundingBox()) !== JSON.stringify(positions)
    )
     throw new Error('Settings section or navigation moved: ' + name)
-   checks.push(name + ' retains the full-page layout and navigation position')
+   checks.push(name + ' is current, displays its heading and retains the full-page layout and navigation position')
   }
   await page.screenshot({path: join(results, 'settings.png'), fullPage: true})
   await dialog.getByRole('button', {name: '关闭', exact: true}).click()

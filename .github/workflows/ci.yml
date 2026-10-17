@@ -55,7 +55,6 @@ jobs:
           dbus-run-session -- bash -euo pipefail -c '
             smoke_keyring_password=$(openssl rand -hex 24)
             smoke_keyring_environment=$(printf "%s" "$smoke_keyring_password" | gnome-keyring-daemon --unlock --components=secrets)
-            test -n "$smoke_keyring_environment"
             eval "$smoke_keyring_environment"
             xvfb-run --auto-servernum pnpm runtime:smoke --output "$RUNNER_TEMP/meiji-runtime-smoke"
           '
