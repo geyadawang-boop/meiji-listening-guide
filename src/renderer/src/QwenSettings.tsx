@@ -11,6 +11,50 @@ const fallback: Profile = {
  apiFormat: 'chat_completions',
  models: []
 }
+export type SettingsSection = 'qwen' | 'search' | 'prompts'
+export function SettingsNavigation({
+ section,
+ onSection
+}: {
+ section: SettingsSection
+ onSection?: (section: SettingsSection) => void
+}) {
+ return (
+  <aside>
+   <h2>设置</h2>
+   <p>模型、搜索与提示词</p>
+   {onSection && (
+    <nav aria-label="设置导航">
+     {(
+      [
+       ['qwen', '通义千问'],
+       ['search', '搜索与主题'],
+       ['prompts', '提示词']
+      ] as const
+     ).map(([id, name]) => (
+      <button
+       key={id}
+       className={section === id ? 'active' : ''}
+       aria-current={section === id ? 'page' : undefined}
+       onClick={() => onSection(id)}
+      >
+       {name}
+      </button>
+     ))}
+    </nav>
+   )}
+   <a
+    href="https://bailian.console.aliyun.com/"
+    onClick={event => {
+     event.preventDefault()
+     void invoke('external', {url: 'https://bailian.console.aliyun.com/'})
+    }}
+   >
+    获取千问 API Key
+   </a>
+  </aside>
+ )
+}
 export function QwenSettings({
  value,
  update,
@@ -24,7 +68,7 @@ export function QwenSettings({
  save: () => void
  close: () => void
  busy: boolean
- onSection?: (section: 'qwen' | 'search' | 'prompts') => void
+ onSection?: (section: SettingsSection) => void
 }) {
  const [pending, setPending] = useState(false),
   [notice, setNotice] = useState(''),
@@ -73,28 +117,7 @@ export function QwenSettings({
  ]
  return (
   <div className="codex-settings qwen-settings">
-   <aside>
-    <h2>模型连接</h2>
-    <p>当前使用通义千问</p>
-    {onSection && (
-     <nav aria-label="设置导航">
-      <button className="active" onClick={() => onSection('qwen')}>
-       通义千问
-      </button>
-      <button onClick={() => onSection('search')}>搜索与主题</button>
-      <button onClick={() => onSection('prompts')}>提示词</button>
-     </nav>
-    )}
-    <a
-     href="https://bailian.console.aliyun.com/"
-     onClick={event => {
-      event.preventDefault()
-      void invoke('external', {url: 'https://bailian.console.aliyun.com/'})
-     }}
-    >
-     获取千问 API Key
-    </a>
-   </aside>
+   <SettingsNavigation section="qwen" onSection={onSection} />
    <section>
     <header>
      <div>
