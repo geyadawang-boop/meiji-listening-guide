@@ -6,12 +6,12 @@ Windows x64 桌面应用。业务逻辑、前后端、独立工作进程及现�
 
 ## 开发
 
-需要 Node.js 24 和 npm。依赖由 package-lock.json 固定，SQLite 原生模块须使用 Electron ABI：
+需要 Node.js 24 和 pnpm 11.25.0（见 packageManager）。依赖由 pnpm-lock.yaml 固定，SQLite 原生模块须使用 Electron ABI：
 
 ```powershell
-npm ci
-npm run dev
-npm run build
+pnpm install --frozen-lockfile
+pnpm dev
+pnpm build
 ```
 
 resources 包含独立 ONNX 模型、NapCat Node 组件和 FFmpeg/FFprobe 及其许可证。它们是必要第三方资源，不能以 TypeScript 源码代替二进制或权重。源码包不含这些大型文件，需恢复同版本组件。PDF 由应用原生 TypeScript 库处理，不需要 Python。
@@ -19,25 +19,25 @@ resources 包含独立 ONNX 模型、NapCat Node 组件和 FFmpeg/FFprobe 及其
 ## 检查
 
 ```powershell
-npm run typecheck
+pnpm typecheck
 node scripts/audit-language-migration.mts --check
 ```
 
-当前版本按用户要求删除测试脚本、测试配置和测试启动入口。此前的验收记录仍保留；历史验收不代表全部真实账号和外部站点可用。
+pnpm verify 执行 TypeScript、Biome 格式与 lint 检查；CI 再执行构建。历史验收记录保留，真实账号和外部站点能力需单独验证。
 
 ## 发布和恢复组件
 
 ```powershell
-npm run build
+pnpm build
 node scripts/release.mts portable
-npm run release:full
-npm run release:lite
-npm run release:components
+pnpm release:full
+pnpm release:lite
+pnpm release:components
 node scripts/source-package.mts
 node scripts/restore-runtime.mts knowledge 同版本组件文件夹
 ```
 
-portable 为完整目录，full 为完整安装包，lite 为不含可选离线组件的应用，components 为同版本组件。组件恢复逐文件核对大小、SHA256 和版本，不覆盖改动过的文件；组件编号为 knowledge、asr、video。完整发布须重建 EXE，不能只修改 ASAR。实际安装后验证版本、原生后台、运行资源及课程资料不变后才能清理回退文件。
+portable 为完整目录，full 为完整安装包，lite 为不含可选离线组件的应用，components 为同版本组件。full 仅支持 Windows；macOS/Linux 使用 lite（pnpm release lite，可用 --platform=mac 或 --platform=linux 指定目标），本机运行组件安装仅支持 Windows x64。跨平台 CI 已配置，macOS/Linux 实机运行尚未验证。组件恢复逐文件核对大小、SHA256 和版本，不覆盖改动过的文件；组件编号为 knowledge、asr、video。完整发布须重建 EXE，不能只修改 ASAR。实际安装后验证版本、原生后台、运行资源及课程资料不变后才能清理回退文件。
 
 ## 代码目录
 

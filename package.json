@@ -1,159 +1,185 @@
 {
-  "name": "listening-assistant",
-  "version": "0.1.85",
-  "private": true,
-  "description": "听课助手：课堂字幕、教师重点与课后练习",
-  "author": "Listening Assistant contributors",
-  "license": "AGPL-3.0-only",
-  "type": "module",
-  "main": "out/main/main.js",
-  "scripts": {
-    "dev": "electron-vite dev",
-    "build": "npm run typecheck && electron-vite build",
-    "typecheck": "tsc --noEmit && tsc -p tsconfig.migrations.json",
-    "rebuild": "electron-builder install-app-deps",
-    "start": "electron .",
-    "pack": "npm run build && node scripts/release.mts full",
-    "postinstall": "electron-builder install-app-deps",
-    "release:full": "node scripts/release.mts full",
-    "release:lite": "node scripts/release.mts lite",
-    "release:components": "node scripts/release.mts components",
-    "audit:typescript": "node scripts/audit-typescript.mts --check",
-    "release:source": "node scripts/source-package.mts"
+ "name": "listening-assistant",
+ "version": "0.1.85",
+ "private": true,
+ "description": "听课助手：课堂字幕、教师重点与课后练习",
+ "author": "Listening Assistant contributors",
+ "license": "AGPL-3.0-only",
+ "type": "module",
+ "main": "out/main/main.js",
+ "scripts": {
+  "dev": "electron-vite dev",
+  "build": "pnpm typecheck && electron-vite build",
+  "typecheck": "tsc --noEmit && tsc -p tsconfig.migrations.json",
+  "rebuild": "electron-builder install-app-deps",
+  "start": "electron .",
+  "pack": "pnpm build && pnpm release full",
+  "postinstall": "node node_modules/electron/install.js && electron-builder install-app-deps",
+  "release:full": "node scripts/release.mts full",
+  "release:lite": "node scripts/release.mts lite",
+  "release:components": "node scripts/release.mts components",
+  "audit:typescript": "node scripts/audit-typescript.mts --check",
+  "release:source": "node scripts/source-package.mts",
+  "release": "node scripts/release.mts",
+  "lint": "biome lint .",
+  "format": "biome format --write .",
+  "check": "biome check .",
+  "check:fix": "biome check --write .",
+  "verify": "pnpm typecheck && pnpm check"
+ },
+ "dependencies": {
+  "@huggingface/transformers": "4.3.1",
+  "ajv": "8.20.0",
+  "better-sqlite3": "^12.4.1",
+  "better-sqlite3-multiple-ciphers": "13.0.3",
+  "docx": "^9.5.1",
+  "entities": "8.1.0",
+  "htmlparser2": "12.0.0",
+  "iconv-lite": "^0.7.0",
+  "jschardet": "^3.1.4",
+  "jszip": "^3.10.2",
+  "koffi": "3.3.3",
+  "mammoth": "^1.10.0",
+  "onnxruntime-node": "1.30.0",
+  "pdf-lib": "^1.17.1",
+  "pdfjs-dist": "^6.3.289",
+  "qr": "0.7.2",
+  "quickjs-emscripten": "0.32.0",
+  "react": "^19.2.0",
+  "react-dom": "^19.2.0",
+  "react-markdown": "^10.1.0",
+  "remark-gfm": "^4.0.1",
+  "saxes": "6.0.0",
+  "tough-cookie": "6.0.2",
+  "undici": "8.12.1",
+  "youtubei.js": "18.1.0",
+  "zod": "^4.1.12"
+ },
+ "devDependencies": {
+  "@types/better-sqlite3": "^7.6.13",
+  "@types/node": "^24.10.0",
+  "@types/react": "^19.2.0",
+  "@types/react-dom": "^19.2.0",
+  "@vitejs/plugin-react": "^5.1.0",
+  "electron": "42.11.10",
+  "electron-builder": "^26.0.12",
+  "electron-vite": "^4.0.1",
+  "esbuild": "0.25.12",
+  "playwright": "^1.63.0",
+  "typescript": "^5.9.3",
+  "vite": "^7.2.0",
+  "vitest": "5.0.3",
+  "@biomejs/biome": "^2.5.15"
+ },
+ "build": {
+  "appId": "org.listening-assistant.desktop",
+  "productName": "梅酱的听课指南",
+  "directories": {
+   "output": "release"
   },
-  "dependencies": {
-    "@huggingface/transformers": "4.3.1",
-    "ajv": "8.20.0",
-    "better-sqlite3": "^12.4.1",
-    "better-sqlite3-multiple-ciphers": "13.0.3",
-    "docx": "^9.5.1",
-    "entities": "8.1.0",
-    "htmlparser2": "12.0.0",
-    "iconv-lite": "^0.7.0",
-    "jschardet": "^3.1.4",
-    "jszip": "^3.10.2",
-    "koffi": "3.3.3",
-    "mammoth": "^1.10.0",
-    "onnxruntime-node": "1.30.0",
-    "pdf-lib": "^1.17.1",
-    "pdfjs-dist": "^6.3.289",
-    "qr": "0.7.2",
-    "quickjs-emscripten": "0.32.0",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "react-markdown": "^10.1.0",
-    "remark-gfm": "^4.0.1",
-    "saxes": "6.0.0",
-    "tough-cookie": "6.0.2",
-    "undici": "8.12.1",
-    "youtubei.js": "18.1.0",
-    "zod": "^4.1.12"
+  "files": [
+   "out/**",
+   "package.json",
+   "LICENSE",
+   "NOTICE",
+   "THIRD_PARTY_NOTICES.md",
+   "!node_modules/http-cache-semantics/**",
+   "!node_modules/@derhuerst/http-basic/**",
+   "!node_modules/ffmpeg-static/install.js",
+   "!**/*.py",
+   "!**/*.pyc",
+   "!**/__pycache__/**"
+  ],
+  "extraResources": [
+   {
+    "from": "resources/knowledge",
+    "to": "knowledge",
+    "filter": [
+     "onnx-bge/**",
+     "vendor/NapCat.Shell.Windows.Node.zip",
+     "BiliSum-LICENSE"
+    ]
+   },
+   {
+    "from": "prompts",
+    "to": "prompts",
+    "filter": [
+     "**/*",
+     "!**/__pycache__/**",
+     "!**/*.pyc"
+    ]
+   },
+   {
+    "to": "icon.png",
+    "from": "resources/icon.png",
+    "filter": [
+     "**/*",
+     "!**/__pycache__/**",
+     "!**/*.pyc"
+    ]
+   },
+   {
+    "from": "resources/video",
+    "to": "video",
+    "filter": [
+     "ffmpeg.exe",
+     "ffprobe.exe",
+     "LICENSE-ffmpeg-static.txt",
+     "LICENSE-ffprobe.txt"
+    ]
+   },
+   {
+    "from": "resources/asr",
+    "to": "asr",
+    "filter": [
+     "onnx-small/**"
+    ]
+   },
+   {
+    "from": "resources/runtime-manifest.json",
+    "to": "runtime-manifest.json",
+    "filter": [
+     "**/*",
+     "!**/__pycache__/**",
+     "!**/*.pyc"
+    ]
+   }
+  ],
+  "asarUnpack": [
+   "node_modules/@jitl/**/*.wasm",
+   "node_modules/@koromix/**",
+   "node_modules/better-sqlite3-multiple-ciphers/**",
+   "node_modules/better-sqlite3/**",
+   "node_modules/koffi/**",
+   "node_modules/onnxruntime-node/**"
+  ],
+  "win": {
+   "target": "nsis",
+   "icon": "resources/icon.ico"
   },
-  "devDependencies": {
-    "@types/better-sqlite3": "^7.6.13",
-    "@types/node": "^24.10.0",
-    "@types/react": "^19.2.0",
-    "@types/react-dom": "^19.2.0",
-    "@vitejs/plugin-react": "^5.1.0",
-    "electron": "42.11.10",
-    "electron-builder": "^26.0.12",
-    "electron-vite": "^4.0.1",
-    "esbuild": "0.25.12",
-    "playwright": "^1.63.0",
-    "typescript": "^5.9.3",
-    "vite": "^7.2.0",
-    "vitest": "5.0.3"
+  "nsis": {
+   "oneClick": false,
+   "allowToChangeInstallationDirectory": true,
+   "createDesktopShortcut": true
   },
-  "build": {
-    "appId": "org.listening-assistant.desktop",
-    "productName": "梅酱的听课指南",
-    "directories": {
-      "output": "release"
-    },
-    "files": [
-      "out/**",
-      "package.json",
-      "LICENSE",
-      "NOTICE",
-      "THIRD_PARTY_NOTICES.md",
-      "!node_modules/http-cache-semantics/**",
-      "!node_modules/@derhuerst/http-basic/**",
-      "!node_modules/ffmpeg-static/install.js",
-      "!**/*.py",
-      "!**/*.pyc",
-      "!**/__pycache__/**"
-    ],
-    "extraResources": [
-      {
-        "from": "resources/knowledge",
-        "to": "knowledge",
-        "filter": [
-          "onnx-bge/**",
-          "vendor/NapCat.Shell.Windows.Node.zip",
-          "BiliSum-LICENSE"
-        ]
-      },
-      {
-        "from": "prompts",
-        "to": "prompts",
-        "filter": [
-          "**/*",
-          "!**/__pycache__/**",
-          "!**/*.pyc"
-        ]
-      },
-      {
-        "to": "icon.png",
-        "from": "resources/icon.png",
-        "filter": [
-          "**/*",
-          "!**/__pycache__/**",
-          "!**/*.pyc"
-        ]
-      },
-      {
-        "from": "resources/video",
-        "to": "video",
-        "filter": [
-          "ffmpeg.exe",
-          "ffprobe.exe",
-          "LICENSE-ffmpeg-static.txt",
-          "LICENSE-ffprobe.txt"
-        ]
-      },
-      {
-        "from": "resources/asr",
-        "to": "asr",
-        "filter": [
-          "onnx-small/**"
-        ]
-      },
-      {
-        "from": "resources/runtime-manifest.json",
-        "to": "runtime-manifest.json",
-        "filter": [
-          "**/*",
-          "!**/__pycache__/**",
-          "!**/*.pyc"
-        ]
-      }
-    ],
-    "asarUnpack": [
-      "node_modules/@jitl/**/*.wasm",
-      "node_modules/better-sqlite3-multiple-ciphers/prebuilds/win32-x64.node",
-      "node_modules/better-sqlite3/**",
-      "node_modules/koffi/**",
-      "node_modules/@koromix/koffi-win32-x64/**"
-    ],
-    "win": {
-      "target": "nsis",
-      "icon": "resources/icon.ico"
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true
-    },
-    "npmRebuild": true
+  "npmRebuild": true,
+  "mac": {
+   "target": [
+    "dmg",
+    "zip"
+   ],
+   "icon": "resources/icon.png",
+   "category": "public.app-category.education"
+  },
+  "linux": {
+   "target": [
+    "AppImage",
+    "deb"
+   ],
+   "icon": "resources/icon.png",
+   "category": "Education",
+   "maintainer": "Listening Assistant contributors <listening-assistant@users.noreply.github.com>"
   }
+ },
+ "packageManager": "pnpm@11.25.0"
 }
