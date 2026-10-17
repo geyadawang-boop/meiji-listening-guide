@@ -1,9 +1,11 @@
 import {resolve} from 'node:path'
 import {defineConfig, externalizeDepsPlugin} from 'electron-vite'
 import react from '@vitejs/plugin-react'
+const sharedAlias = {'@shared': resolve('src/shared')}
 // Reduced from ElecKoi's Electron Vite configuration (AGPL-3.0).
 export default defineConfig({
  main: {
+  resolve: {alias: sharedAlias},
   plugins: [externalizeDepsPlugin()],
   build: {
    lib: {
@@ -20,11 +22,12 @@ export default defineConfig({
   }
  },
  preload: {
+  resolve: {alias: sharedAlias},
   plugins: [externalizeDepsPlugin()],
   build: {
    lib: {entry: resolve('src/preload/preload.ts')},
    rollupOptions: {output: {format: 'cjs', entryFileNames: '[name].cjs'}}
   }
  },
- renderer: {plugins: [react()], resolve: {alias: {'@shared': resolve('src/shared')}}}
+ renderer: {plugins: [react()], resolve: {alias: sharedAlias}}
 })

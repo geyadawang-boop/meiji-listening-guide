@@ -1,5 +1,5 @@
 import {contextBridge, ipcRenderer, webUtils} from 'electron'
-import type {EventPayload, Bridge} from '../shared/types'
+import type {EventPayload, Bridge} from '@shared/types'
 const bridge: Bridge = {
  invoke: (action, args) => ipcRenderer.invoke('assistant:invoke', action, args),
  onEvent(callback) {

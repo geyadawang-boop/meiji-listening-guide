@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 主进程 IPC 与预加载脚本使用统一共享模块别名，保持开发及生产构建的引用一致。
 - 通讯助手提前禁用非 Windows x64 的本机微信与内置 QQ 后台操作并说明原因；手工 QQ、Web/iLink 保留，旧账号可从“已保存会话”查看本地消息。
 
 - macOS/Linux 的 portable 构建不再随包复制 Windows 专属可选组件，即使本地已有这些资源；Windows portable 保持原行为；当前 Windows 组件包拒绝以 macOS/Linux 为目标生成。

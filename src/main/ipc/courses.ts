@@ -1,7 +1,7 @@
 import {z} from 'zod'
 import {ensureLibrary} from '../library'
 import {copyInto, importDocument, parseCourseware, serializeCoursewareSourceCache} from '../documents'
-import {questionSchema} from '../../shared/types'
+import {questionSchema} from '@shared/types'
 import {readTranscript} from '../transcript'
 import type {ApplicationContext} from '../main'
 import type {IpcHandler} from './handler'
