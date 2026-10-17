@@ -7,6 +7,11 @@ on:
   pull_request:
   workflow_dispatch:
     inputs:
+      v2_fixture:
+        description: Verify fixture-only v2 publishing and POSIX permissions on macOS arm64
+        required: false
+        type: boolean
+        default: false
       source_build:
         description: Build and verify isolated macOS arm64 source candidates (not a release)
         required: false
@@ -24,8 +29,30 @@ on:
         default: false
 
 jobs:
+  v2-fixture:
+    if: github.event_name == 'workflow_dispatch' && inputs.v2_fixture
+    runs-on: macos-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Verify synthetic fixture only
+        run: node scripts/runtime-v2-fixture-smoke.mts "${{ runner.temp }}/v2-fixture-result.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: v2-fixture-result
+          path: ${{ runner.temp }}/v2-fixture-result.json
+          if-no-files-found: warn
+
   source-build:
-    if: github.event_name == 'workflow_dispatch' && inputs.source_build
+    if: github.event_name == 'workflow_dispatch' && inputs.source_build && !inputs.v2_fixture
     runs-on: macos-latest
     timeout-minutes: 60
     steps:
@@ -49,7 +76,7 @@ jobs:
           if-no-files-found: warn
 
   source-prepare:
-    if: github.event_name == 'workflow_dispatch' && inputs.source_prepare && !inputs.source_build
+    if: github.event_name == 'workflow_dispatch' && inputs.source_prepare && !inputs.source_build && !inputs.v2_fixture
     runs-on: macos-latest
     timeout-minutes: 20
     steps:
@@ -72,7 +99,7 @@ jobs:
           if-no-files-found: warn
 
   media-candidate:
-    if: github.event_name == 'workflow_dispatch' && inputs.media_candidate && !inputs.source_prepare && !inputs.source_build
+    if: github.event_name == 'workflow_dispatch' && inputs.media_candidate && !inputs.source_prepare && !inputs.source_build && !inputs.v2_fixture
     strategy:
       fail-fast: false
       matrix:
@@ -119,7 +146,7 @@ jobs:
         run: pnpm build
 
   runtime-smoke:
-    if: github.event_name == 'workflow_dispatch' && !inputs.media_candidate && !inputs.source_prepare && !inputs.source_build
+    if: github.event_name == 'workflow_dispatch' && !inputs.media_candidate && !inputs.source_prepare && !inputs.source_build && !inputs.v2_fixture
     strategy:
       fail-fast: false
       matrix:
