@@ -134,7 +134,8 @@ export function createKnowledgeHandler(
       id: z
        .string()
        .regex(/^LV[0-9a-f]{64}$/)
-       .parse(object.id)
+       .parse(object.id),
+      generation: z.string().min(1).parse(object.generation)
      })
     case 'knowledge:organize':
      return job('知识库分类', () =>

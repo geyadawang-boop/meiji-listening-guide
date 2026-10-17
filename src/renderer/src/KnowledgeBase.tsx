@@ -468,7 +468,7 @@ export function KnowledgeBase({visible, close}: {visible: boolean; close: () => 
            · {entry.classification.type} · {entry.classification.topic} · {entry.classification.keywords.join('、')}
           </span>
          )}
-         {entry.sourceMethod ? ` · ${entry.sourceMethod}` : ''}
+         {entry.sourceMethod ? ` · ${entry.sourceMethod}` : ''} · 版本 {entry.generation_id.slice(-8)}
         </small>
        </div>
        <button
@@ -492,7 +492,7 @@ export function KnowledgeBase({visible, close}: {visible: boolean; close: () => 
           disabled={busy}
           onClick={() =>
            void run(async () => {
-            await invoke('knowledge:delete', {id: entry.bvid})
+            await invoke('knowledge:delete', {id: entry.bvid, generation: entry.generation_id})
             setDeleting('')
             setSearch(null)
             setAnswer(null)
