@@ -6,8 +6,45 @@ on:
       - 'v*'
   pull_request:
   workflow_dispatch:
+    inputs:
+      media_candidate:
+        description: Run locked third-party FFmpeg candidates in isolated target runners
+        required: false
+        type: boolean
+        default: false
 
 jobs:
+  media-candidate:
+    if: github.event_name == 'workflow_dispatch' && inputs.media_candidate
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            source: eugeneware-b6.1.1-darwin-arm64
+          - os: ubuntu-latest
+            source: eugeneware-b6.1.1-linux-x64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Verify isolated media candidates
+        run: node scripts/media-candidate-smoke.mts --source "${{ matrix.source }}" --output "${{ runner.temp }}/meiji-media-results"
+      - name: Upload results only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: media-candidate-${{ matrix.os }}
+          path: ${{ runner.temp }}/meiji-media-results/*.json
+          if-no-files-found: warn
+
   check:
     runs-on: ubuntu-latest
     steps:
@@ -25,7 +62,7 @@ jobs:
         run: pnpm build
 
   runtime-smoke:
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' && !inputs.media_candidate
     strategy:
       fail-fast: false
       matrix:
