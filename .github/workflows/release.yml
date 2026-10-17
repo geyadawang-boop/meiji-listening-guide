@@ -50,11 +50,7 @@ jobs:
       - name: Package lite installers
         run: pnpm release lite --prepared
       - name: Write SHA256SUMS
-        shell: bash
-        run: |
-          cd release/lite
-          find . -maxdepth 1 -type f \( -name '*.exe' -o -name '*.dmg' -o -name '*.zip' -o -name '*.AppImage' -o -name '*.deb' \) -print0 | xargs -0 -r sha256sum > SHA256SUMS.txt
-          cat SHA256SUMS.txt
+        run: node scripts/release-checksums.mts release/lite ${{ matrix.name }}
       - uses: actions/upload-artifact@v4
         with:
           name: installers-${{ matrix.name }}
@@ -64,7 +60,7 @@ jobs:
             release/lite/*.zip
             release/lite/*.AppImage
             release/lite/*.deb
-            release/lite/SHA256SUMS.txt
+            release/lite/SHA256SUMS-${{ matrix.name }}.txt
           if-no-files-found: error
           compression-level: 0
 
@@ -80,6 +76,7 @@ jobs:
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           if ! gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
             gh release create "$GITHUB_REF_NAME" --title "梅酱的听课指南 $GITHUB_REF_NAME" --generate-notes
