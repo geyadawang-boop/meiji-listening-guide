@@ -7,7 +7,7 @@ import { readImageDeck } from '../ppt-extract';
 import { defaultVideoPrompt } from '../../shared/video-ppt';
 import { readFile, stat, rm } from 'node:fs/promises';
 import { readTranscript } from '../transcript';
-import { parseCourseware } from '../documents';
+import { parseCourseware, serializeCoursewareSourceCache } from '../documents';
 import { listLibrary, managedFile } from '../file-manager';
 import { Api } from '../api';
 import { type Settings } from '../../shared/types';
@@ -21,7 +21,8 @@ export function createDesktopHandler(context: Pick<ApplicationContext, "runtime"
             switch (action) {
                 case 'app:info': return { version: app.getVersion(), electron: process.versions.electron, platform: process.platform };
                 case 'runtime:status': return runtime.status();
-                case 'runtime:install': return job('安装运行组件', async (signal) => { if (toolsBackend.started || media.started || knowledge.started)
+                case 'runtime:install': if (process.platform !== 'win32')
+                    throw new Error('运行组件目前仅支持 Windows，无法在当前平台安装'); return job('安装运行组件', async (signal) => { if (toolsBackend.started || media.started || knowledge.started)
                     throw new Error('请重启软件后先安装组件，再打开后台任务'); const picked = await dialog.showOpenDialog(window, { title: '选择同版本组件文件夹', properties: ['openDirectory'] }); if (picked.canceled)
                     return null; return runtime.install(z.string().parse(object.id), picked.filePaths[0], signal, message => emit({ kind: 'progress', data: { stage: '安装组件', message } })); });
                 case 'library:open': {
@@ -93,7 +94,9 @@ export function createDesktopHandler(context: Pick<ApplicationContext, "runtime"
                             throw new Error(review.warning + ' 视频已保留，可继续检查');
                         const result = await saveVideoPdf(source.id, course.name, review.pages.map(({ page, keep, crop }) => ({ page, keep, crop })), signal);
                         const lecture = planned?.lectureId ? db.lecture(planned.lectureId) : db.detail(course.id).lectures.find(l => l.title === title) || db.createLecture(course.id, title, '', '', '');
-                        db.db.prepare('UPDATE lectures SET ppt_path=?,ppt_text=?,ppt_processed=0 WHERE id=?').run(result.path, '', lecture.id);
+                        const generated = await parseCourseware(result.path);
+                        const generatedText = await serializeCoursewareSourceCache(result.path, generated.text, 'local', generated.needsOcr, generated.omissions);
+                        db.db.prepare('UPDATE lectures SET ppt_path=?,ppt_text=?,ppt_processed=0 WHERE id=?').run(result.path, generatedText, lecture.id);
                         if (path)
                             await rm(path, { force: true });
                         return { path: result.path, lectureId: lecture.id, courseId: course.id, fromVideo: true };
@@ -101,10 +104,14 @@ export function createDesktopHandler(context: Pick<ApplicationContext, "runtime"
                     try {
                         const parsed = kind === 'transcript' ? await readTranscript(path) : await parseCourseware(path);
                         const lecture = planned?.lectureId ? db.lecture(planned.lectureId) : db.detail(course.id).lectures.find(l => l.title === title) || db.createLecture(course.id, title, '', '', '');
-                        if (kind === 'transcript')
+                        if (kind === 'transcript') {
                             db.db.prepare('UPDATE lectures SET transcript_path=?,transcript_text=?,time_estimated=?,status=? WHERE id=?').run(path, (parsed as Awaited<ReturnType<typeof readTranscript>>).text, (parsed as Awaited<ReturnType<typeof readTranscript>>).estimated ? 1 : 0, '待校订', lecture.id);
-                        else
-                            db.db.prepare('UPDATE lectures SET ppt_path=?,ppt_text=?,ppt_processed=0 WHERE id=?').run(path, parsed.text, lecture.id);
+                        }
+                        else {
+                            const courseware = parsed as Awaited<ReturnType<typeof parseCourseware>>;
+                            const cachedText = await serializeCoursewareSourceCache(path, courseware.text, 'local', courseware.needsOcr, courseware.omissions);
+                            db.db.prepare('UPDATE lectures SET ppt_path=?,ppt_text=?,ppt_processed=0 WHERE id=?').run(path, cachedText, lecture.id);
+                        }
                         db.db.prepare('DELETE FROM correction_checkpoints WHERE lecture_id=?').run(lecture.id);
                         return { path, lectureId: lecture.id, courseId: course.id };
                     }

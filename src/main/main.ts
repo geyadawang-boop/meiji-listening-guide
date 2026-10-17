@@ -122,7 +122,7 @@ async function startApplication() {
             key = settings.searchKey();
         }
         catch { } return searchAnswers(query, key, net.fetch.bind(net) as typeof fetch, signal); }, json: api.json.bind(api), progress: (message: string) => emit({ kind: 'progress', data: { stage: '题目答案', message } }) };
-    const flows = new Workflows(db, settings, api, p => emit({ kind: 'progress', data: p }), answerDependencies, !!testApi);
+    const flows = new Workflows(db, settings, api, p => emit({ kind: 'progress', data: p }), answerDependencies);
     const highlighter = new TextbookHighlighter(api, (input, url, signal) => routed.chat([{ role: 'system', content: '识别教材图片的可编辑划线位置，严格返回用户要求的 JSON。' }, { role: 'user', content: input }], undefined, signal, undefined, { images: [{ label: '教材原页', url }] }));
     window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
     window.webContents.on('will-navigate', e => e.preventDefault());

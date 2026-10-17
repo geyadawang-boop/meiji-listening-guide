@@ -1,11 +1,85 @@
 import { readFile, copyFile, mkdir } from 'node:fs/promises'
 import { join, extname, basename, posix } from 'node:path'
-import { randomUUID } from 'node:crypto'
+import { randomUUID, createHash } from 'node:crypto'
+import { resolve } from 'node:path'
 import JSZip from 'jszip'
 import mammoth from 'mammoth'
 import jschardet from 'jschardet'
 import iconv from 'iconv-lite'
 import type { CourseFile } from '../shared/types'
+
+export interface CoursewareSourceIdentity { path:string; sha256:string; size:number }
+export type CoursewareProvenance='local'|'ocr'|'manual'
+export interface CoursewareCacheMetadata {
+  version:1
+  sourcePath:string
+  sourceSha256:string
+  sourceSize:number
+  textSha256:string
+  provenance:CoursewareProvenance
+  needsOcr:boolean
+  omissions:string[]
+  capturedAt:string
+}
+export interface ParsedCoursewareCache {
+  text:string
+  state:'verified'|'unknown'|'stale'
+  provenance:CoursewareProvenance|'unknown'
+  metadata?:CoursewareCacheMetadata
+  needsOcr:boolean
+  omissions:string[]
+}
+const coursewareCacheMarker='bilisum-courseware-cache:v1:'
+const sha256=(value:Buffer|string)=>createHash('sha256').update(value).digest('hex')
+export function coursewareTextHash(text:string){return sha256(text)}
+export async function sourceIdentity(path:string):Promise<CoursewareSourceIdentity>{
+  const bytes=await readFile(path)
+  return {path:resolve(path),sha256:sha256(bytes),size:bytes.length}
+}
+export const coursewareSourceIdentity=sourceIdentity
+export async function serializeCoursewareSourceCache(path:string,text:string,provenance:CoursewareProvenance,needsOcr:boolean,omissions:string[]=[]):Promise<string>{
+  return serializeCoursewareCache(text,createCoursewareMetadata(await coursewareSourceIdentity(path),text,provenance,needsOcr,omissions))
+}
+export function createCoursewareMetadata(source:CoursewareSourceIdentity,text:string,provenance:CoursewareProvenance,needsOcr:boolean,omissions:string[]=[]):CoursewareCacheMetadata {
+  return {version:1,sourcePath:source.path,sourceSha256:source.sha256,sourceSize:source.size,textSha256:coursewareTextHash(text),provenance,needsOcr,omissions:[...new Set(omissions)],capturedAt:new Date().toISOString()}
+}
+export function serializeCoursewareCache(text:string,metadata:CoursewareCacheMetadata):string {
+  const saved={...metadata,textSha256:coursewareTextHash(text)}
+  return `${text}\n<!-- ${coursewareCacheMarker}${Buffer.from(JSON.stringify(saved),'utf8').toString('base64')} -->`
+}
+function validCoursewareMetadata(value:unknown):value is CoursewareCacheMetadata {
+  if(!value||typeof value!=='object')return false
+  const item=value as Partial<CoursewareCacheMetadata>
+  return item.version===1&&typeof item.sourcePath==='string'&&item.sourcePath.length>0&&typeof item.sourceSha256==='string'&&/^[a-f0-9]{64}$/.test(item.sourceSha256)&&typeof item.sourceSize==='number'&&Number.isSafeInteger(item.sourceSize)&&item.sourceSize>=0&&typeof item.textSha256==='string'&&/^[a-f0-9]{64}$/.test(item.textSha256)&&(item.provenance==='local'||item.provenance==='ocr'||item.provenance==='manual')&&typeof item.needsOcr==='boolean'&&Array.isArray(item.omissions)&&item.omissions.every(v=>typeof v==='string')&&typeof item.capturedAt==='string'
+}
+export function parseCoursewareCache(value:string,currentSource?:CoursewareSourceIdentity|null):ParsedCoursewareCache {
+  const match=/\n?<!-- bilisum-courseware-cache:v1:([A-Za-z0-9+/=]+) -->\s*$/.exec(value)
+  if(!match)return {text:value,state:'unknown',provenance:'unknown',needsOcr:false,omissions:[]}
+  let metadata:unknown
+  try{metadata=JSON.parse(Buffer.from(match[1],'base64').toString('utf8'))}catch{return {text:value,state:'unknown',provenance:'unknown',needsOcr:false,omissions:[]}}
+  if(!validCoursewareMetadata(metadata))return {text:value,state:'unknown',provenance:'unknown',needsOcr:false,omissions:[]}
+  const text=value.slice(0,match.index)
+  const textChanged=coursewareTextHash(text)!==metadata.textSha256
+  const sourceChanged=currentSource===null||currentSource!==undefined&&(resolve(currentSource.path)!==resolve(metadata.sourcePath)||currentSource.sha256!==metadata.sourceSha256||currentSource.size!==metadata.sourceSize)
+  const state=textChanged||sourceChanged?'stale':currentSource?'verified':'unknown'
+  return {text,state,provenance:metadata.provenance,metadata,needsOcr:metadata.needsOcr,omissions:[...metadata.omissions]}
+}
+export function coursewareCacheLimitations(cache:ParsedCoursewareCache):string[] {
+  const result=[...cache.omissions]
+  if(cache.state==='stale')result.push('已保存的课件文本或来源文件与提取记录不匹配；保留现有文本供参考，来源需要核对。')
+  else if(cache.state==='unknown'&&cache.text.trim())result.push('课件文本没有可验证的来源记录；已保留原文本，来源链未核实。')
+  if(cache.needsOcr)result.push('课件来源需要 OCR；当前文字可能不完整。')
+  if(cache.provenance==='ocr')result.push('课件文字由 OCR 识别，未经人工逐页核对。')
+  return [...new Set(result)]
+}
+export interface CoursewareParseResult { text:string; needsOcr:boolean; images:{label:string;url:string}[]; omissions:string[]; metadata:CoursewareCacheMetadata }
+export function serializeCourseware(parsed:Pick<CoursewareParseResult,'text'|'metadata'>):string {
+  return serializeCoursewareCache(parsed.text,parsed.metadata)
+}
+async function withCoursewareMetadata(path:string,result:{text:string;needsOcr:boolean;images:{label:string;url:string}[];omissions:string[]}):Promise<CoursewareParseResult>{
+  const source=await coursewareSourceIdentity(path)
+  return {...result,metadata:createCoursewareMetadata(source,result.text,'local',result.needsOcr,result.omissions)}
+}
 export function chunks(text:string,size=14000):string[] {
   const paragraphs=text.split(/\n(?=#{1,6}\s|第[一二三四五六七八九十\d]+[章节])|\n\s*\n/), result:string[]=[];let current=''
   for(const para of paragraphs) {
@@ -47,11 +121,11 @@ export async function importDocument(root:string,courseId:string,kind:CourseFile
   return {id:randomUUID(),course_id:courseId,kind,filename:basename(source),path,text:parsed.text,chunks:chunks(parsed.text),needs_ocr:parsed.needsOcr?1:0}
 }
 
-export async function parseCourseware(path:string) {
+export async function parseCourseware(path:string):Promise<CoursewareParseResult> {
   const ext=extname(path).toLowerCase()
   if(ext==='.ppt')throw new Error('旧版 PPT 暂不支持直接解析，请在 PowerPoint 中另存为 PPTX')
-  if(ext==='.pdf')return {...await parseDocument(path),images:[] as {label:string;url:string}[],omissions:[] as string[]}
-  if(ext!=='.pptx')return {...await parseDocument(path),images:[] as {label:string;url:string}[],omissions:[] as string[]}
+  if(ext==='.pdf')return withCoursewareMetadata(path,{...await parseDocument(path),images:[] as {label:string;url:string}[],omissions:[] as string[]})
+  if(ext!=='.pptx')return withCoursewareMetadata(path,{...await parseDocument(path),images:[] as {label:string;url:string}[],omissions:[] as string[]})
   const archive=await readFile(path);if(archive.length>200*1024*1024)throw new Error('PPTX 文件超过 200 MB 本地读取上限')
   const zip=await JSZip.loadAsync(archive)
   const declaredSize=(entry:JSZip.JSZipObject)=>{
@@ -135,5 +209,5 @@ export async function parseCourseware(path:string) {
     if(!text&&!images.some(image=>image.label.startsWith(`课件第 ${index+1} 页`)))omissions.push(`第 ${index+1} 页没有提取到文字或可发送的图片`)
   }
   if(images.length)omissions.push('PPTX 嵌入图片以原图附加；没有还原幻灯片版式、裁切、遮罩、动画或位置关系')
-  return {text:pages.join('\n\n'),needsOcr:false,images,omissions:[...new Set(omissions)]}
+  return withCoursewareMetadata(path,{text:pages.join('\n\n'),needsOcr:false,images,omissions:[...new Set(omissions)]})
 }

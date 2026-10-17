@@ -12,7 +12,8 @@ export function QwenSettings({value,update,save,close,busy,onSection}:{value:Set
  async function readModels(){await run(async()=>{const models=await invoke<string[]>('settings:models',{profile});patch({models});setNotice(`已读取 ${models.length} 个模型。视觉识别仍使用单独选择的视觉模型。`)})}
  async function test(){await run(async()=>setNotice('连接测试成功：'+await invoke<string>('settings:probe',{profile})))}
  const known=[...new Set(['qwen3.8-flash',...(profile.models||[])])]
- const visionCandidates=[...new Set([profile.visionModel||'qwen3-vl-plus','qwen3-vl-plus','qwen3.8-max','qwen3.7-plus'])]
+ // VL 名称仅作候选提示，实际能力由服务商确认。
+ const visionCandidates=[...new Set([profile.visionModel||'qwen3-vl-plus',...(profile.models||[]).filter(model=>/(?:^|[-_/.])vl(?:$|[-_/.\d])/i.test(model))])]
  return <div className="codex-settings qwen-settings"><aside><h2>模型连接</h2><p>当前使用通义千问</p>{onSection&&<nav aria-label="设置导航"><button className="active" onClick={()=>onSection('qwen')}>通义千问</button><button onClick={()=>onSection('search')}>搜索与主题</button><button onClick={()=>onSection('prompts')}>提示词</button></nav>}<a href="https://bailian.console.aliyun.com/" onClick={event=>{event.preventDefault();void invoke('external',{url:'https://bailian.console.aliyun.com/'})}}>获取千问 API Key</a></aside><section><header><div><h2>通义千问连接</h2><p className="hint">模型通过 DashScope OpenAI 兼容 API 直连。旧登录凭据不会迁移到此连接。</p></div><div><button disabled={disabled} onClick={close}>关闭</button><button className="primary" disabled={disabled} onClick={save}>保存并使用千问</button></div></header>
   <label>API 地址<input aria-label="千问 API 地址" disabled={disabled} value={profile.baseUrl} onChange={e=>patch({baseUrl:e.target.value})}/></label>
   <label>千问 API Key<input aria-label="千问 API Key" type="password" autoComplete="off" spellCheck={false} disabled={disabled} value={profile.apiKey||''} placeholder={profile.hasKey?'已加密保存，留空保持原密钥':'填写千问 API Key'} onChange={e=>patch({apiKey:e.target.value||undefined})}/></label>
@@ -20,7 +21,7 @@ export function QwenSettings({value,update,save,close,busy,onSection}:{value:Set
   <div className="row"><input aria-label="自定义文本模型 ID" disabled={disabled} value={manualText} placeholder="自定义文本模型 ID" onChange={e=>setManualText(e.target.value)}/><button disabled={disabled||!manualText.trim()} onClick={()=>{const model=manualText.trim();patch({model,models:[...new Set([...(profile.models||[]),model])]});setManualText('')}}>添加文本模型</button></div>
   <label>视觉模型<select aria-label="视觉模型" disabled={disabled} value={profile.visionModel||'qwen3-vl-plus'} onChange={e=>patch({visionModel:e.target.value})}>{visionCandidates.filter(Boolean).map(model=><option key={model} value={model}>{model}</option>)}</select></label>
   <div className="row"><input aria-label="自定义视觉模型 ID" disabled={disabled} value={manualVision} placeholder="自定义视觉模型 ID" onChange={e=>setManualVision(e.target.value)}/><button disabled={disabled||!manualVision.trim()} onClick={()=>{const model=manualVision.trim();patch({visionModel:model,models:[...new Set([...(profile.models||[]),model])]});setManualVision('')}}>添加视觉模型</button></div>
-  <p className="hint">纯文本默认使用 qwen3.8-flash；含图像的任务自动切换到视觉模型，默认 qwen3-vl-plus。官方模型列表不保证每个模型支持视觉输入；如服务商提供其他视觉模型，请手动填写完整 ID。模型调用会将字幕、图片和课程资料发送到你配置的服务端。</p>
+  <p className="hint">纯文本默认使用 qwen3.8-flash；含图像的任务自动切换到视觉模型，默认 qwen3-vl-plus。视觉候选按可用模型的 VL 名称筛选，名称不保证支持图像；请核对服务商说明，也可手动填写完整 ID。模型调用会将字幕、图片和课程资料发送到你配置的服务端。</p>
   <div className="toolbar"><button disabled={disabled||!hasKey} onClick={()=>void readModels()}>读取可用模型</button><button disabled={disabled||!hasKey} onClick={()=>void test()}>测试千问连接</button></div>{notice&&<p role="status" className="notice">{notice}</p>}
  </section></div>
 }

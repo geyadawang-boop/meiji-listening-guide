@@ -2,6 +2,17 @@ import type { Profile } from '../shared/types'
 import type { SettingsStore } from './settings'
 export interface FileInput {filename:string;file_data:string;path?:string}
 export interface ChatMessage { role:'system'|'user'|'assistant'; content:string|({type:'text';text:string}|{type:'file';file:FileInput}|{type:'image_url';image_url:{url:string}})[] }
+class ApiConnectionError extends Error {}
+export function isRetryableApiError(error:unknown):boolean {
+  // 只重试连接故障；鉴权失败和明确截断不属于此类。
+  for(let depth=0;error instanceof Error&&depth<3;depth++){
+    if(error instanceof ApiConnectionError||error.name==='TimeoutError')return true
+    const code=(error as Error&{code?:string}).code||''
+    if(/ERR_CONNECTION_(CLOSED|RESET|ABORTED)|ERR_(NETWORK_CHANGED|TIMED_OUT|EMPTY_RESPONSE)|ECONNRESET|ECONNABORTED|ETIMEDOUT|UND_ERR_(SOCKET|CONNECT_TIMEOUT|HEADERS_TIMEOUT|BODY_TIMEOUT)|fetch failed|network error|aborted due to timeout|HTTP (429|5\d\d)/i.test(code+' '+error.message))return true
+    error=error.cause
+  }
+  return false
+}
 async function requestError(response:Response,nativeFile:boolean,hasFile:boolean) {
   let hint=''
   if(response.status===400){
@@ -23,7 +34,7 @@ export async function readSse(body:ReadableStream<Uint8Array>,onText:(text:strin
   const event=(value:string)=> {
     const data=value.split('\n').filter(l=>l.startsWith('data:')).map(l=>l.slice(5).trimStart()).join('\n').trim()
     if(!data)return
-    if(data==='[DONE]'){if(finishReason==='stop')completed=true;return}
+    if(data==='[DONE]'){if(!finishReason||finishReason==='stop')completed=true;return}
     const obj=JSON.parse(data)
     if(obj.error||obj.type==='response.failed'||obj.type==='response.incomplete')throw new Error('API 未完成流式输出，请检查服务配置或输出长度限制')
     if(obj.type==='response.completed'){if(obj.response?.status&&obj.response.status!=='completed')throw new Error('API 未完成流式输出');completed=true;return}
@@ -31,6 +42,7 @@ export async function readSse(body:ReadableStream<Uint8Array>,onText:(text:strin
     if(typeof reason==='string'){
       finishReason=reason
       if(reason==='length'||reason==='content_filter')throw new Error(reason==='length'?'API 输出达到长度限制，未保存不完整结果':'API 输出被内容安全过滤，未保存不完整结果')
+      if(reason&&reason!=='stop')throw new Error('API 未正常结束文本输出，未保存结果')
       if(reason==='stop')completed=true
     }
     const delta=obj.type==='response.output_text.delta'?obj.delta:obj.choices?.[0]?.delta?.content
@@ -43,7 +55,7 @@ export async function readSse(body:ReadableStream<Uint8Array>,onText:(text:strin
       while((index=buffer.indexOf('\n\n'))>=0) {event(buffer.slice(0,index));buffer=buffer.slice(index+2)}
       if(done){if(buffer.trim())event(buffer);break}
     }
-    if(!completed)throw new Error('API 流提前结束，缺少有效完成标记，未保存不完整结果')
+    if(!completed)throw new ApiConnectionError('API 流提前结束，缺少有效完成标记，未保存不完整结果')
     if(!all.trim())throw new Error('API 未返回文本')
     return all
   } finally {reader.releaseLock()}
@@ -67,9 +79,10 @@ export class Api {
     const data=await response.json() as {status?:string;incomplete_details?:unknown;output?:{type:string;content?:{type:string;text?:string}[]}[];choices?:{finish_reason?:string;message?:{content?:string|{type:string;text?:string}[]}}[]}
     if(data.status==='incomplete'||data.status==='failed'||(responses&&data.status!=='completed'))throw new Error('API 未完成输出，请检查输出长度限制或服务状态')
     const choice=data.choices?.[0],finish=choice?.finish_reason
-    if(!responses&&finish!=='stop')throw new Error(finish==='length'?'API 输出达到长度限制，未保存不完整结果':finish==='content_filter'?'API 输出被内容安全过滤，未保存不完整结果':'API 未正常结束，未保存结果')
+    // 兼容未返回 finish_reason 的完整 JSON 响应。
+    if(!responses&&finish!=null&&finish!=='stop')throw new Error(finish==='length'?'API 输出达到长度限制，未保存不完整结果':finish==='content_filter'?'API 输出被内容安全过滤，未保存不完整结果':'API 未正常结束，未保存结果')
     const body=choice?.message?.content,value=responses?data.output?.filter(item=>item.type==='message').flatMap(item=>item.content||[]).filter(part=>part.type==='output_text').map(part=>part.text||'').join(''):Array.isArray(body)?body.filter(part=>part.type==='text').map(part=>part.text||'').join(''):body
-    if(!value)throw new Error('API 未返回有效文本')
+    if(!value?.trim())throw new Error('API 未返回有效文本')
     return value
   }
   async models(profile:Profile):Promise<string[]> {

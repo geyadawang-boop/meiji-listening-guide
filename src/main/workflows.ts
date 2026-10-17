@@ -7,12 +7,12 @@ import { notesSchema, questionSchema, type LectureNotes, type Progress, type Pra
 import { parseSrt, toSrt, time, verifyNotes, keywordCandidates } from '../shared/srt'
 import { Store } from './db'
 import { SettingsStore } from './settings'
-import type { Api } from './api'
-import { chunks, parseCourseware } from './documents'
+import { isRetryableApiError, type Api } from './api'
+import { chunks, parseCourseware, parseCoursewareCache, coursewareCacheLimitations, coursewareSourceIdentity, serializeCoursewareSourceCache } from './documents'
 import { readTranscript } from './transcript'
 import { prepareAnswer, type AnswerDependencies } from './practice-answer'
 export class Workflows {
-  constructor(private store:Store,private settings:SettingsStore,private api:Pick<Api,'chat'|'json'>,private progress:(p:Progress)=>void,private answers?:AnswerDependencies,private batchMode=false){}
+  constructor(private store:Store,private settings:SettingsStore,private api:Pick<Api,'chat'|'json'>,private progress:(p:Progress)=>void,private answers?:AnswerDependencies){}
   private async readyAnswers(result:PracticeSet,course:string,signal?:AbortSignal){
     if(!this.answers)return
     for(const group of ['past','extended','generated'] as const)for(const [index,q] of (result[group]||[]).entries()){
@@ -72,15 +72,19 @@ export class Workflows {
       const prompt=this.settings.prompt('correction')
       const hash=createHash('sha256').update(JSON.stringify({engine:'qwen',connection:this.settings.connectionFingerprint(),segments:source.segments,prompt}))
       report('本地解析课件','提取页面文字与有限嵌入图片；不会上传原始 PPT/PDF 文件')
-      const data=await readFile(lecture.ppt_path),courseware=await parseCourseware(lecture.ppt_path)
+      const data=await readFile(lecture.ppt_path),courseware=await parseCourseware(lecture.ppt_path),sourceIdentity=await coursewareSourceIdentity(lecture.ppt_path)
       hash.update(data)
-      const limitations=[...courseware.omissions]
+      const cachedCourseware=parseCoursewareCache(lecture.ppt_text,sourceIdentity)
+      const preserveCached=!!cachedCourseware.text.trim()&&(cachedCourseware.state!=='verified'||cachedCourseware.provenance==='manual'||cachedCourseware.provenance==='ocr')
+      const selectedText=preserveCached?cachedCourseware.text:courseware.text
+      const limitations=[...courseware.omissions,...(preserveCached?coursewareCacheLimitations(cachedCourseware):[])]
       if(courseware.needsOcr)limitations.push('扫描 PDF：本地没有提取到足够文字，未执行 OCR。')
-      const ppt=courseware.text+(limitations.length?'\n\n[课件提取限制]\n'+[...new Set(limitations)].map(item=>'- '+item).join('\n'):'')
+      const ppt=selectedText+(limitations.length?'\n\n[课件提取限制]\n'+[...new Set(limitations)].map(item=>'- '+item).join('\n'):'')
+      const storedPpt=preserveCached?lecture.ppt_text:await serializeCoursewareSourceCache(lecture.ppt_path,courseware.text,'local',courseware.needsOcr,courseware.omissions)
       const modelLimitations=[...new Set(limitations)]
       const extracted=ppt.slice(0,24000)
       if(ppt.length>extracted.length){modelLimitations.push('课件文字超过 24,000 字，本次只发送开头部分。');report('课件文字受限','课件文字超过 24,000 字；本次只发送开头部分')}
-      this.store.db.prepare('UPDATE lectures SET ppt_text=? WHERE id=?').run(ppt,lectureId)
+      if(!preserveCached)this.store.db.prepare('UPDATE lectures SET ppt_text=? WHERE id=?').run(storedPpt,lectureId)
       const fingerprint=hash.digest('hex'),checkpoint=this.store.correctionCheckpoint(lectureId)
       const schema=z.array(z.object({id:z.number().int(),text:z.string().min(1),uncertain:z.boolean(),reason:z.string()})),result=checkpoint?.fingerprint===fingerprint?checkpoint.segments:[]
       if(result.length)report('继续校订',`已恢复 ${result.length}/${source.segments.length} 条，从未完成的批次继续`)
@@ -104,8 +108,7 @@ export class Workflows {
           try{corrected=await this.api.json(prompt,{courseware:extracted,coursewareLimitations:batchLimitations,lectureContext,instructions:'结合课件文字、附加页面图片与相邻原文理解当前批次。扫描 PDF 或没有提取到的图表内容不可猜测；limitations 说明未附加的页面及原因。rows 是必须逐条返回的记录；lectureContext 仅作局部上下文，不要额外返回。',rows:block.map((s,j)=>({id:i+j,text:s.text}))},validate,signal,undefined,images.length?{images}:undefined);break}
           catch(error){
             if(signal?.aborted)throw error
-            const message=error instanceof Error?error.message:String(error)
-            if(attempt===2||!/ERR_CONNECTION_(CLOSED|RESET|ABORTED)|ERR_(NETWORK_CHANGED|TIMED_OUT|EMPTY_RESPONSE)|fetch failed|network error|TimeoutError|aborted due to timeout|HTTP (429|5\d\d)/i.test(message))throw error
+            if(attempt===2||!isRetryableApiError(error))throw error
             report('连接重试',`当前批次连接中断，自动重试 ${attempt+1}/2；已保存 ${result.length} 条`)
             await delay(attempt===0?1000:3000,undefined,{signal})
           }
@@ -118,7 +121,7 @@ export class Workflows {
       }
       const folder=join(this.store.root,'courses',lecture.course_id,'transcript-results',lectureId);await mkdir(folder,{recursive:true})
       await writeFile(join(folder,'校订字幕.srt'),toSrt(result),'utf8')
-      this.store.db.prepare('UPDATE lectures SET transcript_text=?,time_estimated=?,ppt_text=? WHERE id=?').run(source.text,source.estimated?1:0,ppt,lectureId)
+      this.store.db.prepare('UPDATE lectures SET transcript_text=?,time_estimated=?,ppt_text=? WHERE id=?').run(source.text,source.estimated?1:0,storedPpt,lectureId)
       this.store.saveSubtitles(lectureId,result);report('完成','原文与 PPT 校订完成；疑点及原文已保留'+(source.estimated?'，时间为估算':'，保留原文时间点'))
       return this.store.lectureDetail(lectureId)
     }catch(error){const saved=this.store.correctionCheckpoint(lectureId);this.store.status(lectureId,saved?'校订未完成，可继续':signal?.aborted?'已取消':'需核对');if(saved&&!signal?.aborted)throw new Error(`已保存 ${saved.segments.length}/${saved.total} 条，点击继续校订可从断点恢复。${error instanceof Error?error.message:'当前批次失败'}`);throw error}
@@ -129,9 +132,10 @@ export class Workflows {
     if(!detail.segments.length)throw new Error('请先生成或导入完整字幕')
     const result:LectureNotes={keyPoints:[],notTested:[],uncertain:[]}
     const full=detail.segments.map(s=>`[${time(s.start,false)}] ${s.text}`).join('\n')
-    const coursewareText=detail.lecture.ppt_text,limitationMarker='[课件提取限制]',markerIndex=coursewareText.lastIndexOf(limitationMarker)
+    const cached=detail.lecture.ppt_path?await coursewareSourceIdentity(detail.lecture.ppt_path).catch(()=>undefined):undefined
+    const parsedCache=parseCoursewareCache(detail.lecture.ppt_text,cached??(detail.lecture.ppt_path?null:undefined)),coursewareText=parsedCache.text,limitationMarker='[课件提取限制]',markerIndex=coursewareText.lastIndexOf(limitationMarker)
     let courseware=markerIndex>=0?coursewareText.slice(0,markerIndex).trimEnd():coursewareText
-    const limitations=markerIndex>=0?coursewareText.slice(markerIndex+limitationMarker.length).split(/\r?\n/).map(line=>/^\s*-\s*(.+)$/.exec(line)?.[1]?.trim()).filter((line):line is string=>!!line):[]
+    const limitations=[...coursewareCacheLimitations(parsedCache),...(markerIndex>=0?coursewareText.slice(markerIndex+limitationMarker.length).split(/\r?\n/).map(line=>/^\s*-\s*(.+)$/.exec(line)?.[1]?.trim()).filter((line):line is string=>!!line):[])]
     if(/^\[扫描 PDF[：:]/.test(courseware)){limitations.push('课件为扫描 PDF，未执行 OCR。')}
     if(courseware.length>12000){courseware=courseware.slice(0,12000);limitations.push('用于笔记生成的课件文字超过 12,000 字，仅发送开头部分。');this.progress({lectureId,stage:'课件文字受限',message:'笔记请求的课件文字限于前 12,000 字；已将截断情况告知模型'})}
     const coursewareLimitations=[...new Set(limitations)]

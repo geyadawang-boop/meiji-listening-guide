@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { ensureLibrary } from '../library';
-import { copyInto, importDocument, parseCourseware } from '../documents';
+import { copyInto, importDocument, parseCourseware, serializeCoursewareSourceCache } from '../documents';
 import { questionSchema } from '../../shared/types';
 import { readTranscript } from '../transcript';
 import type { ApplicationContext } from '../main';
@@ -75,10 +75,12 @@ export function createCoursesHandler(context: Pick<ApplicationContext, "db" | "d
                     const course = courseId();
                     db.course(course);
                     const source = z.string().min(1).parse(object.transcriptPath), ppt = z.string().parse(object.pptPath || ''), original = await readTranscript(source);
-                    const parsed = ppt ? await parseCourseware(ppt) : { text: '', needsOcr: false };
-                    if (parsed.needsOcr)
+                    const parsed = ppt ? await parseCourseware(ppt) : undefined;
+                    if (parsed?.needsOcr)
                         throw new Error('课件是扫描 PDF，请使用 PPTX 或文字 PDF');
-                    const lecture = db.createLecture(course, z.string().min(1).max(200).parse(object.title), '', ppt ? await copyInto(root, course, ppt, 'courseware', await directory('PPT', course)) : '', parsed.text);
+                    const pptPath = ppt ? await copyInto(root, course, ppt, 'courseware', await directory('PPT', course)) : '';
+                    const pptText = ppt && parsed ? await serializeCoursewareSourceCache(pptPath, parsed.text, 'local', parsed.needsOcr, parsed.omissions) : '';
+                    const lecture = db.createLecture(course, z.string().min(1).max(200).parse(object.title), '', pptPath, pptText);
                     const path = await copyInto(root, course, source, 'transcripts', await directory('语音原文', course));
                     db.db.prepare('UPDATE lectures SET transcript_path=?,transcript_text=?,time_estimated=?,status=? WHERE id=?').run(path, original.text, original.estimated ? 1 : 0, '待校订', lecture.id);
                     return db.lecture(lecture.id);
@@ -97,7 +99,8 @@ export function createCoursesHandler(context: Pick<ApplicationContext, "db" | "d
                     if (parsed.needsOcr)
                         throw new Error('课件是扫描件，需要先 OCR 为文本 PDF');
                     const path = await copyInto(root, lecture.course_id, source, 'courseware', await directory('PPT', lecture.course_id));
-                    db.db.prepare('UPDATE lectures SET ppt_path=?,ppt_text=?,ppt_processed=0 WHERE id=?').run(path, parsed.text, lecture.id);
+                    const cachedText = await serializeCoursewareSourceCache(path, parsed.text, 'local', parsed.needsOcr, parsed.omissions);
+                    db.db.prepare('UPDATE lectures SET ppt_path=?,ppt_text=?,ppt_processed=0 WHERE id=?').run(path, cachedText, lecture.id);
                     db.db.prepare('DELETE FROM correction_checkpoints WHERE lecture_id=?').run(lecture.id);
                     db.db.prepare('DELETE FROM subtitles WHERE lecture_id=?').run(lecture.id);
                     db.db.prepare('DELETE FROM lecture_notes WHERE lecture_id=?').run(lecture.id);
