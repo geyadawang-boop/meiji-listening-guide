@@ -5,11 +5,16 @@ export function RuntimePanel() {
   [error, setError] = useState(''),
   [busy, setBusy] = useState(false),
   [notice, setNotice] = useState('')
+ const isWindows = navigator.platform.toLowerCase().startsWith('win')
  const refresh = () => window.assistant.invoke<RuntimeStatus>('runtime:status').then(setData)
  useEffect(() => {
   void refresh().catch(e => setError(String(e)))
  }, [])
  async function install(id: string) {
+  if (!isWindows) {
+   setError('运行组件目前仅支持 Windows，无法在当前平台安装。')
+   return
+  }
   setBusy(true)
   setError('')
   try {
@@ -29,6 +34,11 @@ export function RuntimePanel() {
    <h3>应用与运行组件</h3>
    <p>梅酱的听课指南 {data?.version || ''}</p>
    <p className="hint">完整包可离线使用。轻量包可选择同版本组件文件夹安装；不会自动下载或更改你的资料。</p>
+   {!isWindows && (
+    <p className="hint" role="status">
+     运行组件目前仅支持 Windows；此平台不可安装 Windows 专属组件。
+    </p>
+   )}
    {error && (
     <p className="alert" role="alert">
      {error}
@@ -42,7 +52,7 @@ export function RuntimePanel() {
       {' '}
       · {(c.bytes / 1048576).toFixed(1)} MiB · {c.installed ? '已安装' : '未安装'}
      </span>
-     <button disabled={busy || c.installed} onClick={() => void install(c.id)}>
+     <button disabled={busy || c.installed || !isWindows} onClick={() => void install(c.id)}>
       选择组件文件夹安装
      </button>
     </article>
