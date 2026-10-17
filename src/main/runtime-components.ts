@@ -71,7 +71,8 @@ export class RuntimeComponents {
     id: c.id,
     label: c.label,
     bytes: c.bytes,
-    installed: c.files.every(f => existsSync(contained(join(this.resources, c.directory), f.path)))
+    installed:
+     c.files.length > 0 && c.files.every(f => existsSync(contained(join(this.resources, c.directory), f.path)))
    }))
   }
  }
@@ -79,6 +80,7 @@ export class RuntimeComponents {
   const catalog = await this.manifest(),
    component = catalog.components.find(c => c.id === id)
   if (!component) throw new Error('未知组件')
+  if (!component.files.length) throw new Error('组件文件清单为空，未安装')
   const target = contained(this.resources, component.directory)
   if (existsSync(target)) throw new Error('组件目录已存在；请使用完整更新包修复，避免覆盖正在使用的文件')
   const descriptor = JSON.parse(await readFile(await regular(source, 'component.json'), 'utf8'))
