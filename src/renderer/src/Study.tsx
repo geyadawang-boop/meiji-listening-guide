@@ -334,9 +334,7 @@ export function Study({
        void run(async () => {
         setEntries(await invoke('study:save', {entries}))
         await refresh()
-        setNotice(
-         '课表已保存，关联课次已按课表改名。核验时间已计算；自动运行通过 Codex 定时任务设置，教材不会自动划线。'
-        )
+        setNotice('课表已保存，关联课次已按课表改名。核验时间已计算。请手动检查课程资料，再生成并保存教材划线建议。')
        })
       }
      >
