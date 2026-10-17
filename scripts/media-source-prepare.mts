@@ -63,7 +63,10 @@ export async function downloadSource(source: Source, destination: string) {
    url = new URL(next, url).href
    continue
   }
-  check(response.ok && response.body, 'Source download HTTP ' + response.status)
+  check(
+   response.ok && response.body,
+   'Source ' + source.id + ' download HTTP ' + response.status + ' at ' + parsed.hostname
+  )
   const declared = response.headers.get('content-length')
   check(declared === null || Number(declared) === source.size, 'Unexpected source Content-Length')
   const file = await open(destination, 'wx', 0o600)
@@ -222,11 +225,14 @@ export async function prepareBuildSources(request: {sourceIds: string[]; offline
   unpacked = join(work, 'sources')
  await mkdir(archives, {mode: 0o700})
  await mkdir(unpacked, {mode: 0o700})
+ let activeSource = 'archive-tool'
  try {
   const tarVersion = await tar(['--version'])
   check(tarVersion.startsWith('bsdtar '), 'This bounded source preparer requires BSD tar')
   const receipts = []
   for (const source of selected) {
+   activeSource = source.id + ' (' + new URL(source.url).hostname + ')'
+   console.error('Preparing source: ' + source.id)
    const archive = join(archives, source.archive)
    if (request.offlineDirectory) {
     const input = join(request.offlineDirectory, source.archive)
@@ -271,7 +277,9 @@ export async function prepareBuildSources(request: {sourceIds: string[]; offline
   await writeFile(join(work, 'source-report.json'), JSON.stringify(report, null, 2) + '\n', {flag: 'wx', mode: 0o600})
   return {work, report}
  } catch (error) {
-  throw new Error('Source preparation failed; incomplete work retained in ' + work, {cause: error})
+  throw new Error('Source preparation failed for ' + activeSource + '; incomplete work retained in ' + work, {
+   cause: error
+  })
  }
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

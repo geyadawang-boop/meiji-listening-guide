@@ -20,15 +20,18 @@ export const buildSources = [
   version: 'b35605ace3ddf7c1a5d67a2eb553f034aef41d55',
   root: 'x264-b35605ace3ddf7c1a5d67a2eb553f034aef41d55',
   archive: 'x264-b35605ac.tar.bz2',
-  url: 'https://code.videolan.org/videolan/x264/-/archive/b35605ace3ddf7c1a5d67a2eb553f034aef41d55/x264-b35605ace3ddf7c1a5d67a2eb553f034aef41d55.tar.bz2',
-  hosts: ['code.videolan.org'],
+  url: 'https://distfiles.macports.org/x264/x264-b35605ace3ddf7c1a5d67a2eb553f034aef41d55.tar.bz2',
+  originalSource:
+   'https://code.videolan.org/videolan/x264/-/archive/b35605ace3ddf7c1a5d67a2eb553f034aef41d55/x264-b35605ace3ddf7c1a5d67a2eb553f034aef41d55.tar.bz2',
+  hosts: ['distfiles.macports.org'],
   size: 848719,
   sha256: '6eeb82934e69fd51e043bd8c5b0d152839638d1ce7aa4eea65a3fedcf83ff224',
   identity: 'Official VideoLAN commit b35605ace3ddf7c1a5d67a2eb553f034aef41d55',
   evidence: 'https://code.videolan.org/videolan/x264/-/tree/b35605ace3ddf7c1a5d67a2eb553f034aef41d55',
   licenseFiles: ['COPYING'],
   license: 'GPL-2.0-or-later',
-  digestEvidence: 'Complete source archive locally hashed'
+  digestEvidence:
+   'Complete MacPorts mirror archive matches independently obtained official archive size and SHA256; official endpoint returns HTTP 406 to Node fetch'
  },
  {
   id: 'vpx',
