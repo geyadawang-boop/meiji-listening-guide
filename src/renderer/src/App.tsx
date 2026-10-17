@@ -967,6 +967,14 @@ export default function App() {
                  <button onClick={() => exportResult('notes', 'docx')}>Word</button>
                 </>
                )}
+               <button disabled={busy} onClick={() => exportResult('evidence-bundle', 'json')}>
+                <StudyIcon name="download" />
+                证据包 JSON
+               </button>
+               <button disabled={busy} onClick={() => exportResult('evidence-bundle', 'md')}>
+                <StudyIcon name="download" />
+                证据包 Markdown
+               </button>
               </div>
               {lecture.notes ? (
                <Notes
@@ -1287,7 +1295,7 @@ export default function App() {
            <span className={`composer-brand ${modelBrand}`} aria-hidden="true">
             {modelBrand === 'custom' && <ModelNavIcon />}
            </span>
-           <span className="composer-model-name">{activeProfile?.model || 'Codex · 自动'}</span>
+           <span className="composer-model-name">{activeProfile?.model || '请选择千问模型'}</span>
            <DshChevronDownIcon />
           </button>
           {busy ? (
