@@ -185,6 +185,35 @@ try {
   const receipt = prepared.report.receipts.find(r => r.source.id === id)!
   const cwd = join(prepared.work, receipt.path)
   console.log('Building source: ' + id)
+  if (id === 'vorbis') {
+   // libvorbis 1.3.7 unconditionally appends obsolete PowerPC-era Darwin flags,
+   // including to explicit CFLAGS. Modern arm64 ld rejects this flag.
+   const patches = []
+   for (const file of ['configure', 'configure.ac']) {
+    const path = join(cwd, file),
+     before = await readFile(path, 'utf8'),
+     token = ' -force_cpusubtype_ALL'
+    check(before.split(token).length === 4, 'Unexpected locked Vorbis Darwin flag occurrences')
+    const after = before.replaceAll(token, '')
+    await writeFile(path, after)
+    patches.push({
+     file,
+     removedToken: token,
+     occurrences: 3,
+     beforeSha256: createHash('sha256').update(before).digest('hex'),
+     afterSha256: createHash('sha256').update(after).digest('hex')
+    })
+   }
+   const patchReceipt = {
+    source: receipt.source.id,
+    version: receipt.source.version,
+    reason: 'Remove obsolete Darwin CPU-subtype flag rejected by arm64 linker; no codec or test removed.',
+    failureEvidence: 'https://github.com/geyadawang-boop/meiji-listening-guide/actions/runs/39049861297',
+    patches
+   }
+   report.sourcePatches = patchReceipt
+   await writeFile(join(artifacts, 'vorbis-darwin-patch.json'), JSON.stringify(patchReceipt, null, 2) + '\n')
+  }
   try {
    await execute(join(cwd, 'configure'), ['--prefix=' + prefix, ...configs[id]], cwd, env, id + '-configure')
    await execute('/usr/bin/make', ['-j3'], cwd, env, id + '-make')
