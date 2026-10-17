@@ -6860,7 +6860,7 @@ QQ 后台组件为用户提供发行包的 NapCat.Shell.Windows.Node.zip（4.18.
 ## TypeScript 迁移新增依赖（2026-10-14）
 
 qr 0.7.2：Copyright (c) 2023 Paul Miller，MIT OR Apache-2.0，包内保留许可证。官方来源 https://github.com/paulmillr/qr 。
-entities：由 package-lock.json 固定版本，BSD-2-Clause，包内保留许可证。官方来源 https://github.com/fb55/entities 。
+entities：由 pnpm-lock.yaml 固定版本，BSD-2-Clause，包内保留许可证。官方来源 https://github.com/fb55/entities 。
 saxes 6.0.0 / xmlchars 2.2.0：ISC，包内保留版权和许可声明；XML 解析只读取文本，不加载外部实体。官方来源 https://github.com/lddubeau/saxes 和 https://github.com/lddubeau/xmlchars 。
 esbuild 0.25.12：MIT，固定开发依赖，用于集成测试源码构建，许可随包保留。官方来源 https://github.com/evanw/esbuild 。
 Transformers.js 4.3.1：Apache-2.0；onnxruntime-node 1.30.0：MIT。包内保留许可证和原生运行库说明。Whisper Small ONNX 修订及权重 SHA256 见 resources/asr/onnx-small/acquisition.json；上游模型 openai/whisper-small 声明 Apache-2.0，模型目录保留说明和许可全文。Silero V6 权重来自现有 faster-whisper 1.2.1 运行资源；VAD 实现改写为 TypeScript，保留原 MIT 署名和许可证。模型推理仅使用本地文件。

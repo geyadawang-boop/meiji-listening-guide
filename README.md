@@ -6,34 +6,38 @@ Windows x64 桌面应用。业务逻辑、前后端、独立工作进程及现�
 
 ## 开发
 
-需要 Node.js 24 和 npm。依赖由 package-lock.json 固定，SQLite 原生模块须使用 Electron ABI：
+需要 Node.js 24 和 pnpm。依赖由 pnpm-lock.yaml 固定，SQLite 原生模块须使用 Electron ABI：
 
-```powershell
-npm ci
-npm run dev
-npm run build
+```sh
+pnpm install
+pnpm dev
+pnpm build
 ```
+
+开发与构建入口在 macOS/Linux/Windows 均可用（发布产物仍以 Windows 为主）；macOS/Linux 的 lite 安装包由 CI 构建，功能适配现状见 docs/跨平台适配清单.md。
 
 resources 只包含独立 ONNX 模型、Codex 连接组件、NapCat Node 组件和 FFmpeg/FFprobe 及其许可证。它们是必要第三方资源，不能以 TypeScript 源码代替二进制或权重。源码包不含这些大型文件，需恢复同版本组件。PDF 由应用原生 TypeScript 库处理，不需要 Python。
 
 ## 检查
 
-```powershell
-npm run typecheck
+```sh
+pnpm verify
 node scripts/audit-language-migration.mts --check
 ```
+
+`pnpm verify` 即 `pnpm typecheck && pnpm check`：全量类型检查加 Biome 格式检查与 lint，任一失败即不通过；CI 与本地使用同一入口。提交前可先运行 `pnpm check:fix` 自动修复格式与可修复告警，风格配置见 biome.jsonc。
 
 当前版本按用户要求删除测试脚本、测试配置和测试启动入口。此前的验收记录仍保留；历史验收不代表全部真实账号和外部站点可用。
 
 ## 发布和恢复组件
 
-```powershell
-npm run build
-node scripts/release.mts portable
-npm run release:full
-npm run release:lite
-npm run release:components
-node scripts/source-package.mts
+```sh
+pnpm build
+pnpm release portable
+pnpm release full
+pnpm release lite
+pnpm release components
+pnpm release:source
 node scripts/restore-runtime.mts knowledge 同版本组件文件夹
 ```
 
