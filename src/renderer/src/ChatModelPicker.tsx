@@ -1,6 +1,6 @@
 import {useEffect, useRef, useState} from 'react'
-import {reasoningOptions} from '../../shared/reasoning'
-import type {Settings} from '../../shared/types'
+import {reasoningOptions} from '@shared/reasoning'
+import type {Settings} from '@shared/types'
 
 // Model/parameter tabs and draft confirmation follow ElecKoi ModelPicker (AGPL-3.0).
 export function ChatModelPicker({

@@ -1,5 +1,5 @@
 import {createContext, useContext, useState} from 'react'
-import {defaultIdentity, type Identity} from '../../shared/identity'
+import {defaultIdentity, type Identity} from '@shared/identity'
 import buddy from './assets/mei-avatar.png'
 import lian from './assets/lian-avatar.jpg'
 export const IdentityContext = createContext<Identity>(defaultIdentity)

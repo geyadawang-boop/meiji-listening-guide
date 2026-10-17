@@ -1,6 +1,6 @@
-import type {LibraryFile} from '../../shared/types'
+import type {LibraryFile} from '@shared/types'
 import {useEffect, useRef, useState} from 'react'
-import {defaultPptExtractPrompt, type PptExtractReview, type PptExtractPage} from '../../shared/ppt-extract'
+import {defaultPptExtractPrompt, type PptExtractReview, type PptExtractPage} from '@shared/ppt-extract'
 const invoke = <T,>(action: string, args?: unknown) => window.assistant.invoke<T>(action, args)
 export function PptExtract({
  visible,

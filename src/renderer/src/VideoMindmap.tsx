@@ -1,4 +1,4 @@
-import {noteGroups, type VideoNotePoint} from '../../shared/video-notes'
+import {noteGroups, type VideoNotePoint} from '@shared/video-notes'
 export function VideoMindmap({title, points}: {title: string; points: VideoNotePoint[]}) {
  return (
   <div className="video-mindmap" aria-label="课程思维导图">

@@ -1,6 +1,6 @@
 import {useEffect, useRef, useState} from 'react'
 import {KnowledgeClassification} from './KnowledgeClassification'
-import type {KnowledgeEntry, KnowledgeList, KnowledgeHit, KnowledgeSearch} from '../../shared/knowledge'
+import type {KnowledgeEntry, KnowledgeList, KnowledgeHit, KnowledgeSearch} from '@shared/knowledge'
 const invoke = <T,>(action: string, args?: unknown) => window.assistant.invoke<T>(action, args)
 type Answer = {
  answer: {paragraphs: {text: string; citations: {id: string; quote: string}[]}[]; limitation: string}

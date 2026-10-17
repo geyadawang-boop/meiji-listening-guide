@@ -1,5 +1,5 @@
 import {useEffect, useState} from 'react'
-import type {Course, LibraryFile} from '../../shared/types'
+import type {Course, LibraryFile} from '@shared/types'
 import {FolderNavIcon, TrashIcon} from './ManagementIcons'
 export function FileManager({
  busy,

@@ -3,8 +3,8 @@ import {SubtitleBatchRecords} from './SubtitleBatchRecords'
 import {MediaDownloads} from './MediaDownloads'
 import {Discussion} from './Discussion'
 import {BiliBrowse} from './BiliBrowse'
-import type {VideoSeries} from '../../shared/video-ppt'
-import type {SubtitleSyncTask} from '../../shared/subtitle-sync'
+import type {VideoSeries} from '@shared/video-ppt'
+import type {SubtitleSyncTask} from '@shared/subtitle-sync'
 const invoke = <T,>(action: string, args?: unknown) => window.assistant.invoke<T>(action, args)
 type Folder = {id: number; title: string; media_count: number}
 type Video = {id: number; bvid: string; title: string; duration: number; available: boolean; url: string}

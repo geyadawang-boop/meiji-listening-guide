@@ -26,5 +26,5 @@ export default defineConfig({
    rollupOptions: {output: {format: 'cjs', entryFileNames: '[name].cjs'}}
   }
  },
- renderer: {plugins: [react()]}
+ renderer: {plugins: [react()], resolve: {alias: {'@shared': resolve('src/shared')}}}
 })

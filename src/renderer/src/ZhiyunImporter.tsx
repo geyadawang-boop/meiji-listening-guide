@@ -1,5 +1,5 @@
 import {useEffect, useState} from 'react'
-import type {ZhiyunCourse, ZhiyunLesson} from '../../shared/types'
+import type {ZhiyunCourse, ZhiyunLesson} from '@shared/types'
 const invoke = <T,>(action: string, args?: unknown) => window.assistant.invoke<T>(action, args)
 export function ZhiyunImporter({
  visible,

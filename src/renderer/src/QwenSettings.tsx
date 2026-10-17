@@ -1,5 +1,5 @@
 import {useEffect, useState} from 'react'
-import type {Profile, Settings} from '../../shared/types'
+import type {Profile, Settings} from '@shared/types'
 const invoke = <T,>(action: string, args?: unknown) => window.assistant.invoke<T>(action, args)
 const fallback: Profile = {
  id: 'qwen-default',

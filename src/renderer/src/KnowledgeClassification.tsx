@@ -1,5 +1,5 @@
 import {useEffect, useState} from 'react'
-import type {KnowledgeEntry} from '../../shared/knowledge'
+import type {KnowledgeEntry} from '@shared/knowledge'
 const invoke = <T,>(action: string, args?: unknown) => window.assistant.invoke<T>(action, args)
 type Selection = {
  type: string

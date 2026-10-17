@@ -1,8 +1,8 @@
 import {useEffect, useRef, useState} from 'react'
 import {getDocument, GlobalWorkerOptions} from 'pdfjs-dist/legacy/build/pdf.mjs'
 import workerUrl from 'pdfjs-dist/legacy/build/pdf.worker.mjs?url'
-import {highlightColors, highlightLabels, checkAt, type Highlight, type StudyEntry} from '../../shared/study'
-import type {Course, Detail} from '../../shared/types'
+import {highlightColors, highlightLabels, checkAt, type Highlight, type StudyEntry} from '@shared/study'
+import type {Course, Detail} from '@shared/types'
 GlobalWorkerOptions.workerSrc = workerUrl
 const invoke = <T,>(action: string, args?: unknown) => window.assistant.invoke<T>(action, args)
 type Book = {id: string; path: string; pages: number}

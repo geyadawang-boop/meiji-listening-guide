@@ -1,9 +1,9 @@
 import {useState} from 'react'
-import type {Course, ChatSession} from '../../shared/types'
+import type {Course, ChatSession} from '@shared/types'
 import {TrashIcon, CourseBookIcon} from './ManagementIcons'
 import {MessageNavIcon} from './SidebarIcons'
 import {DshChevronDownIcon} from './ChatIcons'
-import {courseLabel, courseYear, courseSubject, sortCoursesForNavigation} from '../../shared/course-groups'
+import {courseLabel, courseYear, courseSubject, sortCoursesForNavigation} from '@shared/course-groups'
 export function CourseList({
  courses,
  selected,
