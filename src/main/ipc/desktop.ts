@@ -14,7 +14,7 @@ import {validateDeepSeek} from '../deepseek'
 import {Api} from '../api'
 import {CodexClient} from '../codex'
 import {type Settings} from '../../shared/types'
-import {exportFile} from '../exports'
+import {exportFile, validateExportFormat} from '../exports'
 import type {ApplicationContext} from '../main'
 import type {IpcHandler} from './handler'
 export function createDesktopHandler(
@@ -437,13 +437,19 @@ export function createDesktopHandler(
     }
     case 'settings:test':
      return job('test-codex', signal => api.chat([{role: 'user', content: '请回复“连接成功”。'}], undefined, signal))
-    case 'export':
+    case 'export': {
+     const detail = db.lectureDetail(id()),
+      kind = z.enum(['subtitles', 'notes', 'practice', 'evidence-bundle']).parse(object.kind),
+      format = z.string().parse(object.format)
+     validateExportFormat(kind, format)
      return exportFile(
-      db.lectureDetail(id()),
-      z.enum(['subtitles', 'notes', 'practice']).parse(object.kind),
-      z.string().parse(object.format),
-      await directory(object.kind === 'practice' ? '历年卷' : '笔记', db.lecture(id()).course_id)
+      detail,
+      kind,
+      format,
+      await directory(kind === 'practice' ? '历年卷' : '笔记', detail.lecture.course_id),
+      kind === 'evidence-bundle' ? db.course(detail.lecture.course_id) : undefined
      )
+    }
     case 'external': {
      const url = new URL(z.string().parse(object.url))
      if (!['http:', 'https:'].includes(url.protocol)) throw new Error('只允许网页链接')
