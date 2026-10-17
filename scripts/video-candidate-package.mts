@@ -69,7 +69,9 @@ export function selectedMemberSize(text: string, name: string) {
  const lines = text
   .replaceAll('\r\n', '\n')
   .split('\n')
-  .filter(line => line.endsWith(' ' + name) || line.includes(' ' + name + ' -> '))
+  .filter(
+   line => line.endsWith(' ' + name) || line.includes(' ' + name + ' -> ') || line.includes(' ' + name + ' link to ')
+  )
  check(lines.length === 1, 'Selected archive member missing or duplicated: ' + name)
  const m = /^-[rwx-]{9}\s+\d+\s+\S+\s+\S+\s+(\d+)\s+[A-Za-z]{3}\s+\d{1,2}\s+(?:\d{4}|\d{1,2}:\d{2})\s+(.+)$/.exec(
   lines[0]
@@ -129,6 +131,10 @@ export async function packageVideoCandidate(value: unknown) {
  const request = requestSchema.parse(value),
   archive = await plain(request.archive),
   reportPath = await plain(request.buildReport)
+ check(
+  (await lstat(archive)).size > 0 && (await lstat(archive)).size <= 1024 * 1024 * 1024,
+  'Candidate archive exceeds size budget'
+ )
  check((await sha(archive)) === request.expectedArchiveSha256, 'Caller archive digest mismatch')
  check((await sha(reportPath)) === request.expectedBuildReportSha256, 'Caller build report digest mismatch')
  check((await lstat(reportPath)).size <= 4 * 1024 * 1024, 'Build report too large')
