@@ -53,6 +53,7 @@ export function createResourcesHandler(
    'visual:prepare-resume',
    'visual:prepare',
    'visual:recognize',
+   'visual:recover-output',
    'media:discussion',
    'media:discussion-import',
    'media:catalog',
@@ -176,6 +177,15 @@ export function createResourcesHandler(
        },
        message => emit({kind: 'progress', data: {stage: '画面识别', message}}),
        signal
+      )
+     )
+    case 'visual:recover-output':
+     return job('恢复画面成果', async () =>
+      visual.recoverSavedOutput(
+       z
+        .string()
+        .regex(/^[a-f0-9]{32}$/)
+        .parse(object.id)
       )
      )
     case 'media:discussion':
