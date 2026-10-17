@@ -21,11 +21,11 @@ resources 只包含独立 ONNX 模型、Codex 连接组件、NapCat Node 组件�
 ## 检查
 
 ```sh
-pnpm ci
+pnpm verify
 node scripts/audit-language-migration.mts --check
 ```
 
-`pnpm ci` 即 `pnpm typecheck && pnpm check`：全量类型检查加 Biome 格式检查与 lint，任一失败即不通过；CI 与本地使用同一入口。提交前可先运行 `pnpm check:fix` 自动修复格式与可修复告警，风格配置见 biome.jsonc。
+`pnpm verify` 即 `pnpm typecheck && pnpm check`：全量类型检查加 Biome 格式检查与 lint，任一失败即不通过；CI 与本地使用同一入口。提交前可先运行 `pnpm check:fix` 自动修复格式与可修复告警，风格配置见 biome.jsonc。
 
 当前版本按用户要求删除测试脚本、测试配置和测试启动入口。此前的验收记录仍保留；历史验收不代表全部真实账号和外部站点可用。
 

@@ -25,7 +25,7 @@
   "format": "biome format --write .",
   "check": "biome check .",
   "check:fix": "biome check --write .",
-  "ci": "pnpm typecheck && pnpm check"
+  "verify": "pnpm typecheck && pnpm check"
  },
  "dependencies": {
   "@huggingface/transformers": "4.3.1",

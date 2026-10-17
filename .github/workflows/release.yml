@@ -44,7 +44,7 @@ jobs:
       - name: Ensure Electron binary
         run: node node_modules/electron/install.js
       - name: Verify (typecheck + format + lint)
-        run: pnpm ci
+        run: pnpm verify
       - name: Typecheck and build
         run: pnpm build
       - name: Package lite installers
