@@ -109,7 +109,6 @@ export function createStudyHandler(
        undefined,
        signal,
        undefined,
-       undefined,
        {images: images.map((url, i) => ({label: 'PPT 第 ' + (i + 1) + ' 页', url}))}
       )
       signal.throwIfAborted()

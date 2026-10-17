@@ -1,13 +1,33 @@
 import {app, safeStorage} from 'electron'
 import {join} from 'node:path'
 import {readFileSync, writeFileSync, mkdirSync, existsSync, renameSync} from 'node:fs'
-import {randomUUID} from 'node:crypto'
+import {createHash} from 'node:crypto'
 import type {Settings, Profile} from '../shared/types'
-import {validateDeepSeek} from './deepseek'
-interface Stored extends Omit<Settings, 'profiles' | 'hasSearchKey' | 'searchKey'> {
- profiles: (Profile & {encryptedKey?: string})[]
+type StoredProfile = Profile & {encryptedKey?: string; apiKey?: string}
+interface Stored extends Omit<Settings, 'profiles' | 'activeProfile' | 'hasSearchKey' | 'searchKey' | 'connection'> {
+ // Keep pre-migration fields intact but never expose or use their credentials.
+ profiles: StoredProfile[]
+ activeProfile?: string
+ connection?: string
+ codex?: unknown
+ qwenProfile?: StoredProfile
  encryptedSearchKey?: string
  videoPolicyVersion?: number
+}
+const defaultProfile = (): Profile => ({
+ id: 'qwen-default',
+ name: '通义千问',
+ provider: 'qwen',
+ baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+ model: '',
+ visionModel: '',
+ apiFormat: 'chat_completions',
+ models: []
+})
+const endpointIdentity = (profile: Profile) => {
+ const url = new URL(profile.baseUrl)
+ if (url.search || url.hash) throw new Error('API 地址不能包含查询参数或片段')
+ return `${url.origin}${url.pathname.replace(/\/$/, '')}`
 }
 export class SettingsStore {
  private path: string
@@ -28,6 +48,13 @@ export class SettingsStore {
       compress: false,
       prompts: {}
      }
+  // Legacy Codex/DeepSeek profiles stay encrypted in their original fields.
+  // The active provider receives a fresh identity and never inherits those keys.
+  if (!this.value.qwenProfile) {
+   this.value.qwenProfile = defaultProfile()
+   this.value.connection = 'qwen'
+   this.flush()
+  }
   if (this.value.videoPolicyVersion !== 2) {
    if (this.value.maxMinutes === 45 || this.value.maxMinutes >= 60) {
     this.value.maxMinutes = 60
@@ -45,19 +72,33 @@ export class SettingsStore {
   }
  }
  public get(): Settings {
-  const {encryptedSearchKey, profiles, videoPolicyVersion, ...rest} = this.value
+  const {
+   encryptedSearchKey,
+   profiles: _legacyProfiles,
+   activeProfile: _legacyActive,
+   connection: _legacyConnection,
+   codex: _legacyCodex,
+   qwenProfile,
+   videoPolicyVersion,
+   ...rest
+  } = this.value
+  const profile: StoredProfile = qwenProfile || {...defaultProfile()},
+   {encryptedKey, apiKey, ...publicProfile} = profile
   return {
    ...rest,
+   connection: 'qwen',
    hasSearchKey: !!encryptedSearchKey,
-   profiles: profiles.map(({encryptedKey, apiKey, ...p}) => ({
-    ...p,
-    hasKey: !!encryptedKey,
-    keyLength: encryptedKey ? this.decrypt(encryptedKey).length : 0
-   }))
+   profiles: [
+    {
+     ...publicProfile,
+     provider: 'qwen',
+     apiFormat: 'chat_completions',
+     hasKey: !!encryptedKey,
+     keyLength: encryptedKey ? this.decrypt(encryptedKey).length : 0
+    }
+   ],
+   activeProfile: profile.id
   }
- }
- public codexSelection(): Settings['codex'] {
-  return this.value.codex ? {...this.value.codex} : undefined
  }
  private encrypt(value: string): string {
   if (!safeStorage.isEncryptionAvailable()) throw new Error('系统加密存储不可用，未保存密钥')
@@ -69,67 +110,62 @@ export class SettingsStore {
  public save(settings: Settings): Settings {
   if (!(settings.maxMinutes >= 1 && settings.maxMinutes <= 60) || !(settings.maxGB > 0 && settings.maxGB <= 10))
    throw new Error('视频限制设置不合法')
-  const profiles = settings.profiles.map(p => {
-   const name = p.name?.trim(),
-    model = p.model?.trim(),
-    baseUrl = p.baseUrl?.trim()
-   if (!name || !model) throw new Error('请填写配置名称和模型名后再保存')
-   if (!baseUrl) throw new Error('请填写 API 的 Base URL 后再保存')
-   let parsed: URL
-   try {
-    parsed = new URL(baseUrl)
-   } catch {
-    throw new Error('API 地址格式不正确，请填写完整地址，例如 https://服务地址/v1')
-   }
-   if (!['https:', 'http:'].includes(parsed.protocol) || parsed.username || parsed.password)
-    throw new Error('API 地址必须是 HTTP(S)，不能包含密码')
-   for (const param of Object.values(p.parameters || {})) {
-    if (
-     (param.temperature !== undefined &&
-      (!Number.isFinite(param.temperature) || param.temperature < 0 || param.temperature > 2)) ||
-     (param.topP !== undefined && (!Number.isFinite(param.topP) || param.topP < 0 || param.topP > 1)) ||
-     (param.maxTokens !== undefined && (!Number.isInteger(param.maxTokens) || param.maxTokens < 1))
-    )
-     throw new Error('模型参数超出允许范围')
-   }
-   const id = p.id || randomUUID(),
-    old = this.value.profiles.find(v => v.id === id)
-   if (p.apiFormat !== undefined && !['chat_completions', 'responses'].includes(p.apiFormat))
-    throw new Error('不支持此 API 接口格式')
-   return {
-    id,
-    name,
-    baseUrl: baseUrl.replace(/\/$/, ''),
-    model,
-    apiFormat: p.apiFormat || old?.apiFormat || 'chat_completions',
-    provider: p.provider || old?.provider || 'custom',
-    parameters: p.parameters || old?.parameters || {},
-    models: p.models || old?.models || [],
-    encryptedKey: p.apiKey?.trim() ? this.encrypt(p.apiKey.trim()) : old?.encryptedKey
-   }
-  })
+  const input =
+    settings.profiles.find(p => p.id === settings.activeProfile) || settings.profiles[0] || defaultProfile(),
+   name = input.name?.trim(),
+   model = input.model?.trim(),
+   visionModel = input.visionModel?.trim() || '',
+   baseUrl = input.baseUrl?.trim()
+  if (!name) throw new Error('请填写配置名称')
+  if (!baseUrl) throw new Error('请填写千问 API 的 Base URL')
+  let parsed: URL
+  try {
+   parsed = new URL(baseUrl)
+  } catch {
+   throw new Error('API 地址格式不正确，请填写完整地址')
+  }
+  if (!['https:', 'http:'].includes(parsed.protocol) || parsed.username || parsed.password)
+   throw new Error('API 地址必须是 HTTP(S)，不能包含密码')
+  endpointIdentity({...input, baseUrl})
+  for (const param of Object.values(input.parameters || {})) {
+   if (
+    (param.temperature !== undefined &&
+     (!Number.isFinite(param.temperature) || param.temperature < 0 || param.temperature > 2)) ||
+    (param.topP !== undefined && (!Number.isFinite(param.topP) || param.topP < 0 || param.topP > 1)) ||
+    (param.maxTokens !== undefined && (!Number.isInteger(param.maxTokens) || param.maxTokens < 1))
+   )
+    throw new Error('模型参数超出允许范围')
+  }
+  const id = 'qwen',
+   old = this.value.qwenProfile,
+   identity = endpointIdentity({...input, baseUrl}),
+   oldIdentity = old ? endpointIdentity(old) : ''
+  if (!input.apiKey?.trim() && old?.encryptedKey && identity !== oldIdentity)
+   throw new Error('API 地址已改变。为避免把旧密钥发送到新地址，请重新填写该地址的千问 API Key')
+  const profile: StoredProfile = {
+   id,
+   name,
+   baseUrl: baseUrl.replace(/\/$/, ''),
+   model,
+   visionModel,
+   apiFormat: 'chat_completions',
+   provider: 'qwen',
+   parameters: input.parameters || {},
+   models: [...new Set([model, visionModel, ...(input.models || [])])],
+   encryptedKey: input.apiKey?.trim() ? this.encrypt(input.apiKey.trim()) : old?.encryptedKey
+  }
   const encryptedSearchKey =
    settings.searchKey === undefined
     ? this.value.encryptedSearchKey
     : settings.searchKey
       ? this.encrypt(settings.searchKey)
       : undefined
-  if (settings.codex && (typeof settings.codex.model !== 'string' || typeof settings.codex.effort !== 'string'))
-   throw new Error('Codex 模型设置不正确')
-  if (settings.connection !== undefined && !['codex', 'deepseek'].includes(settings.connection))
-   throw new Error('模型连接方式不正确')
-  if (settings.connection === 'deepseek') {
-   const selected = profiles.find(p => p.id === settings.activeProfile)
-   if (!selected || selected.provider !== 'deepseek') throw new Error('请选择 DeepSeek 配置')
-   validateDeepSeek({...selected, key: this.decrypt(selected.encryptedKey)})
-  }
   const next: Stored = {
-   connection: settings.connection || 'codex',
-   codex: settings.codex || this.value.codex,
-   videoPolicyVersion: 2,
-   profiles,
-   activeProfile: profiles.some(p => p.id === settings.activeProfile) ? settings.activeProfile : profiles[0]?.id || '',
+   ...this.value,
+   connection: 'qwen',
+   qwenProfile: profile,
    encryptedSearchKey,
+   videoPolicyVersion: 2,
    theme: settings.theme === 'dark' ? 'dark' : 'light',
    browserWidth: Math.min(900, Math.max(280, settings.browserWidth)),
    browserOpen: !!settings.browserOpen,
@@ -148,11 +184,11 @@ export class SettingsStore {
   this.flush()
  }
  public revealKey(id: string) {
-  const p = this.value.profiles.find(p => p.id === id)
-  if (!p?.encryptedKey) throw new Error('此配置尚未保存密钥')
+  const p = this.value.qwenProfile
+  if (id !== 'qwen' || !p?.encryptedKey) throw new Error('此千问配置尚未保存密钥')
   return this.decrypt(p.encryptedKey)
  }
- public draft(p: Profile) {
+ public draft(p: Profile): Profile & {key: string} {
   const baseUrl = p.baseUrl?.trim()
   let url: URL
   try {
@@ -162,15 +198,36 @@ export class SettingsStore {
   }
   if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password)
    throw new Error('API 地址必须是 HTTP(S)，不能包含密码')
-  const old = this.value.profiles.find(v => v.id === p.id),
-   key = p.apiKey?.trim() || this.decrypt(old?.encryptedKey)
-  if (!key) throw new Error('请填写 API Key，或使用此配置已保存的密钥')
-  return {...p, baseUrl: baseUrl.replace(/\/$/, ''), key}
+  const old = this.value.qwenProfile
+  if (p.provider && p.provider !== 'qwen') throw new Error('本版本仅支持千问模型配置')
+  const identity = endpointIdentity({...p, baseUrl}),
+   oldIdentity = old ? endpointIdentity(old) : ''
+  if (old?.encryptedKey && identity !== oldIdentity && !p.apiKey?.trim())
+   throw new Error('API 地址已改变，请填写该地址对应的千问 API Key')
+  const key = p.apiKey?.trim() || (identity === oldIdentity ? this.decrypt(old?.encryptedKey) : '')
+  if (!key) throw new Error('请填写千问 API Key，并确认 Base URL 与密钥属于同一服务')
+  return {
+   ...p,
+   provider: 'qwen',
+   apiFormat: 'chat_completions',
+   visionModel: p.visionModel?.trim() || '',
+   baseUrl: baseUrl.replace(/\/$/, ''),
+   key
+  }
  }
  public profile() {
-  const p = this.value.profiles.find(p => p.id === this.value.activeProfile)
-  if (!p) throw new Error('请先在设置中添加并选择 API 配置')
-  return {...p, key: this.decrypt(p.encryptedKey)}
+  const p = this.value.qwenProfile
+  if (!p) throw new Error('请先在设置中配置千问')
+  const {encryptedKey, apiKey, ...safe} = p
+  return this.draft({...safe, apiKey: undefined})
+ }
+ public connectionFingerprint() {
+  const p: StoredProfile = this.value.qwenProfile || defaultProfile()
+  return createHash('sha256')
+   .update(
+    JSON.stringify([p.baseUrl, p.model, p.visionModel, p.apiFormat, p.parameters, p.encryptedKey || 'missing-key'])
+   )
+   .digest('hex')
  }
  public searchKey() {
   const k = this.decrypt(this.value.encryptedSearchKey)

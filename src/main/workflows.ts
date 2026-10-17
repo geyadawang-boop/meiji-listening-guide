@@ -1,6 +1,6 @@
 import {randomUUID, createHash} from 'node:crypto'
 import {setTimeout as delay} from 'node:timers/promises'
-import {join, basename} from 'node:path'
+import {join} from 'node:path'
 import {readFile, writeFile, mkdir} from 'node:fs/promises'
 import {z} from 'zod'
 import {
@@ -14,7 +14,7 @@ import {
 import {parseSrt, toSrt, time, verifyNotes, keywordCandidates} from '../shared/srt'
 import {Store} from './db'
 import {SettingsStore} from './settings'
-import type {Api} from './api'
+import {type Api, isRetryableApiError} from './api'
 import {chunks, parseCourseware} from './documents'
 import {readTranscript} from './transcript'
 import {prepareAnswer, type AnswerDependencies} from './practice-answer'
@@ -24,8 +24,7 @@ export class Workflows {
   private settings: SettingsStore,
   private api: Pick<Api, 'chat' | 'json'>,
   private progress: (p: Progress) => void,
-  private answers?: AnswerDependencies,
-  private batchMode = false
+  private answers?: AnswerDependencies
  ) {}
  private async readyAnswers(result: PracticeSet, course: string, signal?: AbortSignal) {
   if (!this.answers) return
@@ -40,6 +39,54 @@ export class Workflows {
      signal
     )
    }
+ }
+ private coursewareImages(
+  images: {label: string; url: string}[],
+  ppt: string,
+  context: string,
+  batchIndex: number,
+  batchCount: number
+ ) {
+  if (!images.length) return []
+  const pages = new Map<number, string>()
+  for (const match of ppt.matchAll(/\[第\s*(\d+)\s*页\]\n([\s\S]*?)(?=\n\s*\[第\s*\d+\s*页\]|$)/g))
+   pages.set(Number(match[1]), match[2])
+  const grams = (value: string) => {
+   const normalized = value.toLowerCase().replace(/[^\p{Script=Han}a-z0-9]+/giu, ' '),
+    tokens = new Set<string>()
+   for (const term of normalized.split(/\s+/).filter(Boolean)) {
+    if (/[\p{Script=Han}]/u.test(term)) {
+     for (let size of [2, 3]) for (let i = 0; i + size <= term.length; i++) tokens.add(term.slice(i, i + size))
+    } else if (term.length > 1) tokens.add(term)
+   }
+   return tokens
+  }
+  const query = grams(context),
+   ranked = images
+    .map((image, index) => {
+     const page = Number(/第\s*(\d+)\s*页/.exec(image.label)?.[1]),
+      tokens = grams(pages.get(page) || image.label)
+     let score = 0
+     for (const token of tokens) if (query.has(token)) score++
+     return {image, index, score, bytes: Buffer.byteLength(image.url, 'utf8')}
+    })
+    .sort((a, b) => b.score - a.score || a.index - b.index)
+  const chosen = ranked.filter(item => item.score > 0).slice(0, 3)
+  if (!chosen.length) {
+   const center = Math.min(
+    images.length - 1,
+    Math.floor(((batchIndex + 0.5) * images.length) / Math.max(1, batchCount))
+   )
+   chosen.push(...ranked.slice(Math.max(0, center - 1), center + 2))
+  }
+  const result: {label: string; url: string}[] = []
+  let bytes = 0
+  for (const item of chosen.sort((a, b) => a.index - b.index)) {
+   if (item.bytes > 900_000 || bytes + item.bytes > 1_800_000) continue
+   result.push(item.image)
+   bytes += item.bytes
+  }
+  return result
  }
  async splitExam(courseId: string, fileId: string, signal?: AbortSignal) {
   const file = this.store.detail(courseId).files.find(f => f.id === fileId && f.kind === 'past_exam')
@@ -71,49 +118,31 @@ export class Workflows {
   try {
    const source = await readTranscript(lecture.transcript_path)
    report('准备资料', '准备语音原文与课件，一起交给模型校订')
-   const prompt = this.settings.prompt('correction'),
-    config = this.settings.get(),
-    profile = config.profiles.find(p => p.id === config.activeProfile)
+   const prompt = this.settings.prompt('correction')
    const hash = createHash('sha256').update(
     JSON.stringify({
-     engine: this.batchMode ? 'api' : config.connection || 'codex',
+     engine: 'qwen',
+     connection: this.settings.connectionFingerprint(),
      segments: source.segments,
-     prompt,
-     profile:
-      this.batchMode || config.connection === 'deepseek'
-       ? profile && {
-          id: profile.id,
-          model: profile.model,
-          baseUrl: profile.baseUrl,
-          apiFormat: profile.apiFormat,
-          parameters: profile.parameters
-         }
-       : config.codex || {model: 'auto', effort: 'auto'}
+     prompt
     })
    )
-   let file: import('./api').FileInput | undefined,
-    ppt = ''
-   if (/\.(pptx?|pdf)$/i.test(lecture.ppt_path)) {
-    report('准备课件', '准备课件与原文，交给模型识别和校订')
-    const data = await readFile(lecture.ppt_path),
-     pdf = /\.pdf$/i.test(lecture.ppt_path)
-    hash.update(data)
-    if (data.length >= 50 * 1024 * 1024) throw new Error('课件达到 50 MB 文件输入上限，请使用较小的课件')
-    if (pdf && data.subarray(0, 5).toString() !== '%PDF-') throw new Error('课件不是有效 PDF，请重新导入')
-    const mime = pdf
-     ? 'application/pdf'
-     : /\.pptx$/i.test(lecture.ppt_path)
-       ? 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
-       : 'application/vnd.ms-powerpoint'
-    file = {
-     path: lecture.ppt_path,
-     filename: basename(lecture.ppt_path),
-     file_data: `data:${mime};base64,${data.toString('base64')}`
-    }
-   } else {
-    ppt = (await parseCourseware(lecture.ppt_path)).text
-    hash.update(ppt)
+   report('本地解析课件', '提取页面文字与有限嵌入图片；不会上传原始 PPT/PDF 文件')
+   const data = await readFile(lecture.ppt_path),
+    courseware = await parseCourseware(lecture.ppt_path)
+   hash.update(data)
+   const limitations = [...courseware.omissions]
+   if (courseware.needsOcr) limitations.push('扫描 PDF：本地没有提取到足够文字，未执行 OCR。')
+   const ppt =
+    courseware.text +
+    (limitations.length ? '\n\n[课件提取限制]\n' + [...new Set(limitations)].map(item => '- ' + item).join('\n') : '')
+   const modelLimitations = [...new Set(limitations)]
+   const extracted = ppt.slice(0, 24000)
+   if (ppt.length > extracted.length) {
+    modelLimitations.push('课件文字超过 24,000 字，本次只发送开头部分。')
+    report('课件文字受限', '课件文字超过 24,000 字；本次只发送开头部分')
    }
+   this.store.db.prepare('UPDATE lectures SET ppt_text=? WHERE id=?').run(ppt, lectureId)
    const fingerprint = hash.digest('hex'),
     checkpoint = this.store.correctionCheckpoint(lectureId)
    const schema = z.array(
@@ -121,17 +150,14 @@ export class Workflows {
     ),
     result = checkpoint?.fingerprint === fingerprint ? checkpoint.segments : []
    if (result.length) report('继续校订', `已恢复 ${result.length}/${source.segments.length} 条，从未完成的批次继续`)
-   // Codex receives the entire lecture in one request; the small API batch
-   // remains only for older compatible API adapters.
-   const batchSize = this.batchMode ? 30 : source.segments.length
+   // Bound each request so long lectures can resume without an unbounded context.
+   const batchSize = 30
    for (let i = result.length; i < source.segments.length; i += batchSize) {
     signal?.throwIfAborted()
     const block = source.segments.slice(i, i + batchSize)
     report(
      '校订字幕',
-     this.batchMode
-      ? '结合原文与课件校订 ' + (i + 1) + '–' + (i + block.length) + ' / ' + source.segments.length + ' 条'
-      : '整节原文与课件共同校订，共 ' + source.segments.length + ' 条；等待完整结果'
+     '结合原文与课件校订 ' + (i + 1) + '–' + (i + block.length) + ' / ' + source.segments.length + ' 条'
     )
     const validate = (v: unknown) => {
      const rows = schema.parse(v)
@@ -140,36 +166,39 @@ export class Workflows {
      return rows
     }
     let corrected: ReturnType<typeof validate> | undefined
+    const lectureContext = source.segments
+     .slice(Math.max(0, i - 30), Math.min(source.segments.length, i + block.length + 30))
+     .map((s, j) => ({id: Math.max(0, i - 30) + j, text: s.text}))
+    const images = this.coursewareImages(
+     courseware.images,
+     ppt,
+     block.map(s => s.text).join('\n') + '\n' + lectureContext.map(s => s.text).join('\n'),
+     Math.floor(i / batchSize),
+     Math.ceil(source.segments.length / batchSize)
+    )
+    if (images.length)
+     report('结合课件页面', `字幕批次 ${Math.floor(i / batchSize) + 1} 附带 ${images.length} 张本地择取的页面原图`)
     for (let attempt = 0; attempt < 3; attempt++) {
      try {
       corrected = await this.api.json(
        prompt,
        {
-        ppt,
-        ...(!this.batchMode
-         ? {
-            lectureContext: source.segments.map((s, j) => ({id: j, text: s.text})),
-            instructions:
-             '结合整节原文与全部课件共同理解。rows 是必须逐条返回的记录；lectureContext 仅作全课上下文，不要额外返回。'
-           }
-         : {}),
+        courseware: extracted,
+        coursewareLimitations: modelLimitations,
+        lectureContext,
+        instructions:
+         '结合课件文字、附加页面图片与相邻原文理解当前批次。扫描 PDF 或没有提取到的图表内容不可猜测。rows 是必须逐条返回的记录；lectureContext 仅作局部上下文，不要额外返回。',
         rows: block.map((s, j) => ({id: i + j, text: s.text}))
        },
        validate,
        signal,
-       file
+       undefined,
+       images.length ? {images} : undefined
       )
       break
      } catch (error) {
       if (signal?.aborted) throw error
-      const message = error instanceof Error ? error.message : String(error)
-      if (
-       attempt === 2 ||
-       !/ERR_CONNECTION_(CLOSED|RESET|ABORTED)|ERR_(NETWORK_CHANGED|TIMED_OUT|EMPTY_RESPONSE)|fetch failed|network error|TimeoutError|aborted due to timeout|HTTP (429|5\d\d)/i.test(
-        message
-       )
-      )
-       throw error
+      if (attempt === 2 || !isRetryableApiError(error)) throw error
       report('连接重试', `当前批次连接中断，自动重试 ${attempt + 1}/2；已保存 ${result.length} 条`)
       await delay(attempt === 0 ? 1000 : 3000, undefined, {signal})
      }
@@ -192,8 +221,8 @@ export class Workflows {
    await mkdir(folder, {recursive: true})
    await writeFile(join(folder, '校订字幕.srt'), toSrt(result), 'utf8')
    this.store.db
-    .prepare('UPDATE lectures SET transcript_text=?,time_estimated=? WHERE id=?')
-    .run(source.text, source.estimated ? 1 : 0, lectureId)
+    .prepare('UPDATE lectures SET transcript_text=?,time_estimated=?,ppt_text=? WHERE id=?')
+    .run(source.text, source.estimated ? 1 : 0, ppt, lectureId)
    this.store.saveSubtitles(lectureId, result)
    report('完成', '原文与 PPT 校订完成；疑点及原文已保留' + (source.estimated ? '，时间为估算' : '，保留原文时间点'))
    return this.store.lectureDetail(lectureId)
@@ -213,7 +242,7 @@ export class Workflows {
   if (!detail.segments.length) throw new Error('请先生成或导入完整字幕')
   const result: LectureNotes = {keyPoints: [], notTested: [], uncertain: []}
   const full = detail.segments.map(s => `[${time(s.start, false)}] ${s.text}`).join('\n')
-  const parts = this.batchMode ? chunks(full, 18000) : [full]
+  const parts = chunks(full, 16000)
   for (let i = 0; i < parts.length; i++) {
    this.progress({
     lectureId,
@@ -223,7 +252,11 @@ export class Workflows {
    })
    const notes = await this.api.json(
     this.settings.prompt('notes'),
-    {subtitles: parts[i], courseware: detail.lecture.ppt_text.slice(0, 18000)},
+    {
+     subtitles: parts[i],
+     courseware: detail.lecture.ppt_text.slice(0, 12000),
+     coursewareLimitations: detail.lecture.ppt_text.startsWith('[扫描 PDF：') ? '课件为扫描 PDF，未执行 OCR。' : ''
+    },
     v => notesSchema.parse(v),
     signal
    )

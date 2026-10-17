@@ -163,9 +163,7 @@ export function createLearningHandler(
         {role: 'user', content}
        ],
        stream = (text: string) => emit({kind: 'chat', requestId, text})
-      const reply = await (testApi
-       ? testApi.chat(messages, stream, signal)
-       : routed.chat(messages, stream, signal, undefined, undefined, {fast: casual}))
+      const reply = await (testApi ? testApi.chat(messages, stream, signal) : routed.chat(messages, stream, signal))
       db.message(course.id, lectureId, 'assistant', reply, session.id)
       return reply
      })

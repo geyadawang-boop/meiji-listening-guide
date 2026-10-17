@@ -5,7 +5,7 @@ import {join, basename, resolve, dirname} from 'node:path'
 import {randomUUID, createHash} from 'node:crypto'
 import {inflateSync} from 'node:zlib'
 import {z} from 'zod'
-import type {CodexClient} from './codex'
+import type {Api} from './api'
 import {croppedImage} from './ppt-extract'
 import {imagePdf} from './image-pdf'
 import {verifyGeneratedPdf} from './pdf-ppt-cleanup'
@@ -125,7 +125,7 @@ export class VideoPpt {
  private tasks = new Map<string, Task>()
  constructor(
   private root: string,
-  private codex: Pick<CodexClient, 'chat'>,
+  private api: Pick<Api, 'chat'>,
   private progress: (s: string) => void
  ) {}
  async create(name: string, meta?: SubtitleTaskData) {
@@ -279,7 +279,7 @@ export class VideoPpt {
   let crop: Region = {left: 0, right: 1, top: 0, bottom: 1},
    warning = ''
   try {
-   const raw = await this.codex.chat(
+   const raw = await this.api.chat(
     [
      {
       role: 'system',
@@ -290,7 +290,6 @@ export class VideoPpt {
     ],
     undefined,
     signal,
-    undefined,
     undefined,
     {images}
    )
@@ -384,7 +383,7 @@ export class VideoPpt {
    if (images.reduce((n, i) => n + i.url.length, 0) > 32 * 1024 * 1024)
     throw new Error('候选画面较多，已提取全部页面，请在预览中检查重复')
    this.progress(`正在检查全部 ${frames.length} 张候选画面，优先保留最早、完整且没有手写笔记的版本`)
-   const raw = await this.codex.chat(
+   const raw = await this.api.chat(
     [
      {
       role: 'system',
@@ -397,7 +396,6 @@ export class VideoPpt {
     ],
     undefined,
     signal,
-    undefined,
     undefined,
     {images}
    )

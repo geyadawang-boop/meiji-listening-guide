@@ -1,14 +1,21 @@
-import type {CodexClient} from './codex'
+import type {Api} from './api'
 import type {FileInput} from './api'
 
-// Choose a connection at each request; preserve its arguments and receiver.
-export function modelRouter(select: () => Pick<CodexClient, 'chat' | 'json'>) {
+// Keep one active provider behind the existing workflow boundary.
+export function modelRouter(select: () => Pick<Api, 'chat' | 'json'>) {
  return {
-  chat(...args: Parameters<CodexClient['chat']>) {
+  chat(...args: Parameters<Api['chat']>) {
    return select().chat(...args)
   },
-  json<T>(prompt: string, input: unknown, validate: (value: unknown) => T, signal?: AbortSignal, file?: FileInput) {
-   return select().json(prompt, input, validate, signal, file)
+  json<T>(
+   prompt: string,
+   input: unknown,
+   validate: (value: unknown) => T,
+   signal?: AbortSignal,
+   file?: FileInput,
+   options?: {images?: {label: string; url: string}[]}
+  ) {
+   return select().json(prompt, input, validate, signal, file, options)
   }
  }
 }

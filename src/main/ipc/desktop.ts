@@ -9,10 +9,7 @@ import {readFile, stat, rm} from 'node:fs/promises'
 import {readTranscript} from '../transcript'
 import {parseCourseware} from '../documents'
 import {listLibrary, managedFile} from '../file-manager'
-import {openCodexLoginInChrome} from '../login-browser'
-import {validateDeepSeek} from '../deepseek'
 import {Api} from '../api'
-import {CodexClient} from '../codex'
 import {type Settings} from '../../shared/types'
 import {exportFile, validateExportFormat} from '../exports'
 import type {ApplicationContext} from '../main'
@@ -25,9 +22,7 @@ export function createDesktopHandler(
   | 'knowledge'
   | 'api'
   | 'appearance'
-  | 'codex'
   | 'db'
-  | 'deepseek'
   | 'directory'
   | 'emit'
   | 'idSchema'
@@ -53,9 +48,7 @@ export function createDesktopHandler(
   knowledge,
   api,
   appearance,
-  codex,
   db,
-  deepseek,
   directory,
   emit,
   idSchema,
@@ -92,11 +85,9 @@ export function createDesktopHandler(
    'library:reveal',
    'library:delete',
    'cancel',
-   'codex:account',
-   'codex:models',
-   'codex:login',
-   'codex:test',
    'settings:get',
+   'settings:models',
+   'settings:probe',
    'appearance:get',
    'appearance:save',
    'appearance:clear',
@@ -104,8 +95,6 @@ export function createDesktopHandler(
    'identity:get',
    'identity:save',
    'identity:avatar',
-   'deepseek:models',
-   'deepseek:test',
    'settings:save',
    'settings:test',
    'export',
@@ -309,19 +298,6 @@ export function createDesktopHandler(
     case 'cancel':
      for (const c of jobs.values()) c.abort()
      return true
-    case 'codex:account':
-     return codex.account()
-    case 'codex:models':
-     return codex.models()
-    case 'codex:login': {
-     const url = await codex.login()
-     await openCodexLoginInChrome(url)
-     return true
-    }
-    case 'codex:test':
-     return job('test-codex', signal =>
-      codex.chat([{role: 'user', content: '请只回复：连接成功。'}], undefined, signal)
-     )
     case 'settings:get':
      return settings.get()
     case 'appearance:get':
@@ -374,69 +350,38 @@ export function createDesktopHandler(
       .resize({width: 256, height: 256})
       .toDataURL()
     }
-    case 'deepseek:models':
-     return job('deepseek-models', async () => {
-      const profile = validateDeepSeek(settings.draft(object.profile as any))
-      const models = await new Api(settings, net.fetch.bind(net)).models(profile)
-      return models.filter(m => ['deepseek-flash', 'deepseek-v4-pro'].includes(m))
+    case 'settings:models':
+     return job('qwen-models', async () => {
+      const profile = settings.draft(object.profile as any)
+      return new Api(settings, net.fetch.bind(net)).models(profile)
      })
-    case 'deepseek:test':
-     return job('test-deepseek', async signal => {
-      const profile = validateDeepSeek(settings.draft(object.profile as any)),
-       probe = new CodexClient(
-        process.env.LISTENING_ASSISTANT_CODEX_FIXTURE && process.env.LISTENING_ASSISTANT_DATA
-         ? process.execPath
-         : join(
-            app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'resources'),
-            'codex',
-            'bin',
-            'codex.exe'
-           ),
-        join(root, 'deepseek-test'),
-        join(root, 'deepseek-workspace'),
-        settings,
-        message => emit({kind: 'progress', data: {stage: 'DeepSeek', message: message.replace(/Codex/g, 'DeepSeek')}}),
-        process.env.LISTENING_ASSISTANT_CODEX_FIXTURE && process.env.LISTENING_ASSISTANT_DATA
-         ? [process.env.LISTENING_ASSISTANT_CODEX_FIXTURE]
-         : [],
-        () => profile
-       )
-      try {
-       return await probe.chat([{role: 'user', content: '请只回复：连接成功。'}], undefined, signal)
-      } finally {
-       probe.dispose()
-      }
+    case 'settings:probe':
+     return job('test-qwen', async signal => {
+      const profile = settings.draft(object.profile as any)
+      return new Api(settings, net.fetch.bind(net)).chat(
+       [{role: 'user', content: '请只回复：连接成功。'}],
+       undefined,
+       signal,
+       profile
+      )
      })
     case 'settings:save': {
      const next = object.settings as unknown as Settings,
-      current = settings.get()
+      before = settings.connectionFingerprint()
      const changed =
-      JSON.stringify({
-       connection: current.connection || 'codex',
-       profile: current.profiles.find(p => p.id === current.activeProfile),
-       codex: current.codex
-      }) !==
-      JSON.stringify({
-       connection: next.connection || 'codex',
-       profile: next.profiles.find(p => p.id === next.activeProfile),
-       codex: next.codex
-      })
+      JSON.stringify(next.profiles.find(p => p.id === next.activeProfile) || next.profiles[0]) !==
+      JSON.stringify(settings.get().profiles[0])
      if (changed && jobs.size) throw new Error('任务运行中，请完成或取消后再更换模型连接')
-     const before = visualConnection(),
-      saved = settings.save(next)
-     if (changed) deepseek.dispose()
+     const saved = settings.save(next)
      if (toolsBackend.started && before !== visualConnection())
       await toolsBackend.request('configure', {
        connection: visualConnection(),
-       model:
-        (saved.connection || 'codex') === 'codex'
-         ? 'Codex'
-         : saved.profiles.find(item => item.id === saved.activeProfile)?.model || '未配置'
+       model: saved.profiles.find(item => item.id === saved.activeProfile)?.model || '未配置'
       })
      return saved
     }
     case 'settings:test':
-     return job('test-codex', signal => api.chat([{role: 'user', content: '请回复“连接成功”。'}], undefined, signal))
+     return job('test-qwen', signal => api.chat([{role: 'user', content: '请回复“连接成功”。'}], undefined, signal))
     case 'export': {
      const detail = db.lectureDetail(id()),
       kind = z.enum(['subtitles', 'notes', 'practice', 'evidence-bundle']).parse(object.kind),

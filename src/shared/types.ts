@@ -130,6 +130,7 @@ export interface Profile {
  name: string
  baseUrl: string
  model: string
+ visionModel?: string
  apiFormat?: 'chat_completions' | 'responses'
  hasKey?: boolean
  keyLength?: number
@@ -138,20 +139,8 @@ export interface Profile {
  provider?: string
  parameters?: Record<string, {temperature?: number; topP?: number; maxTokens?: number; reasoningEffort?: string}>
 }
-export interface CodexAccount {
- loggedIn: boolean
- plan?: string
-}
-export interface CodexModel {
- id: string
- name: string
- efforts: string[]
- defaultEffort: string
- isDefault: boolean
-}
 export interface Settings {
- connection?: 'codex' | 'deepseek'
- codex?: {model: string; effort: string}
+ connection?: 'qwen'
  profiles: Profile[]
  activeProfile: string
  hasSearchKey: boolean

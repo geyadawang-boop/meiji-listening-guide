@@ -53,10 +53,7 @@ export function createResearchHandler(
       .parse(object.action)
      await toolsBackend.request('configure', {
       connection: visualConnection(),
-      model:
-       (settings.get().connection || 'codex') === 'codex'
-        ? 'Codex'
-        : settings.get().profiles.find(item => item.id === settings.get().activeProfile)?.model || '未配置'
+      model: settings.get().profiles.find(item => item.id === settings.get().activeProfile)?.model || '未配置'
      })
      return toolsBackend.request(action, object.args || {})
     }

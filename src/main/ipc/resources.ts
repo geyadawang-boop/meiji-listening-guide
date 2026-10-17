@@ -172,7 +172,7 @@ export function createResourcesHandler(
             undefined,
             signal
            )
-         : routed.chat(messages, undefined, signal, undefined, undefined, {images: [{label: '所选画面', url}]})
+         : routed.chat(messages, undefined, signal, undefined, {images: [{label: '所选画面', url}]})
        },
        message => emit({kind: 'progress', data: {stage: '画面识别', message}}),
        signal
