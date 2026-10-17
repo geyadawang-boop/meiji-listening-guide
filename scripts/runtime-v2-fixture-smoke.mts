@@ -90,6 +90,13 @@ try {
   /Descriptor/
  )
  checks.push('descriptor mismatch rejected')
+ const changed = structuredClone(manifest)
+ changed.components[0].files[0].sha256 = '0'.repeat(64)
+ await assert.rejects(
+  installVideoFixture({...request, descriptor: createVideoDescriptor(changed)}, new AbortController().signal),
+  /Descriptor/
+ )
+ checks.push('self-consistent tampered package descriptor cannot replace caller-selected manifest')
  for (const kind of ['extra', 'hash', 'symlink', 'hardlink']) {
   const dir = await payload()
   if (kind === 'extra') await writeFile(join(dir, 'extra'), 'x')
@@ -113,7 +120,9 @@ try {
   'readback-mismatch',
   'existing-publish',
   'stage-directory-swap',
-  'stage-directory-link'
+  'stage-directory-link',
+  'input-directory-swap',
+  'root-directory-swap'
  ]) {
   const controller = new AbortController(),
    originalOpen = fsPromises.open,
@@ -157,6 +166,17 @@ try {
       if (scenario === 'stage-directory-swap') await mkdir(stagePath)
       else await symlink(input, stagePath)
      }
+     if (!fired && scenario === 'input-directory-swap') {
+      fired = true
+      await fsPromises.rename(input, input + '-original')
+      await mkdir(input)
+     }
+     if (!fired && scenario === 'root-directory-swap') {
+      fired = true
+      const rootPath = String(args[0]).split('/stage/')[0]
+      await fsPromises.rename(rootPath, rootPath + '-original')
+      await mkdir(rootPath)
+     }
     }
    }
    return handle
@@ -197,8 +217,15 @@ try {
   }
   assert(fired)
   assert(stage)
+  if (scenario === 'input-directory-swap') {
+   await fsPromises.rename(input, input + '-replacement')
+   await fsPromises.rename(input + '-original', input)
+  }
   if (scenario === 'existing-publish') assert.equal(await readFile(join(publish, 'sentinel'), 'utf8'), 'keep')
-  else if (scenario.startsWith('stage-directory'))
+  else if (scenario === 'root-directory-swap') {
+   assert.deepEqual(await readdir(dirname(stage)), [])
+   assert.deepEqual(await readdir(dirname(stage) + '-original'), ['stage'])
+  } else if (scenario.startsWith('stage-directory'))
    assert.deepEqual((await readdir(dirname(stage))).sort(), ['stage', 'stage-original'])
   else assert.deepEqual(await readdir(dirname(stage)), ['stage'])
   for (const file of files) {

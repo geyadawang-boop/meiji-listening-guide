@@ -151,6 +151,8 @@ export async function installVideoFixture(
     writer = await open(destination, 'wx', 0o600)
    let copied = 0
    try {
+    const before = await reader.stat()
+    check(before.isFile() && before.nlink === 1 && before.size === file.size, 'Copy source type/size mismatch')
     for await (const bytes of reader.createReadStream({autoClose: false})) {
      signal.throwIfAborted()
      copied += bytes.length
@@ -158,6 +160,18 @@ export async function installVideoFixture(
      await writer.writeFile(bytes)
     }
     await writer.sync()
+    const after = await reader.stat(),
+     current = await lstat(source)
+    check(
+     before.dev === after.dev &&
+      before.ino === after.ino &&
+      before.dev === current.dev &&
+      before.ino === current.ino &&
+      before.mtimeMs === after.mtimeMs &&
+      before.ctimeMs === after.ctimeMs &&
+      after.size === file.size,
+     'Copy source changed'
+    )
    } finally {
     await reader.close()
     await writer.close()
@@ -183,6 +197,13 @@ export async function installVideoFixture(
    }
   }
   // Last complete verification immediately precedes publish; cancellation remains active.
+  await stableDirectories()
+  await exactFiles(
+   input,
+   files.map(file => file.path)
+  )
+  for (const file of files)
+   check((await hashFile(join(input, file.path), file.size, signal)) === file.sha256, 'Input changed before publish')
   await exactFiles(
    stage,
    files.map(file => file.path)
