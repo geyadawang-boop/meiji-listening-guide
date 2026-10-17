@@ -884,6 +884,10 @@ export default function App() {
                   <StudyIcon name="download" />
                   TXT
                  </button>
+                 <button onClick={() => exportResult('evidence-bundle', 'md')}>
+                  <StudyIcon name="download" />
+                  课程证据包
+                 </button>
                 </>
                )}
               </div>
