@@ -34,6 +34,7 @@ const manifest: RuntimeManifest = process.argv.includes('--prepared')
 if (manifest.schema !== 1 || manifest.productVersion !== pkg.version) throw new Error('运行清单与产品版本不一致')
 const output = join(root, 'release', profile)
 if (profile === 'components') {
+ if (platform !== Platform.WINDOWS) throw new Error('当前组件包仅支持 Windows，未生成其他平台组件包')
  await mkdir(output, {recursive: true})
  for (const component of manifest.components) {
   const directory = join(output, component.id + '-' + pkg.version),
@@ -53,6 +54,8 @@ if (profile === 'components') {
 } else {
  if (profile === 'full' && platform !== Platform.WINDOWS)
   throw new Error('完整发布仅支持 Windows；macOS/Linux 请使用 lite')
+ // Current optional component payloads target Windows, including local portable builds.
+ const omitOptional = profile === 'lite' || platform !== Platform.WINDOWS
  const optional = new Set(manifest.components.map(component => component.directory))
  const entries = pkg.build.extraResources
  if (!Array.isArray(entries)) throw new Error('发布资源配置必须为数组')
@@ -65,7 +68,7 @@ if (profile === 'components') {
  const resources = entries.filter(entry => {
   if (typeof entry === 'string' || !entry.from) return true
   if (entry.to && optional.has(entry.to)) {
-   if (profile === 'lite') return false
+   if (omitOptional) return false
    if (missing.has(entry.to)) {
     console.warn('缺少组件目录，已跳过：' + entry.to)
     return false
@@ -106,7 +109,7 @@ if (profile === 'components') {
     electronVersion: pkg.devDependencies.electron,
     profile,
     platform: active,
-    optionalComponents: profile === 'lite' ? manifest.components.map(component => component.id) : [],
+    optionalComponents: omitOptional ? manifest.components.map(component => component.id) : [],
     artifacts: files.filter(file => /\.(?:exe|dmg|zip|AppImage|deb)$/.test(file))
    },
    null,
