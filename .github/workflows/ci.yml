@@ -23,3 +23,49 @@ jobs:
         run: pnpm verify
       - name: Build
         run: pnpm build
+
+  runtime-smoke:
+    if: github.event_name == 'workflow_dispatch'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build
+        run: pnpm build
+      - name: Prepare Linux secure storage
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gnome-keyring libsecret-1-0 dbus-x11 xvfb
+      - name: Verify Linux runtime with a real secret service
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          dbus-run-session -- bash -euo pipefail -c '
+            smoke_keyring_password=$(openssl rand -hex 24)
+            smoke_keyring_environment=$(printf "%s" "$smoke_keyring_password" | gnome-keyring-daemon --unlock --components=secrets)
+            test -n "$smoke_keyring_environment"
+            eval "$smoke_keyring_environment"
+            xvfb-run --auto-servernum pnpm runtime:smoke --output "$RUNNER_TEMP/meiji-runtime-smoke"
+          '
+      - name: Verify Windows or macOS runtime
+        if: runner.os != 'Linux'
+        run: pnpm runtime:smoke --output "${{ runner.temp }}/meiji-runtime-smoke"
+      - name: Upload only results and screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-smoke-${{ matrix.os }}
+          path: ${{ runner.temp }}/meiji-runtime-smoke/results
+          if-no-files-found: warn
