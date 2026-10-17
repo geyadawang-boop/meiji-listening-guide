@@ -129,7 +129,7 @@ export function inspectArchiveListing(namesText: string, verboseText: string, ex
   check(!entries.has(key), 'Duplicate archive path')
   // Strict BSD tar C-locale listing. Unsupported formats fail before extraction.
   const match =
-   /^([-d])[rwxstST-]{9}\s+\d+\s+\S+\s+\S+\s+(\d+)\s+[A-Za-z]{3}\s+\d{1,2}\s+(?:\d{4}|\d{1,2}:\d{2})\s+(.+)$/.exec(
+   /^([-d])[rwx-]{9}\s+\d+\s+\S+\s+\S+\s+(\d+)\s+[A-Za-z]{3}\s+\d{1,2}\s+(?:\d{4}|\d{1,2}:\d{2})\s+(.+)$/.exec(
     details[index]
    )
   check(match && match[3] === name, 'Unsupported archive type or verbose listing')
