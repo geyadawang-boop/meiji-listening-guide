@@ -16,7 +16,9 @@ pnpm build
 
 开发与构建入口在 macOS/Linux/Windows 均可用（发布产物仍以 Windows 为主）；macOS/Linux 的 lite 安装包由 CI 构建，功能适配现状见 docs/跨平台适配清单.md。
 
-resources 只包含独立 ONNX 模型、Codex 连接组件、NapCat Node 组件和 FFmpeg/FFprobe 及其许可证。它们是必要第三方资源，不能以 TypeScript 源码代替二进制或权重。源码包不含这些大型文件，需恢复同版本组件。PDF 由应用原生 TypeScript 库处理，不需要 Python。
+resources 只包含独立 ONNX 模型、NapCat Node 组件和 FFmpeg/FFprobe 及其许可证。它们是必要第三方资源，不能以 TypeScript 源码代替二进制或权重。源码包不含这些大型文件，需恢复同版本组件。PDF 由应用原生 TypeScript 库处理，不需要 Python。
+
+模型连接在设置中填写千问 API 地址与密钥，并分别选择文本和视觉模型；不再提供 ChatGPT/Codex 账号或 DeepSeek 专用入口，也不需要 Codex 连接组件。
 
 ## 检查
 
@@ -41,7 +43,7 @@ pnpm release:source
 node scripts/restore-runtime.mts knowledge 同版本组件文件夹
 ```
 
-portable 为完整目录，full 为完整安装包，lite 为不含可选离线组件的应用，components 为同版本组件。组件恢复逐文件核对大小、SHA256 和版本，不覆盖改动过的文件；其它组件编号为 asr、codex、video。完整发布须重建 EXE，不能只修改 ASAR。实际安装后验证版本、原生后台、运行资源及课程资料不变后才能清理回退文件。
+portable 为完整目录，full 为完整安装包，lite 为不含可选离线组件的应用，components 为同版本组件。组件恢复逐文件核对大小、SHA256 和版本，不覆盖改动过的文件；其它组件编号为 asr、video。完整发布须重建 EXE，不能只修改 ASAR。实际安装后验证版本、原生后台、运行资源及课程资料不变后才能清理回退文件。
 
 ## 代码目录
 
