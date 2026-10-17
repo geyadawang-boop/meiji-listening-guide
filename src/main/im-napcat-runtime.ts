@@ -64,6 +64,7 @@ export class NativeNapcatRuntime {
   return target
  }
  async prepare() {
+  if (process.platform !== 'win32' || process.arch !== 'x64') throw new Error('内置 QQ 后台暂仅支持 Windows x64')
   await mkdir(this.root, {recursive: true})
   if (
    (await lstat(this.root)).isSymbolicLink() ||
@@ -175,6 +176,8 @@ export class NativeNapcatRuntime {
   return {directory: target, value}
  }
  ensure() {
+  if (process.platform !== 'win32' || process.arch !== 'x64')
+   return Promise.reject(new Error('内置 QQ 后台暂仅支持 Windows x64'))
   if (this.closed) return Promise.reject(new Error('QQ 组件所属服务已关闭'))
   if (this.child?.poll() === null) return Promise.resolve(this.value!)
   return (this.pending ??= this.start().finally(() => {

@@ -1,5 +1,6 @@
 import {useEffect, useState} from 'react'
 import {ImAutomation} from './ImAutomation'
+type Capability = {available: boolean; reason: string}
 type Connection = {
  id: string
  name: string
@@ -8,8 +9,14 @@ type Connection = {
  account: string
  login_epoch: string
  has_session: boolean
+ live: Capability
 }
-type Listing = {revision: string; connections: Connection[]; qq_component: {state: string; version: string}}
+type Listing = {
+ revision: string
+ connections: Connection[]
+ platforms: Record<string, Capability>
+ qq_component: {state: string; version: string}
+}
 type Login = {
  operation_id: string
  connection_id: string
@@ -72,7 +79,8 @@ export function Communications({visible, close}: {visible: boolean; close: () =>
   [error, setError] = useState(''),
   [processes, setProcesses] = useState<{pid: number; created: number; label: string}[]>([]),
   [probe, setProbe] = useState<{probe_id: string; account: string}>()
- const row = data?.connections.find(item => item.id === selected)
+ const row = data?.connections.find(item => item.id === selected),
+  liveAvailable = row?.live?.available === true
  const scope = (chosen = peer): Scope => {
   if (!row?.account || !chosen) throw new Error('请先绑定账号并选择会话')
   return {
@@ -180,13 +188,17 @@ export function Communications({visible, close}: {visible: boolean; close: () =>
      <div className="row">
       <input aria-label="通讯连接名称" placeholder="连接名称" value={name} onChange={e => setName(e.target.value)} />
       <select aria-label="通讯平台" value={platform} onChange={e => setPlatform(e.target.value)}>
-       <option value="qq_napcat">QQ · 后台组件</option>
-       <option value="weixin_local">个人微信 · 本机只读</option>
+       <option value="qq_napcat" disabled={!data?.platforms?.qq_napcat?.available}>
+        QQ · 内置后台
+       </option>
+       <option value="weixin_local" disabled={!data?.platforms?.weixin_local?.available}>
+        个人微信 · 本机只读
+       </option>
        <option value="weixin_web">微信 Web · 实验</option>
        <option value="weixin_ilink">微信 Bot · iLink</option>
       </select>
       <button
-       disabled={busy || !name.trim() || !data}
+       disabled={busy || !name.trim() || !data?.platforms?.[platform]?.available}
        onClick={() =>
         void run(async () => {
          const next = await request<Listing>('change', {
@@ -207,6 +219,7 @@ export function Communications({visible, close}: {visible: boolean; close: () =>
        添加连接
       </button>
      </div>
+     {data?.platforms?.[platform]?.reason && <p className="hint">{data.platforms[platform].reason}</p>}
      <div className="row">
       <select aria-label="当前通讯账号" value={selected} onChange={e => setSelected(e.target.value)}>
        <option value="">选择连接</option>
@@ -238,11 +251,12 @@ export function Communications({visible, close}: {visible: boolean; close: () =>
       </p>
      )}
     </section>
+    {row?.live?.reason && <p className="hint">{row.live.reason}</p>}
     {row && row.platform !== 'weixin_local' && (
      <section className="knowledge-card">
       <h3>扫码与账号确认</h3>
       <button
-       disabled={busy}
+       disabled={busy || !liveAvailable}
        onClick={() =>
         void run(async () =>
          showLogin(
@@ -269,7 +283,7 @@ export function Communications({visible, close}: {visible: boolean; close: () =>
         )}
         <div className="row">
          <button
-          disabled={busy}
+          disabled={busy || !liveAvailable}
           onClick={() =>
            void run(async () =>
             showLogin(
@@ -293,7 +307,7 @@ export function Communications({visible, close}: {visible: boolean; close: () =>
          {login.state === 'awaiting_bind' && (
           <button
            className="primary"
-           disabled={busy}
+           disabled={busy || !liveAvailable}
            onClick={() =>
             void run(async () => {
              const result = await request<{login: Login}>('confirm', {...operation(), displayed_account: login.account})
@@ -317,7 +331,7 @@ export function Communications({visible, close}: {visible: boolean; close: () =>
        请先在官方微信客户端登录；读取范围仅为你选中的进程和会话。点击核验才检查本机读取能力，密钥不写入文件。
       </p>
       <button
-       disabled={busy}
+       disabled={busy || !liveAvailable}
        onClick={() =>
         void run(async () =>
          setProcesses(
@@ -331,7 +345,7 @@ export function Communications({visible, close}: {visible: boolean; close: () =>
       {processes.map(item => (
        <button
         key={item.pid}
-        disabled={busy}
+        disabled={busy || !liveAvailable}
         onClick={() =>
          void run(async () =>
           setProbe(
@@ -351,7 +365,7 @@ export function Communications({visible, close}: {visible: boolean; close: () =>
       {probe && (
        <button
         className="primary"
-        disabled={busy}
+        disabled={busy || !liveAvailable}
         onClick={() =>
          void run(async () => {
           await request('personal-confirm', {
@@ -375,6 +389,17 @@ export function Communications({visible, close}: {visible: boolean; close: () =>
       <h3>所选会话</h3>
       <button
        disabled={busy}
+       onClick={() =>
+        void run(async () => {
+         const result = await request<{peers: {peer: string; name: string}[]}>('saved-directory', scope('_directory_'))
+         setPeers(result.peers)
+        })
+       }
+      >
+       已保存会话
+      </button>
+      <button
+       disabled={busy || !liveAvailable}
        onClick={() =>
         void run(async () => {
          const result = await request<{peers: {peer: string; name: string}[]}>('directory', scope('_directory_'))
@@ -405,7 +430,7 @@ export function Communications({visible, close}: {visible: boolean; close: () =>
        <>
         <div className="row">
          <button
-          disabled={busy}
+          disabled={busy || !liveAvailable}
           onClick={() =>
            void run(async () => {
             await request('sync', scope())
@@ -470,7 +495,7 @@ export function Communications({visible, close}: {visible: boolean; close: () =>
            我已核对账号 {row.account}、会话 {peer} 和正文，确认发送
           </label>
           <button
-           disabled={busy || !confirm || !text.trim()}
+           disabled={busy || !liveAvailable || !confirm || !text.trim()}
            onClick={() =>
             void run(async () => {
              const result = await request<{state: string; operation_id: string}>('send', {
@@ -506,6 +531,7 @@ export function Communications({visible, close}: {visible: boolean; close: () =>
       key={row.id + row.login_epoch + peer}
       scope={scope()}
       visible={visible}
+      liveAvailable={liveAvailable}
       onDraft={value => {
        setText(value)
        setConfirm(false)
