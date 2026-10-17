@@ -1,11 +1,162 @@
-import {useEffect,useState} from 'react'
-type Task={id:string;source:string;duration:number;output?:string;preparation?:{status:string;error?:string};frames:{time:number;status:string;text?:string;error?:string}[]}
-const invoke=<T,>(action:string,args?:unknown)=>window.assistant.invoke<T>(action,args)
-export function VisualIcon(){return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="8" cy="9" r="1.5"/><path d="m4 18 6-6 4 4 3-3 4 5"/></svg>}
-export function VisualAnalysis({visible,close}:{visible:boolean;close:()=>void}){
- const [tasks,setTasks]=useState<Task[]>([]),[cap,setCap]=useState(6),[policy,setPolicy]=useState('balanced'),[busy,setBusy]=useState(false),[error,setError]=useState(''),[progress,setProgress]=useState('')
- async function refresh(){setTasks(await invoke('visual:list'))}
- useEffect(()=>{if(visible)void refresh().catch(reason=>setError(String(reason)))},[visible]);useEffect(()=>window.assistant.onEvent(event=>{if(event.kind==='progress')setProgress(event.data.message)}),[])
- async function run(fn:()=>Promise<void>){setBusy(true);setError('');setProgress('');try{await fn();await refresh()}catch(reason){setError(reason instanceof Error?reason.message:String(reason));void refresh()}finally{setBusy(false)}}
- return <section className="ppt-extract-page learning-window" aria-label="画面识别" hidden={!visible} style={!visible?{display:'none'}:undefined}><aside className="learning-menu"><h2>画面识别</h2><p>识别图片和视频画面，<br/>保留来源及时间点。</p><button onClick={close}>返回课程对话</button></aside><main className="learning-content"><header><div><h2>画面识别</h2><p>文字识别、图表解释与画面摘要</p></div></header><section className="knowledge-card"><p className="hint">先在本机选择图片或视频并提取画面，点击“识别所选画面”才发送画面到当前连接模型。文本模型未必支持图片；失败时保留恢复任务。</p><div className="row"><label>最多画面数<input aria-label="最多识别画面数" type="number" min={1} max={12} value={cap} disabled={busy} onChange={e=>setCap(Number(e.target.value))}/></label><label>选帧方式<select value={policy} disabled={busy} onChange={e=>setPolicy(e.target.value)}><option value="balanced">内容变化优先</option><option value="coverage">覆盖时间范围</option></select></label><button className="primary" disabled={busy} onClick={()=>void run(async()=>{await invoke('visual:prepare',{cap,policy})})}>选择图片或视频</button><button disabled={busy} onClick={()=>void run(refresh)}>刷新识别记录</button></div></section>{busy&&<div className="row"><p role="status">{progress||'正在提取或识别…'}</p><button onClick={()=>void invoke('cancel')}>取消识别</button></div>}{error&&<p className="alert" role="alert">{error}</p>}{tasks.map(task=><section className="knowledge-card" key={task.id}><header><h3>{task.source.split(/[\\/]/).pop()}</h3>{!task.frames.length?<button disabled={busy} onClick={()=>void run(async()=>{await invoke('visual:prepare-resume',{id:task.id})})}>继续提取画面</button>:task.output?<button onClick={()=>void invoke('library:open-file',{path:task.output})}>打开识别结果</button>:<button disabled={busy} onClick={()=>void run(async()=>{await invoke('visual:recognize',{id:task.id})})}>识别所选画面</button>}</header>{task.preparation?.error&&<p className="alert">{task.preparation.error}</p>}<p className="hint">共 {task.frames.length} 个画面 · 已完成 {task.frames.filter(frame=>frame.status==='已完成').length}</p>{task.frames.map((frame,index)=><details key={index} open={!!frame.error}><summary>{Math.floor(frame.time/60)}:{Math.floor(frame.time%60).toString().padStart(2,'0')} · {frame.status}</summary>{frame.text&&<p className="knowledge-text">{frame.text}</p>}{frame.error&&<p role="alert" className="hint">{frame.error}</p>}</details>)}</section>)}</main></section>
+import {useEffect, useState} from 'react'
+type Task = {id: string; source: string; duration: number; output?: string; preparation?: {status: string; error?: string}; frames: {time: number; status: string; text?: string; error?: string}[]}
+const invoke = <T,>(action: string, args?: unknown) => window.assistant.invoke<T>(action, args)
+export function VisualIcon() {
+ return (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
+   <rect x="3" y="4" width="18" height="16" rx="3" />
+   <circle cx="8" cy="9" r="1.5" />
+   <path d="m4 18 6-6 4 4 3-3 4 5" />
+  </svg>
+ )
+}
+export function VisualAnalysis({visible, close}: {visible: boolean; close: () => void}) {
+ const [tasks, setTasks] = useState<Task[]>([]),
+  [cap, setCap] = useState(6),
+  [policy, setPolicy] = useState('balanced'),
+  [busy, setBusy] = useState(false),
+  [error, setError] = useState(''),
+  [progress, setProgress] = useState('')
+ async function refresh() {
+  setTasks(await invoke('visual:list'))
+ }
+ useEffect(() => {
+  if (visible) void refresh().catch(reason => setError(String(reason)))
+ }, [visible])
+ useEffect(
+  () =>
+   window.assistant.onEvent(event => {
+    if (event.kind === 'progress') setProgress(event.data.message)
+   }),
+  []
+ )
+ async function run(fn: () => Promise<void>) {
+  setBusy(true)
+  setError('')
+  setProgress('')
+  try {
+   await fn()
+   await refresh()
+  } catch (reason) {
+   setError(reason instanceof Error ? reason.message : String(reason))
+   void refresh()
+  } finally {
+   setBusy(false)
+  }
+ }
+ return (
+  <section className="ppt-extract-page learning-window" aria-label="画面识别" hidden={!visible} style={!visible ? {display: 'none'} : undefined}>
+   <aside className="learning-menu">
+    <h2>画面识别</h2>
+    <p>
+     识别图片和视频画面，
+     <br />
+     保留来源及时间点。
+    </p>
+    <button onClick={close}>返回课程对话</button>
+   </aside>
+   <main className="learning-content">
+    <header>
+     <div>
+      <h2>画面识别</h2>
+      <p>文字识别、图表解释与画面摘要</p>
+     </div>
+    </header>
+    <section className="knowledge-card">
+     <p className="hint">先在本机选择图片或视频并提取画面，点击“识别所选画面”才发送画面到当前连接模型。文本模型未必支持图片；失败时保留恢复任务。</p>
+     <div className="row">
+      <label>
+       最多画面数
+       <input aria-label="最多识别画面数" type="number" min={1} max={12} value={cap} disabled={busy} onChange={e => setCap(Number(e.target.value))} />
+      </label>
+      <label>
+       选帧方式
+       <select value={policy} disabled={busy} onChange={e => setPolicy(e.target.value)}>
+        <option value="balanced">内容变化优先</option>
+        <option value="coverage">覆盖时间范围</option>
+       </select>
+      </label>
+      <button
+       className="primary"
+       disabled={busy}
+       onClick={() =>
+        void run(async () => {
+         await invoke('visual:prepare', {cap, policy})
+        })
+       }
+      >
+       选择图片或视频
+      </button>
+      <button disabled={busy} onClick={() => void run(refresh)}>
+       刷新识别记录
+      </button>
+     </div>
+    </section>
+    {busy && (
+     <div className="row">
+      <p role="status">{progress || '正在提取或识别…'}</p>
+      <button onClick={() => void invoke('cancel')}>取消识别</button>
+     </div>
+    )}
+    {error && (
+     <p className="alert" role="alert">
+      {error}
+     </p>
+    )}
+    {tasks.map(task => (
+     <section className="knowledge-card" key={task.id}>
+      <header>
+       <h3>{task.source.split(/[\\/]/).pop()}</h3>
+       {!task.frames.length ? (
+        <button
+         disabled={busy}
+         onClick={() =>
+          void run(async () => {
+           await invoke('visual:prepare-resume', {id: task.id})
+          })
+         }
+        >
+         继续提取画面
+        </button>
+       ) : task.output ? (
+        <button onClick={() => void invoke('library:open-file', {path: task.output})}>打开识别结果</button>
+       ) : (
+        <button
+         disabled={busy}
+         onClick={() =>
+          void run(async () => {
+           await invoke('visual:recognize', {id: task.id})
+          })
+         }
+        >
+         识别所选画面
+        </button>
+       )}
+      </header>
+      {task.preparation?.error && <p className="alert">{task.preparation.error}</p>}
+      <p className="hint">
+       共 {task.frames.length} 个画面 · 已完成 {task.frames.filter(frame => frame.status === '已完成').length}
+      </p>
+      {task.frames.map((frame, index) => (
+       <details key={index} open={!!frame.error}>
+        <summary>
+         {Math.floor(frame.time / 60)}:
+         {Math.floor(frame.time % 60)
+          .toString()
+          .padStart(2, '0')}{' '}
+         · {frame.status}
+        </summary>
+        {frame.text && <p className="knowledge-text">{frame.text}</p>}
+        {frame.error && (
+         <p role="alert" className="hint">
+          {frame.error}
+         </p>
+        )}
+       </details>
+      ))}
+     </section>
+    ))}
+   </main>
+  </section>
+ )
 }

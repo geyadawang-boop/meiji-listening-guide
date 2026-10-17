@@ -1,82 +1,86 @@
 {
-  // Biome 工具链配置。
-  // 现有 TS/TSX 代码早于 Biome，且采用紧凑单行风格；本配置刻意不重排存量代码：
-  // - formatter 默认关闭（`pnpm format` 手动启用，按现风格格式化）；
-  // - 下方 off 列表是在当前代码上运行 `biome check` 后有实际告警的推荐规则，
-  //   后续可逐条开启并逐步清理存量代码，不要一次性全部打开。
-  "$schema": "https://biomejs.dev/schemas/2.5.15/schema.json",
-  "vcs": {
-    "enabled": true,
-    "clientKind": "git",
-    "useIgnoreFile": true
-  },
+ // Biome 工具链配置。
+ // 本仓库要求全量通过 `pnpm check`（format + lint）；修改代码后先运行 `pnpm format`
+ // 或 `pnpm check:fix` 自动修复，再提交。
+ // 下方 off 列表是在存量代码上仍有告警的推荐规则，后续可逐条开启并逐步清理。
+ "$schema": "https://biomejs.dev/schemas/2.5.15/schema.json",
+ "vcs": {
+  "enabled": true,
+  "clientKind": "git",
+  "useIgnoreFile": true
+ },
+ // runtime-manifest.json 由 scripts/runtime-manifest.mts 生成并保持 minify 输出，
+ // 不参与格式化，避免生成器与格式门禁互相覆盖。
+ "files": {
+  "includes": ["**", "!resources/runtime-manifest.json"]
+ },
+ "formatter": {
+  "enabled": true,
+  "indentStyle": "space",
+  "indentWidth": 1,
+  "lineWidth": 320
+ },
+ "javascript": {
   "formatter": {
-    "enabled": false,
-    "indentStyle": "space",
-    "indentWidth": 1,
-    "lineWidth": 320
-  },
-  "javascript": {
-    "formatter": {
-      "quoteStyle": "single",
-      "semicolons": "asNeeded",
-      "bracketSpacing": false,
-      "arrowParentheses": "asNeeded",
-      "trailingCommas": "none"
-    }
-  },
-  "assist": {
-    "actions": {
-      "source": {
-        "organizeImports": "off"
-      }
-    }
-  },
-  "linter": {
-    "enabled": true,
-    "rules": {
-      "preset": "recommended",
-      "a11y": {
-        "noAutofocus": "off",
-        "noLabelWithoutControl": "off",
-        "noStaticElementInteractions": "off",
-        "noSvgWithoutTitle": "off",
-        "useAltText": "off",
-        "useAriaPropsSupportedByRole": "off",
-        "useButtonType": "off",
-        "useSemanticElements": "off",
-        "useValidAriaRole": "off"
-      },
-      "complexity": {
-        "noImportantStyles": "off",
-        "noUselessEscapeInRegex": "off",
-        "useOptionalChain": "off"
-      },
-      "correctness": {
-        "noEmptyCharacterClassInRegex": "off",
-        "noUnusedFunctionParameters": "off",
-        "noUnusedImports": "off",
-        "noUnusedVariables": "off",
-        "useExhaustiveDependencies": "off",
-        "useHookAtTopLevel": "off"
-      },
-      "style": {
-        "noDescendingSpecificity": "off",
-        "noNonNullAssertion": "off",
-        "useConst": "off",
-        "useImportType": "off",
-        "useTemplate": "off"
-      },
-      "suspicious": {
-        "noArrayIndexKey": "off",
-        "noAssignInExpressions": "off",
-        "noControlCharactersInRegex": "off",
-        "noExplicitAny": "off",
-        "noShadowRestrictedNames": "off",
-        "noTemplateCurlyInString": "off",
-        "noUselessEscapeInString": "off",
-        "useIterableCallbackReturn": "off"
-      }
-    }
+   "quoteStyle": "single",
+   "semicolons": "asNeeded",
+   "bracketSpacing": false,
+   "arrowParentheses": "asNeeded",
+   "trailingCommas": "none"
   }
+ },
+ "assist": {
+  "actions": {
+   "source": {
+    "organizeImports": "off"
+   }
+  }
+ },
+ "linter": {
+  "enabled": true,
+  "rules": {
+   "preset": "recommended",
+   "a11y": {
+    "noAutofocus": "off",
+    "noLabelWithoutControl": "off",
+    "noStaticElementInteractions": "off",
+    "noSvgWithoutTitle": "off",
+    "useAltText": "off",
+    "useAriaPropsSupportedByRole": "off",
+    "useButtonType": "off",
+    "useSemanticElements": "off",
+    "useValidAriaRole": "off"
+   },
+   "complexity": {
+    "noImportantStyles": "off",
+    "noUselessEscapeInRegex": "off",
+    "useOptionalChain": "off"
+   },
+   "correctness": {
+    "noEmptyCharacterClassInRegex": "off",
+    "noUnusedFunctionParameters": "off",
+    "noUnusedImports": "off",
+    "noUnusedVariables": "off",
+    "useExhaustiveDependencies": "off",
+    "useHookAtTopLevel": "off"
+   },
+   "style": {
+    "noDescendingSpecificity": "off",
+    "noNonNullAssertion": "off",
+    "useConst": "off",
+    "useImportType": "off",
+    "useTemplate": "off"
+   },
+   "suspicious": {
+    "noArrayIndexKey": "off",
+    "noAssignInExpressions": "off",
+    "noControlCharactersInRegex": "off",
+    "noExplicitAny": "off",
+    "noShadowRestrictedNames": "off",
+    "noTemplateCurlyInString": "off",
+    "noUselessEscapeInString": "off",
+    "useIterableCallbackReturn": "off"
+   }
+  }
+ }
 }
