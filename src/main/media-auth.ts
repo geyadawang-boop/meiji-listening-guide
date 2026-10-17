@@ -6,6 +6,7 @@ import {z} from 'zod'
 import {windowsProtect} from './windows-native'
 import type {MediaCrypt} from './media-encryption'
 import type {NativeMediaOptions} from './media-options'
+const vaultLimit = 8 * 1024 * 1024
 const key = z.string().regex(/^[a-f0-9]{32}$/)
 const profile = z
  .object({
@@ -109,7 +110,7 @@ export class NativeMediaAuth {
   const path = await this.path()
   try {
    const info = await lstat(path)
-   if (!info.isFile() || info.isSymbolicLink() || info.size > 8 * 1024 * 1024) throw new Error('登录档案文件无效')
+   if (!info.isFile() || info.isSymbolicLink() || info.size > vaultLimit) throw new Error('登录档案文件无效')
    return z.record(key, profile).parse(JSON.parse((await this.crypt(await readFile(path), true)).toString('utf8')))
   } catch (error) {
    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return {} as Record<string, Profile>
@@ -129,7 +130,9 @@ export class NativeMediaAuth {
     result = fn(rows),
     path = await this.path(),
     temporary = path + '.' + randomUUID() + '.writing'
-   await writeFile(temporary, await this.crypt(Buffer.from(JSON.stringify(rows))), {flag: 'wx'})
+   const sealed = await this.crypt(Buffer.from(JSON.stringify(rows)))
+   if (sealed.length > vaultLimit) throw new Error('登录档案加密后超过 8 MB，未保存')
+   await writeFile(temporary, sealed, {flag: 'wx'})
    await rename(temporary, path)
    return result
   })
