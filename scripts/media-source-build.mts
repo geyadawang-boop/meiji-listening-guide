@@ -46,11 +46,22 @@ async function execute(
   timedOut = false
  try {
   return await new Promise<{code: number | null; output: string}>((done, fail) => {
-   const child = spawn(file, args, {cwd, env, stdio: ['ignore', 'pipe', 'pipe']})
+   // This Mac-only runner creates and owns this process group; never adopt external PIDs.
+   const child = spawn(file, args, {cwd, env, detached: true, stdio: ['ignore', 'pipe', 'pipe']})
+   let escalation: ReturnType<typeof setTimeout> | undefined
+   const stopOwnedGroup = (signal: NodeJS.Signals) => {
+    if (!child.pid) return
+    try {
+     process.kill(-child.pid, signal)
+    } catch (error) {
+     if ((error as NodeJS.ErrnoException).code !== 'ESRCH') fail(error)
+    }
+   }
    const timer = setTimeout(
     () => {
      timedOut = true
-     child.kill('SIGTERM')
+     stopOwnedGroup('SIGTERM')
+     escalation = setTimeout(() => stopOwnedGroup('SIGKILL'), 3000)
     },
     20 * 60 * 1000
    )
@@ -65,10 +76,12 @@ async function execute(
    child.stderr.on('data', receive)
    child.once('error', error => {
     clearTimeout(timer)
+    if (escalation) clearTimeout(escalation)
     fail(error)
    })
    child.once('close', code => {
     clearTimeout(timer)
+    if (escalation) clearTimeout(escalation)
     void (async () => {
      await log.writeFile(Buffer.concat(chunks))
      commands.push({file, args, cwd, label, code, timedOut, logBytes: total, logTruncated: total > 16 * 1024 * 1024})
