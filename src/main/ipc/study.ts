@@ -1,5 +1,5 @@
 import {studyEntries, saveStudyEntries} from '../study'
-import {studyEntrySchema, checkAt} from '../../shared/study'
+import {studyEntrySchema, checkAt} from '@shared/study'
 import {z} from 'zod'
 import {app, dialog, shell} from 'electron'
 import {textbookDirectory} from '../textbook-directory'
