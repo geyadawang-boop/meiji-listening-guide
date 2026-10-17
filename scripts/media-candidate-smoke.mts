@@ -25,13 +25,24 @@ async function sha256(path: string) {
  return hash.digest('hex')
 }
 async function command(file: string, args: string[]) {
- return await new Promise<{code: number | string | null; stdout: string; stderr: string}>(done => {
+ return await new Promise<{
+  code: number | string | null
+  stdout: string
+  stderr: string
+  error?: string
+  signal?: string | null
+ }>(done => {
   execFile(
    file,
    args,
    {encoding: 'utf8', timeout: 20000, maxBuffer: 256000, windowsHide: true},
    (error, stdout, stderr) => {
-    done({code: error ? (error.code ?? null) : 0, stdout, stderr})
+    done({
+     code: error ? (error.code ?? null) : 0,
+     stdout,
+     stderr,
+     ...(error ? {error: error.message, signal: error.signal} : {})
+    })
    }
   )
  })
@@ -332,6 +343,7 @@ try {
 } catch (error) {
  report.status = 'failed'
  report.error = error instanceof Error ? error.message : 'Unknown candidate failure'
+ if (error instanceof Error && error.cause instanceof Error) report.cause = error.cause.message
  process.exitCode = 1
 } finally {
  await writeFile(join(results, 'candidate.json'), JSON.stringify(report, null, 2) + '\n')
