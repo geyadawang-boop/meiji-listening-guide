@@ -7,6 +7,11 @@ on:
   pull_request:
   workflow_dispatch:
     inputs:
+      source_build:
+        description: Build and verify isolated macOS arm64 source candidates (not a release)
+        required: false
+        type: boolean
+        default: false
       source_prepare:
         description: Verify and extract fixed source archives on macOS without building
         required: false
@@ -19,8 +24,32 @@ on:
         default: false
 
 jobs:
+  source-build:
+    if: github.event_name == 'workflow_dispatch' && inputs.source_build
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build and verify source candidate only
+        run: node scripts/media-source-build.mts --output "${{ runner.temp }}/media-source-build-artifacts"
+      - name: Upload isolated candidate evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-source-build-candidate-not-release
+          path: ${{ runner.temp }}/media-source-build-artifacts
+          retention-days: 7
+          if-no-files-found: warn
+
   source-prepare:
-    if: github.event_name == 'workflow_dispatch' && inputs.source_prepare
+    if: github.event_name == 'workflow_dispatch' && inputs.source_prepare && !inputs.source_build
     runs-on: macos-latest
     timeout-minutes: 20
     steps:
@@ -43,7 +72,7 @@ jobs:
           if-no-files-found: warn
 
   media-candidate:
-    if: github.event_name == 'workflow_dispatch' && inputs.media_candidate && !inputs.source_prepare
+    if: github.event_name == 'workflow_dispatch' && inputs.media_candidate && !inputs.source_prepare && !inputs.source_build
     strategy:
       fail-fast: false
       matrix:
@@ -90,7 +119,7 @@ jobs:
         run: pnpm build
 
   runtime-smoke:
-    if: github.event_name == 'workflow_dispatch' && !inputs.media_candidate && !inputs.source_prepare
+    if: github.event_name == 'workflow_dispatch' && !inputs.media_candidate && !inputs.source_prepare && !inputs.source_build
     strategy:
       fail-fast: false
       matrix:

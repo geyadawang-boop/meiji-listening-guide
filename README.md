@@ -35,6 +35,8 @@ node scripts/audit-language-migration.mts --check
 
 ## 发布和恢复组件
 
+手动 CI 的 `source_build` 只在 macOS arm64 隔离构建七份锁定源码并验证应用所需编码路径。工件包含来源、构建配置/日志和候选工具，标记为 candidate-only；不发布或安装，GPL 对应源码审阅、Developer ID 签名与公证仍待完成。
+
 源码准备工具 `node scripts/media-source-prepare.mts` 只下载、核验并安全解包七份固定媒体源码；可用 `--offline <归档目录>` 验证已有源包。它要求 BSD tar，仅写新的系统临时目录，不编译或安装。CI 手动选项 `source_prepare` 在 macOS 检查真实下载与解包，仅上传准备报告；源码来源/构建/许可审核与可分发结论仍分开。
 
 CI 手动运行时可选 `media_candidate`，在匹配的 macOS arm64/Linux x64 runner 下载并核验锁定候选，检查真实生成、转码、探测、取消和 IPC 断开退出。仅上传结果 JSON；许可、对应源码与分发签名仍待审核，不代表组件已可安装或分发。
