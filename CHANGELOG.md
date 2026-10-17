@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- 主进程 IPC 与预加载脚本使用统一共享模块别名，保持开发及生产构建的引用一致。
+
 - macOS/Linux 的 portable 构建不再随包复制 Windows 专属可选组件，即使本地已有这些资源；Windows portable 保持原行为；当前 Windows 组件包拒绝以 macOS/Linux 为目标生成。
 - 通讯凭据与会话通过主进程系统密钥库加密，保留 Windows 原格式；等待加密期间若连接或登录状态改变，会保留原记录并拒绝过期写入。
 
