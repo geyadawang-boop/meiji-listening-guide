@@ -11,6 +11,7 @@ import {NativeWeixinLocal} from './im-weixin-local'
 import {NativeImAutomation, type NativeImKnowledge} from './im-automation'
 import type {ResearchModel} from './research-engine'
 import {NativeImCleanup} from './im-cleanup'
+import type {MediaCrypt} from './media-encryption'
 type Projection = {
  operation_id: string
  connection_id: string
@@ -45,10 +46,11 @@ export class NativeImService {
   resources: string,
   private fetcher: typeof fetch = fetch,
   model?: ResearchModel,
-  knowledge?: NativeImKnowledge
+  knowledge?: NativeImKnowledge,
+  crypt?: MediaCrypt
  ) {
-  this.store = new NativeImStore(root)
-  this.runtime = new NativeNapcatRuntime(resources, join(root, 'runtime-components/napcat'))
+  this.store = new NativeImStore(root, crypt)
+  this.runtime = new NativeNapcatRuntime(resources, join(root, 'runtime-components/napcat'), crypt)
   this.automation = new NativeImAutomation(this.store, {
    profile: () => (this.profile ? 'native-' + this.profile : ''),
    sync: (scope, signal) => this.sync(scope, signal),
@@ -119,7 +121,7 @@ export class NativeImService {
     qq_component: this.runtime.status()
    }
   if (action === 'change') {
-   const result = this.store.change(input),
+   const result = await this.store.change(input),
     value = z.record(z.string(), z.unknown()).parse(input)
    if (value.action === 'delete' && typeof value.id === 'string') await this.local.invalidate(value.id)
    return result
@@ -147,16 +149,27 @@ export class NativeImService {
      .parse(input),
     row = this.store.capture(value.connection_id, value.revision)
    if (row.platform !== 'weixin_local') throw new Error('当前连接不是本机微信')
-   const result = await this.local.request<{account: string; session: unknown; capabilities: unknown}>(
-    'confirm',
+   const {result, owner} = await this.local.confirm<{account: string; session: unknown; capabilities: unknown}>(
+    value.connection_id,
     value,
     this.signal()
    )
    try {
-    this.store.bind(value.connection_id, value.revision, result.account, result.session, result.capabilities)
+    owner()
+    await this.store.bind(
+     value.connection_id,
+     value.revision,
+     result.account,
+     result.session,
+     result.capabilities,
+     () => {
+      this.signal().throwIfAborted()
+      owner()
+     }
+    )
     return this.store.listing()
    } catch (error) {
-    await this.local.invalidate(value.connection_id)
+    await this.local.invalidateOwned(value.connection_id, owner).catch(() => {})
     throw error
    }
   }
@@ -222,8 +235,9 @@ export class NativeImService {
      login.projection = {...login.projection, state: state.state, has_qr: !!state.qr}
      return this.persist(login)
     }
-    const privateRow = this.store.privateState(row.id, row.revision),
+    const privateRow = await this.store.privateState(row.id, row.revision),
      managed = row.fields.mode !== 'manual'
+    this.current(login)
     const component = managed ? await this.runtime.ensure() : undefined
     this.current(login)
     login.adapter = new NativeNapcatLogin(
@@ -292,12 +306,22 @@ export class NativeImService {
    const result = await login.adapter!.verify(this.signal(login))
    this.current(login)
    if (result.account !== login.projection.account) throw new Error('确认期间登录账号改变，未绑定')
-   const bound = this.store.bind(
+   const bound = await this.store.bind(
     login.projection.connection_id,
     login.revision,
     result.account,
     result.session,
-    result.capabilities
+    result.capabilities,
+    () => {
+     this.current(login)
+     if (
+      this.operation(value).login !== login ||
+      login.projection.state !== 'awaiting_bind' ||
+      value.displayed_account !== login.projection.account ||
+      result.account !== login.projection.account
+     )
+      throw new Error('确认期间登录状态或账号已改变，未绑定')
+    }
    )
    login.qr = ''
    login.projection = {...login.projection, state: 'online', has_qr: false, boundRevision: bound.revision}
@@ -311,7 +335,7 @@ export class NativeImService {
     if (action === 'send') throw new Error('本机个人微信仅支持只读和草稿')
     this.store.requireRead(localScope.scope)
     if (action === 'sync') return this.sync(localScope.scope, this.signal())
-    const result = await this.local.request('directory', this.localInput(localScope.scope), this.signal())
+    const result = await this.local.request('directory', await this.localInput(localScope.scope), this.signal())
     this.store.checkScope(localScope.scope)
     return result
    }
@@ -324,13 +348,17 @@ export class NativeImService {
      return {...claim.receipt, state: claim.receipt.state === 'sending' ? 'unknown' : claim.receipt.state}
     try {
      if (row.platform === 'weixin_ilink' || row.platform === 'weixin_web') {
-      const session = this.weixin(row.platform, scope.connection_id, scope.revision)
+      const session = await this.weixin(row.platform, scope.connection_id, scope.revision)
+      this.signal().throwIfAborted()
+      this.store.checkScope(scope)
       await session.verify(this.signal(), scope.account)
       this.store.checkScope(scope)
       const receipt = await session.send(scope.peer, claim.value.text, claim.value.operation_id, this.signal())
       return this.store.finishSend(claim.value.operation_id, receipt ? 'sent' : 'unknown', receipt || undefined)
      }
-     const session = this.session(scope.connection_id, scope.revision)
+     const session = await this.session(scope.connection_id, scope.revision)
+     this.signal().throwIfAborted()
+     this.store.checkScope(scope)
      await session.verify(scope.account, this.signal())
      this.store.checkScope(scope)
      const receipt = await session.send(scope.peer, claim.value.text, this.signal())
@@ -342,13 +370,19 @@ export class NativeImService {
    this.store.requireRead(scope)
    if (action === 'sync') return this.sync(scope, this.signal())
    if (row.platform === 'weixin_ilink' || row.platform === 'weixin_web') {
-    const session = this.weixin(row.platform, scope.connection_id, scope.revision)
+    const session = await this.weixin(row.platform, scope.connection_id, scope.revision)
+    this.signal().throwIfAborted()
+    this.store.checkScope(scope)
+    this.store.requireRead(scope)
     await session.verify(this.signal(), scope.account)
     const result = await session.directory(this.signal())
     this.store.checkScope(scope)
     return result
    }
-   const session = this.session(scope.connection_id, scope.revision)
+   const session = await this.session(scope.connection_id, scope.revision)
+   this.signal().throwIfAborted()
+   this.store.checkScope(scope)
+   this.store.requireRead(scope)
    await session.verify(scope.account, this.signal())
    this.store.checkScope(scope)
    const result = await session.directory(this.signal())
@@ -371,25 +405,42 @@ export class NativeImService {
   const {scope, row} = this.store.checkScope(input)
   this.store.requireRead(scope)
   if (!this.store.accountLimits(scope).archive_enabled) throw new Error('此账号已停用消息保存，未请求同步')
+  const privateRow = await this.store.privateState(scope.connection_id, scope.revision)
+  signal.throwIfAborted()
+  this.store.requireRead(scope)
+  if (!this.store.accountLimits(scope).archive_enabled) throw new Error('此账号已停用消息保存，未请求同步')
+  const beforeCommit = () => signal.throwIfAborted()
   if (row.platform === 'weixin_local') {
    const result = await this.local.request<{session: unknown; messages: unknown; coverage: unknown}>(
     'receive',
-    this.localInput(scope),
+    {connection_id: scope.connection_id, account: scope.account, peer: scope.peer, session: privateRow.session},
     signal
    )
    signal.throwIfAborted()
-   return {...this.store.saveSessionAndMessages(scope, result.session, result.messages), coverage: result.coverage}
+   return {
+    ...(await this.store.saveSessionAndMessages(
+     scope,
+     result.session,
+     result.messages,
+     privateRow.snapshot,
+     beforeCommit
+    )),
+    coverage: result.coverage
+   }
   }
   if (row.platform === 'weixin_ilink' || row.platform === 'weixin_web') {
-   const session = this.weixin(row.platform, scope.connection_id, scope.revision)
+   const session =
+    row.platform === 'weixin_web'
+     ? new NativeWeixinWebSession(privateRow.session, this.fetcher)
+     : new NativeILinkSession(privateRow.session, this.fetcher)
    await session.verify(signal, scope.account)
    const result = await session.receive(scope.peer, scope.account, signal)
    await session.verify(signal, scope.account)
    signal.throwIfAborted()
-   return this.store.saveSessionAndMessages(scope, result.session, result.messages)
+   return this.store.saveSessionAndMessages(scope, result.session, result.messages, privateRow.snapshot, beforeCommit)
   }
   if (row.platform !== 'qq_napcat') throw new Error('此平台的原生读取仍在迁移')
-  const session = this.session(scope.connection_id, scope.revision)
+  const session = new NativeQqSession(z.object({onebot: onebotConfig}).parse(privateRow.session).onebot, this.fetcher)
   await session.verify(scope.account, signal)
   this.store.checkScope(scope)
   const messages = await session.receive(scope.peer, scope.account, signal)
@@ -397,23 +448,26 @@ export class NativeImService {
   signal.throwIfAborted()
   return this.store.saveMessages(scope, messages)
  }
- private localInput(input: unknown) {
-  const {scope} = this.store.checkScope(input)
+ private async localInput(input: unknown) {
+  const {scope} = this.store.checkScope(input),
+   privateRow = await this.store.privateState(scope.connection_id, scope.revision)
+  this.signal().throwIfAborted()
+  this.store.requireRead(scope)
   return {
    connection_id: scope.connection_id,
    account: scope.account,
    peer: scope.peer,
-   session: this.store.privateState(scope.connection_id, scope.revision).session
+   session: privateRow.session
   }
  }
- private weixin(platform: string, id: string, revision: string) {
-  const saved = this.store.privateState(id, revision).session
+ private async weixin(platform: string, id: string, revision: string) {
+  const saved = (await this.store.privateState(id, revision)).session
   return platform === 'weixin_web'
    ? new NativeWeixinWebSession(saved, this.fetcher)
    : new NativeILinkSession(saved, this.fetcher)
  }
- private session(id: string, revision: string) {
-  const row = this.store.privateState(id, revision),
+ private async session(id: string, revision: string) {
+  const row = await this.store.privateState(id, revision),
    session = z.object({onebot: onebotConfig}).parse(row.session)
   return new NativeQqSession(session.onebot, this.fetcher)
  }
