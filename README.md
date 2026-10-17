@@ -29,7 +29,7 @@ node scripts/audit-language-migration.mts --check
 
 `pnpm verify` 即 `pnpm typecheck && pnpm check`：全量类型检查加 Biome 格式检查与 lint，任一失败即不通过；CI 与本地使用同一入口。提交前可先运行 `pnpm check:fix` 自动修复格式与可修复告警，风格配置见 biome.jsonc。
 
-当前版本按用户要求删除测试脚本、测试配置和测试启动入口。此前的验收记录仍保留；历史验收不代表全部真实账号和外部站点可用。
+`pnpm verify` 执行静态检查；构建后可手动运行 `pnpm runtime:smoke`，使用隔离合成资料验证系统密钥库、工作进程恢复与设置导航。CI 的三平台运行验证仅手动触发。这些检查不代表真实账号或全部外部站点可用。
 
 ## 发布和恢复组件
 

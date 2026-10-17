@@ -20,6 +20,7 @@
   "pack": "pnpm build && pnpm release full",
   "release": "node scripts/release.mts",
   "release:source": "node scripts/source-package.mts",
+  "runtime:smoke": "node scripts/runtime-smoke.mts",
   "audit:typescript": "node scripts/audit-typescript.mts --check",
   "lint": "biome lint .",
   "format": "biome format --write .",
