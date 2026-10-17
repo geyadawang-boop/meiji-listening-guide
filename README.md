@@ -29,6 +29,8 @@ node scripts/audit-language-migration.mts --check
 
 `pnpm verify` 即 `pnpm typecheck && pnpm check`：全量类型检查加 Biome 格式检查与 lint，任一失败即不通过；CI 与本地使用同一入口。提交前可先运行 `pnpm check:fix` 自动修复格式与可修复告警，风格配置见 biome.jsonc。
 
+媒体组件离线暂存：`node scripts/media-source-stage.mts <sourceId> <inputDirectory> <stagingRoot>`。来源仅限 `eugeneware-b6.1.1-darwin-arm64` 与 `eugeneware-b6.1.1-linux-x64`；输入目录须恰含锁定表中的四个原名文件。输出必须是系统临时目录规范路径下、尚不存在的 `meiji-media-stage-*` 直接子目录，用户路径及父目录不允许链接。工具不下载、执行或安装；`staged_verified` 只表示完整性与文件头架构通过，许可、对应源码、依赖、签名及真实运行仍待验证，不能作为可分发或可安装结论。
+
 `pnpm verify` 执行静态检查；构建后可手动运行 `pnpm runtime:smoke`，使用隔离合成资料验证系统密钥库、工作进程恢复与设置导航。CI 的三平台运行验证仅手动触发。这些检查不代表真实账号或全部外部站点可用。
 
 ## 发布和恢复组件
