@@ -7,7 +7,7 @@ import {readImageDeck} from '../ppt-extract'
 import {defaultVideoPrompt} from '../../shared/video-ppt'
 import {readFile, stat, rm} from 'node:fs/promises'
 import {readTranscript} from '../transcript'
-import {parseCourseware} from '../documents'
+import {parseCourseware, serializeCoursewareSourceCache} from '../documents'
 import {listLibrary, managedFile} from '../file-manager'
 import {Api} from '../api'
 import {type Settings} from '../../shared/types'
@@ -227,9 +227,17 @@ export function createDesktopHandler(
        const lecture = planned?.lectureId
         ? db.lecture(planned.lectureId)
         : db.detail(course.id).lectures.find(l => l.title === title) || db.createLecture(course.id, title, '', '', '')
+       const generated = await parseCourseware(result.path)
+       const generatedText = await serializeCoursewareSourceCache(
+        result.path,
+        generated.text,
+        'local',
+        generated.needsOcr,
+        generated.omissions
+       )
        db.db
         .prepare('UPDATE lectures SET ppt_path=?,ppt_text=?,ppt_processed=0 WHERE id=?')
-        .run(result.path, '', lecture.id)
+        .run(result.path, generatedText, lecture.id)
        if (path) await rm(path, {force: true})
        return {path: result.path, lectureId: lecture.id, courseId: course.id, fromVideo: true}
       }
@@ -238,7 +246,7 @@ export function createDesktopHandler(
        const lecture = planned?.lectureId
         ? db.lecture(planned.lectureId)
         : db.detail(course.id).lectures.find(l => l.title === title) || db.createLecture(course.id, title, '', '', '')
-       if (kind === 'transcript')
+       if (kind === 'transcript') {
         db.db
          .prepare('UPDATE lectures SET transcript_path=?,transcript_text=?,time_estimated=?,status=? WHERE id=?')
          .run(
@@ -248,10 +256,19 @@ export function createDesktopHandler(
           '待校订',
           lecture.id
          )
-       else
+       } else {
+        const courseware = parsed as Awaited<ReturnType<typeof parseCourseware>>
+        const cachedText = await serializeCoursewareSourceCache(
+         path,
+         courseware.text,
+         'local',
+         courseware.needsOcr,
+         courseware.omissions
+        )
         db.db
          .prepare('UPDATE lectures SET ppt_path=?,ppt_text=?,ppt_processed=0 WHERE id=?')
-         .run(path, parsed.text, lecture.id)
+         .run(path, cachedText, lecture.id)
+       }
        db.db.prepare('DELETE FROM correction_checkpoints WHERE lecture_id=?').run(lecture.id)
        return {path, lectureId: lecture.id, courseId: course.id}
       } catch (error) {

@@ -4,7 +4,13 @@ import {z} from 'zod'
 import {app, dialog, shell} from 'electron'
 import {textbookDirectory} from '../textbook-directory'
 import {dirname} from 'node:path'
-import {parseDocument} from '../documents'
+import {
+ parseDocument,
+ parseCoursewareCache,
+ coursewareCacheLimitations,
+ serializeCoursewareSourceCache,
+ coursewareSourceIdentity
+} from '../documents'
 import {readFile} from 'node:fs/promises'
 import {createHash} from 'node:crypto'
 import type {ApplicationContext} from '../main'
@@ -75,10 +81,21 @@ export function createStudyHandler(
      const entry = studyEntries(db).find(e => e.id === z.string().parse(object.entryId))
      if (!entry?.lectureId) throw new Error('请先关联课次')
      const lecture = db.lecture(entry.lectureId)
-     if (lecture.ppt_text.trim() || !lecture.ppt_path || !lecture.ppt_path.toLowerCase().endsWith('.pdf')) return null
+     const cached = parseCoursewareCache(
+      lecture.ppt_text,
+      lecture.ppt_path ? await coursewareSourceIdentity(lecture.ppt_path).catch(() => null) : undefined
+     )
+     const usableCachedText = cached.text.replace(/\[第\s*\d+\s*页\]/g, '').trim()
+     if (
+      (cached.text.trim() && (!cached.needsOcr || usableCachedText.length > 0)) ||
+      !lecture.ppt_path ||
+      !lecture.ppt_path.toLowerCase().endsWith('.pdf')
+     )
+      return null
      const parsed = await parseDocument(lecture.ppt_path)
      if (!parsed.needsOcr) {
-      db.db.prepare('UPDATE lectures SET ppt_text=? WHERE id=?').run(parsed.text, lecture.id)
+      const text = await serializeCoursewareSourceCache(lecture.ppt_path, parsed.text, 'local', parsed.needsOcr, [])
+      db.db.prepare('UPDATE lectures SET ppt_text=? WHERE id=?').run(text, lecture.id)
       return null
      }
      const bytes = await readFile(lecture.ppt_path)
@@ -118,7 +135,10 @@ export function createStudyHandler(
         .digest('hex') !== object.hash
       )
        throw new Error('PPT 已改变，未保存识别结果')
-      db.db.prepare('UPDATE lectures SET ppt_text=? WHERE id=?').run(text, lecture.id)
+      const cachedText = await serializeCoursewareSourceCache(lecture.ppt_path, text, 'ocr', false, [
+       'OCR 输出未经人工逐页核对。'
+      ])
+      db.db.prepare('UPDATE lectures SET ppt_text=? WHERE id=?').run(cachedText, lecture.id)
       return true
      })
     case 'textbook:analyze-images':
@@ -127,22 +147,26 @@ export function createStudyHandler(
       const entry = studyEntries(db).find(e => e.id === z.string().parse(object.entryId))
       if (!entry?.lectureId) throw new Error('请先将课表条目关联到已有课次')
       const d = db.lectureDetail(entry.lectureId),
-       files = db.detail(entry.courseId).files
-      const ppt =
-       d.lecture.ppt_text || (d.lecture.ppt_path ? await parseDocument(d.lecture.ppt_path).then(p => p.text) : '')
-      const sources = {
-       teacher: d.segments.map(s => s.text).join('\n') || d.lecture.transcript_text,
-       focus:
-        d.notes?.keyPoints
-         .filter(p => p.verified === true)
-         .map(p => p.quote)
-         .join('\n') || '',
-       ppt,
-       senior: files
-        .filter(f => f.kind === 'senior_notes')
-        .map(f => f.text)
-        .join('\n')
-      }
+       files = db.detail(entry.courseId).files,
+       source = d.lecture.ppt_path ? await coursewareSourceIdentity(d.lecture.ppt_path).catch(() => null) : undefined,
+       cache = parseCoursewareCache(d.lecture.ppt_text, source),
+       limitations = coursewareCacheLimitations(cache),
+       ppt = cache.text || (d.lecture.ppt_path ? await parseDocument(d.lecture.ppt_path).then(p => p.text) : ''),
+       pptWithLimitations =
+        ppt + (limitations.length ? '\n\n[课件来源限制]\n' + limitations.map(item => '- ' + item).join('\n') : ''),
+       sources = {
+        teacher: d.segments.map(s => s.text).join('\n') || d.lecture.transcript_text,
+        focus:
+         d.notes?.keyPoints
+          .filter(p => p.verified === true)
+          .map(p => p.quote)
+          .join('\n') || '',
+        ppt: pptWithLimitations,
+        senior: files
+         .filter(f => f.kind === 'senior_notes')
+         .map(f => f.text)
+         .join('\n')
+       }
       const first = z.number().int().positive().parse(object.first),
        last = z.number().int().positive().parse(object.last)
       return action === 'textbook:analyze-images'

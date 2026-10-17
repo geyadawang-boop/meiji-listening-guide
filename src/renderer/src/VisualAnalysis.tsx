@@ -1,13 +1,21 @@
 import {useEffect, useState} from 'react'
+
+type Frame = {time: number; status: string; text?: string; error?: string}
 type Task = {
  id: string
  source: string
  duration: number
+ gaps: unknown[]
  output?: string
+ outputRecovery?: 'journal' | 'pending' | 'changed' | 'legacy'
+ outputPending?: boolean
+ outputJournal?: unknown
  preparation?: {status: string; error?: string}
- frames: {time: number; status: string; text?: string; error?: string}[]
+ frames: Frame[]
 }
+
 const invoke = <T,>(action: string, args?: unknown) => window.assistant.invoke<T>(action, args)
+
 export function VisualIcon() {
  return (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
@@ -17,19 +25,23 @@ export function VisualIcon() {
   </svg>
  )
 }
+
 export function VisualAnalysis({visible, close}: {visible: boolean; close: () => void}) {
- const [tasks, setTasks] = useState<Task[]>([]),
-  [cap, setCap] = useState(6),
-  [policy, setPolicy] = useState('balanced'),
-  [busy, setBusy] = useState(false),
-  [error, setError] = useState(''),
-  [progress, setProgress] = useState('')
+ const [tasks, setTasks] = useState<Task[]>([])
+ const [cap, setCap] = useState(6)
+ const [policy, setPolicy] = useState('balanced')
+ const [busy, setBusy] = useState(false)
+ const [error, setError] = useState('')
+ const [progress, setProgress] = useState('')
+
  async function refresh() {
   setTasks(await invoke('visual:list'))
  }
+
  useEffect(() => {
   if (visible) void refresh().catch(reason => setError(String(reason)))
  }, [visible])
+
  useEffect(
   () =>
    window.assistant.onEvent(event => {
@@ -37,6 +49,7 @@ export function VisualAnalysis({visible, close}: {visible: boolean; close: () =>
    }),
   []
  )
+
  async function run(fn: () => Promise<void>) {
   setBusy(true)
   setError('')
@@ -51,6 +64,7 @@ export function VisualAnalysis({visible, close}: {visible: boolean; close: () =>
    setBusy(false)
   }
  }
+
  return (
   <section
    className="ppt-extract-page learning-window"
@@ -76,7 +90,7 @@ export function VisualAnalysis({visible, close}: {visible: boolean; close: () =>
     </header>
     <section className="knowledge-card">
      <p className="hint">
-      先在本机选择图片或视频并提取画面，点击“识别所选画面”才发送画面到当前连接模型。文本模型未必支持图片；失败时保留恢复任务。
+      先在本机选择图片或视频并提取画面，点击“识别所选画面”才发送画面到所选千问视觉模型。视频只处理抽样画面，保留时间间隙和源哈希。
      </p>
      <div className="row">
       <label>
@@ -88,12 +102,12 @@ export function VisualAnalysis({visible, close}: {visible: boolean; close: () =>
         max={12}
         value={cap}
         disabled={busy}
-        onChange={e => setCap(Number(e.target.value))}
+        onChange={event => setCap(Number(event.target.value))}
        />
       </label>
       <label>
        选帧方式
-       <select value={policy} disabled={busy} onChange={e => setPolicy(e.target.value)}>
+       <select value={policy} disabled={busy} onChange={event => setPolicy(event.target.value)}>
         <option value="balanced">内容变化优先</option>
         <option value="coverage">覆盖时间范围</option>
        </select>
@@ -125,59 +139,133 @@ export function VisualAnalysis({visible, close}: {visible: boolean; close: () =>
       {error}
      </p>
     )}
-    {tasks.map(task => (
-     <section className="knowledge-card" key={task.id}>
-      <header>
-       <h3>{task.source.split(/[\\/]/).pop()}</h3>
-       {!task.frames.length ? (
-        <button
-         disabled={busy}
-         onClick={() =>
-          void run(async () => {
-           await invoke('visual:prepare-resume', {id: task.id})
-          })
-         }
-        >
-         继续提取画面
-        </button>
-       ) : task.output ? (
-        <button onClick={() => void invoke('library:open-file', {path: task.output})}>打开识别结果</button>
-       ) : (
-        <button
-         disabled={busy}
-         onClick={() =>
-          void run(async () => {
-           await invoke('visual:recognize', {id: task.id})
-          })
-         }
-        >
-         识别所选画面
-        </button>
-       )}
-      </header>
-      {task.preparation?.error && <p className="alert">{task.preparation.error}</p>}
-      <p className="hint">
-       共 {task.frames.length} 个画面 · 已完成 {task.frames.filter(frame => frame.status === '已完成').length}
-      </p>
-      {task.frames.map((frame, index) => (
-       <details key={index} open={!!frame.error}>
-        <summary>
-         {Math.floor(frame.time / 60)}:
-         {Math.floor(frame.time % 60)
-          .toString()
-          .padStart(2, '0')}{' '}
-         · {frame.status}
-        </summary>
-        {frame.text && <p className="knowledge-text">{frame.text}</p>}
-        {frame.error && (
-         <p role="alert" className="hint">
-          {frame.error}
-         </p>
+    {tasks.map(task => {
+     const completed = task.frames.filter(frame => frame.status === '已完成').length
+     const recoverable = completed > 0 && Boolean(task.outputRecovery || task.outputPending || task.outputJournal)
+     const incomplete = task.frames.some(frame => frame.status !== '已完成')
+
+     return (
+      <section className="knowledge-card" key={task.id}>
+       <header>
+        <h3>{task.source.split(/[\\/]/).pop()}</h3>
+        {!task.frames.length ? (
+         <button
+          disabled={busy}
+          onClick={() =>
+           void run(async () => {
+            await invoke('visual:prepare-resume', {id: task.id})
+           })
+          }
+         >
+          继续提取画面
+         </button>
+        ) : recoverable ? (
+         <>
+          <button
+           disabled={busy}
+           onClick={() =>
+            void run(async () => {
+             await invoke('visual:recover-output', {id: task.id})
+            })
+           }
+          >
+           保存已识别结果
+          </button>
+          {task.output && (
+           <button onClick={() => void invoke('library:open-file', {path: task.output})}>打开当前结果</button>
+          )}
+          {task.output && incomplete && (
+           <button
+            disabled={busy}
+            onClick={() =>
+             void run(async () => {
+              await invoke('visual:recognize', {id: task.id})
+             })
+            }
+           >
+            继续识别未完成画面
+           </button>
+          )}
+         </>
+        ) : task.output ? (
+         <>
+          <button onClick={() => void invoke('library:open-file', {path: task.output})}>打开识别结果</button>
+          {incomplete && (
+           <button
+            disabled={busy}
+            onClick={() =>
+             void run(async () => {
+              await invoke('visual:recognize', {id: task.id})
+             })
+            }
+           >
+            继续识别未完成画面
+           </button>
+          )}
+         </>
+        ) : (
+         <button
+          disabled={busy}
+          onClick={() =>
+           void run(async () => {
+            await invoke('visual:recognize', {id: task.id})
+           })
+          }
+         >
+          识别所选画面
+         </button>
         )}
-       </details>
-      ))}
-     </section>
-    ))}
+       </header>
+       {task.outputRecovery && (
+        <p className="hint" role="status">
+         识别成果需要恢复（
+         {task.outputRecovery === 'journal'
+          ? '上次保存未完成'
+          : task.outputRecovery === 'pending'
+            ? '任务中断'
+            : task.outputRecovery === 'changed'
+              ? '文件已改变'
+              : '旧任务缺少成果记录'}
+         ），当前文件会被保留。
+        </p>
+       )}
+       {task.preparation?.error && <p className="alert">{task.preparation.error}</p>}
+       <p className="hint">
+        共 {task.frames.length} 个画面 · 已完成 {completed} · 未完成{' '}
+        {task.frames.filter(frame => frame.status !== '已完成').length}
+       </p>
+       {task.gaps?.length > 0 ? (
+        <details>
+         <summary>抽样缺口 · {task.gaps.length}</summary>
+         <ul>
+          {task.gaps.map((gap, index) => (
+           <li key={index}>{typeof gap === 'string' ? gap : JSON.stringify(gap)}</li>
+          ))}
+         </ul>
+        </details>
+       ) : (
+        <p className="hint">提取器未报告明确缺口；视频抽样依然不覆盖全部时段。</p>
+       )}
+       {task.frames.map((frame, index) => (
+        <details key={index} open={!!frame.error}>
+         <summary>
+          {Math.floor(frame.time / 60)}:
+          {Math.floor(frame.time % 60)
+           .toString()
+           .padStart(2, '0')}{' '}
+          · {frame.status}
+         </summary>
+         {frame.text && <p className="knowledge-text">{frame.text}</p>}
+         {frame.error && (
+          <p role="alert" className="hint">
+           {frame.error}
+          </p>
+         )}
+        </details>
+       ))}
+      </section>
+     )
+    })}
    </main>
   </section>
  )

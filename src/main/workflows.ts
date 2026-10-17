@@ -14,8 +14,15 @@ import {
 import {parseSrt, toSrt, time, verifyNotes, keywordCandidates} from '../shared/srt'
 import {Store} from './db'
 import {SettingsStore} from './settings'
-import {type Api, isRetryableApiError} from './api'
-import {chunks, parseCourseware} from './documents'
+import {isRetryableApiError, type Api} from './api'
+import {
+ chunks,
+ parseCourseware,
+ parseCoursewareCache,
+ coursewareCacheLimitations,
+ coursewareSourceIdentity,
+ serializeCoursewareSourceCache
+} from './documents'
 import {readTranscript} from './transcript'
 import {prepareAnswer, type AnswerDependencies} from './practice-answer'
 export class Workflows {
@@ -47,7 +54,7 @@ export class Workflows {
   batchIndex: number,
   batchCount: number
  ) {
-  if (!images.length) return []
+  if (!images.length) return {images: [] as {label: string; url: string}[], omissions: [] as string[]}
   const pages = new Map<number, string>()
   for (const match of ppt.matchAll(/\[第\s*(\d+)\s*页\]\n([\s\S]*?)(?=\n\s*\[第\s*\d+\s*页\]|$)/g))
    pages.set(Number(match[1]), match[2])
@@ -79,14 +86,25 @@ export class Workflows {
    )
    chosen.push(...ranked.slice(Math.max(0, center - 1), center + 2))
   }
-  const result: {label: string; url: string}[] = []
+  const result: {label: string; url: string}[] = [],
+   omissions: string[] = []
   let bytes = 0
   for (const item of chosen.sort((a, b) => a.index - b.index)) {
-   if (item.bytes > 900_000 || bytes + item.bytes > 1_800_000) continue
+   const page = /第\s*(\d+)\s*页/.exec(item.image.label)?.[1] || '?'
+   if (item.bytes > 900_000) {
+    omissions.push(`第 ${page} 页嵌入图片因单张请求预算 ${item.bytes}/900000 字节超限，未附加`)
+    continue
+   }
+   if (bytes + item.bytes > 1_800_000) {
+    omissions.push(
+     `第 ${page} 页嵌入图片因本批剩余请求预算 ${1_800_000 - bytes} 字节不足（图片 ${item.bytes} 字节），未附加`
+    )
+    continue
+   }
    result.push(item.image)
    bytes += item.bytes
   }
-  return result
+  return {images: result, omissions}
  }
  async splitExam(courseId: string, fileId: string, signal?: AbortSignal) {
   const file = this.store.detail(courseId).files.find(f => f.id === fileId && f.kind === 'past_exam')
@@ -129,20 +147,41 @@ export class Workflows {
    )
    report('本地解析课件', '提取页面文字与有限嵌入图片；不会上传原始 PPT/PDF 文件')
    const data = await readFile(lecture.ppt_path),
-    courseware = await parseCourseware(lecture.ppt_path)
+    courseware = await parseCourseware(lecture.ppt_path),
+    sourceIdentity = await coursewareSourceIdentity(lecture.ppt_path)
    hash.update(data)
-   const limitations = [...courseware.omissions]
+   const cachedCourseware = parseCoursewareCache(lecture.ppt_text, sourceIdentity)
+   const preserveCached =
+    !!cachedCourseware.text.trim() &&
+    (cachedCourseware.state !== 'verified' ||
+     cachedCourseware.provenance === 'manual' ||
+     cachedCourseware.provenance === 'ocr')
+   const selectedText = preserveCached ? cachedCourseware.text : courseware.text
+   const limitations = [
+    ...courseware.omissions,
+    ...(preserveCached ? coursewareCacheLimitations(cachedCourseware) : [])
+   ]
    if (courseware.needsOcr) limitations.push('扫描 PDF：本地没有提取到足够文字，未执行 OCR。')
    const ppt =
-    courseware.text +
+    selectedText +
     (limitations.length ? '\n\n[课件提取限制]\n' + [...new Set(limitations)].map(item => '- ' + item).join('\n') : '')
+   const storedPpt = preserveCached
+    ? lecture.ppt_text
+    : await serializeCoursewareSourceCache(
+       lecture.ppt_path,
+       courseware.text,
+       'local',
+       courseware.needsOcr,
+       courseware.omissions
+      )
    const modelLimitations = [...new Set(limitations)]
    const extracted = ppt.slice(0, 24000)
    if (ppt.length > extracted.length) {
     modelLimitations.push('课件文字超过 24,000 字，本次只发送开头部分。')
     report('课件文字受限', '课件文字超过 24,000 字；本次只发送开头部分')
    }
-   this.store.db.prepare('UPDATE lectures SET ppt_text=? WHERE id=?').run(ppt, lectureId)
+   if (!preserveCached) this.store.db.prepare('UPDATE lectures SET ppt_text=? WHERE id=?').run(storedPpt, lectureId)
+   hash.update(JSON.stringify({coursewareText: selectedText, limitations}))
    const fingerprint = hash.digest('hex'),
     checkpoint = this.store.correctionCheckpoint(lectureId)
    const schema = z.array(
@@ -169,25 +208,29 @@ export class Workflows {
     const lectureContext = source.segments
      .slice(Math.max(0, i - 30), Math.min(source.segments.length, i + block.length + 30))
      .map((s, j) => ({id: Math.max(0, i - 30) + j, text: s.text}))
-    const images = this.coursewareImages(
-     courseware.images,
-     ppt,
-     block.map(s => s.text).join('\n') + '\n' + lectureContext.map(s => s.text).join('\n'),
-     Math.floor(i / batchSize),
-     Math.ceil(source.segments.length / batchSize)
-    )
+    const selection = this.coursewareImages(
+      courseware.images,
+      ppt,
+      block.map(s => s.text).join('\n') + '\n' + lectureContext.map(s => s.text).join('\n'),
+      Math.floor(i / batchSize),
+      Math.ceil(source.segments.length / batchSize)
+     ),
+     images = selection.images
+    const batchLimitations = [...modelLimitations, ...selection.omissions]
     if (images.length)
      report('结合课件页面', `字幕批次 ${Math.floor(i / batchSize) + 1} 附带 ${images.length} 张本地择取的页面原图`)
+    if (selection.omissions.length)
+     report('课件图片受限', `字幕批次 ${Math.floor(i / batchSize) + 1}：${selection.omissions.join('；')}`)
     for (let attempt = 0; attempt < 3; attempt++) {
      try {
       corrected = await this.api.json(
        prompt,
        {
         courseware: extracted,
-        coursewareLimitations: modelLimitations,
+        coursewareLimitations: batchLimitations,
         lectureContext,
         instructions:
-         '结合课件文字、附加页面图片与相邻原文理解当前批次。扫描 PDF 或没有提取到的图表内容不可猜测。rows 是必须逐条返回的记录；lectureContext 仅作局部上下文，不要额外返回。',
+         '结合课件文字、附加页面图片与相邻原文理解当前批次。扫描 PDF 或没有提取到的图表内容不可猜测；limitations 说明未附加的页面及原因。rows 是必须逐条返回的记录；lectureContext 仅作局部上下文，不要额外返回。',
         rows: block.map((s, j) => ({id: i + j, text: s.text}))
        },
        validate,
@@ -222,7 +265,7 @@ export class Workflows {
    await writeFile(join(folder, '校订字幕.srt'), toSrt(result), 'utf8')
    this.store.db
     .prepare('UPDATE lectures SET transcript_text=?,time_estimated=?,ppt_text=? WHERE id=?')
-    .run(source.text, source.estimated ? 1 : 0, ppt, lectureId)
+    .run(source.text, source.estimated ? 1 : 0, storedPpt, lectureId)
    this.store.saveSubtitles(lectureId, result)
    report('完成', '原文与 PPT 校订完成；疑点及原文已保留' + (source.estimated ? '，时间为估算' : '，保留原文时间点'))
    return this.store.lectureDetail(lectureId)
@@ -242,6 +285,42 @@ export class Workflows {
   if (!detail.segments.length) throw new Error('请先生成或导入完整字幕')
   const result: LectureNotes = {keyPoints: [], notTested: [], uncertain: []}
   const full = detail.segments.map(s => `[${time(s.start, false)}] ${s.text}`).join('\n')
+  const cached = detail.lecture.ppt_path
+   ? await coursewareSourceIdentity(detail.lecture.ppt_path).catch(() => undefined)
+   : undefined
+  const parsedCache = parseCoursewareCache(
+    detail.lecture.ppt_text,
+    cached ?? (detail.lecture.ppt_path ? null : undefined)
+   ),
+   coursewareText = parsedCache.text,
+   limitationMarker = '[课件提取限制]',
+   markerIndex = coursewareText.lastIndexOf(limitationMarker)
+  let courseware = markerIndex >= 0 ? coursewareText.slice(0, markerIndex).trimEnd() : coursewareText
+  const limitations = [
+   ...coursewareCacheLimitations(parsedCache),
+   ...(markerIndex >= 0
+    ? coursewareText
+       .slice(markerIndex + limitationMarker.length)
+       .split(/\r?\n/)
+       .map(line => /^\s*-\s*(.+)$/.exec(line)?.[1]?.trim())
+       .filter((line): line is string => !!line)
+    : [])
+  ]
+  if (/^\[扫描 PDF[：:]/.test(courseware)) {
+   limitations.push('课件为扫描 PDF，未执行 OCR。')
+  }
+  if (courseware.length > 12000) {
+   courseware = courseware.slice(0, 12000)
+   limitations.push('用于笔记生成的课件文字超过 12,000 字，仅发送开头部分。')
+   this.progress({
+    lectureId,
+    stage: '课件文字受限',
+    message: '笔记请求的课件文字限于前 12,000 字；已将截断情况告知模型'
+   })
+  }
+  const coursewareLimitations = [...new Set(limitations)]
+  if (coursewareLimitations.length)
+   this.progress({lectureId, stage: '课件提取限制', message: coursewareLimitations.join('；')})
   const parts = chunks(full, 16000)
   for (let i = 0; i < parts.length; i++) {
    this.progress({
@@ -252,11 +331,7 @@ export class Workflows {
    })
    const notes = await this.api.json(
     this.settings.prompt('notes'),
-    {
-     subtitles: parts[i],
-     courseware: detail.lecture.ppt_text.slice(0, 12000),
-     coursewareLimitations: detail.lecture.ppt_text.startsWith('[扫描 PDF：') ? '课件为扫描 PDF，未执行 OCR。' : ''
-    },
+    {subtitles: parts[i], courseware, coursewareLimitations},
     v => notesSchema.parse(v),
     signal
    )

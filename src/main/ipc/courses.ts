@@ -1,6 +1,6 @@
 import {z} from 'zod'
 import {ensureLibrary} from '../library'
-import {copyInto, importDocument, parseCourseware} from '../documents'
+import {copyInto, importDocument, parseCourseware, serializeCoursewareSourceCache} from '../documents'
 import {questionSchema} from '../../shared/types'
 import {readTranscript} from '../transcript'
 import type {ApplicationContext} from '../main'
@@ -115,15 +115,14 @@ export function createCoursesHandler(
      const source = z.string().min(1).parse(object.transcriptPath),
       ppt = z.string().parse(object.pptPath || ''),
       original = await readTranscript(source)
-     const parsed = ppt ? await parseCourseware(ppt) : {text: '', needsOcr: false}
-     if (parsed.needsOcr) throw new Error('课件是扫描 PDF，请使用 PPTX 或文字 PDF')
-     const lecture = db.createLecture(
-      course,
-      z.string().min(1).max(200).parse(object.title),
-      '',
-      ppt ? await copyInto(root, course, ppt, 'courseware', await directory('PPT', course)) : '',
-      parsed.text
-     )
+     const parsed = ppt ? await parseCourseware(ppt) : undefined
+     if (parsed?.needsOcr) throw new Error('课件是扫描 PDF，请使用 PPTX 或文字 PDF')
+     const pptPath = ppt ? await copyInto(root, course, ppt, 'courseware', await directory('PPT', course)) : ''
+     const pptText =
+      ppt && parsed
+       ? await serializeCoursewareSourceCache(pptPath, parsed.text, 'local', parsed.needsOcr, parsed.omissions)
+       : ''
+     const lecture = db.createLecture(course, z.string().min(1).max(200).parse(object.title), '', pptPath, pptText)
      const path = await copyInto(root, course, source, 'transcripts', await directory('语音原文', course))
      db.db
       .prepare('UPDATE lectures SET transcript_path=?,transcript_text=?,time_estimated=?,status=? WHERE id=?')
@@ -162,9 +161,16 @@ export function createCoursesHandler(
       'courseware',
       await directory('PPT', lecture.course_id)
      )
+     const cachedText = await serializeCoursewareSourceCache(
+      path,
+      parsed.text,
+      'local',
+      parsed.needsOcr,
+      parsed.omissions
+     )
      db.db
       .prepare('UPDATE lectures SET ppt_path=?,ppt_text=?,ppt_processed=0 WHERE id=?')
-      .run(path, parsed.text, lecture.id)
+      .run(path, cachedText, lecture.id)
      db.db.prepare('DELETE FROM correction_checkpoints WHERE lecture_id=?').run(lecture.id)
      db.db.prepare('DELETE FROM subtitles WHERE lecture_id=?').run(lecture.id)
      db.db.prepare('DELETE FROM lecture_notes WHERE lecture_id=?').run(lecture.id)
