@@ -35,6 +35,8 @@ node scripts/audit-language-migration.mts --check
 
 ## 发布和恢复组件
 
+CI 手动运行时可选 `media_candidate`，在匹配的 macOS arm64/Linux x64 runner 下载并核验锁定候选，检查真实生成、转码、探测、取消和 IPC 断开退出。仅上传结果 JSON；许可、对应源码与分发签名仍待审核，不代表组件已可安装或分发。
+
 ```sh
 pnpm build
 pnpm release portable
