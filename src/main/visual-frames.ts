@@ -11,11 +11,26 @@ async function digest(path: string) {
  for await (const bytes of createReadStream(path)) hash.update(bytes)
  return hash.digest('hex')
 }
-const requestSchema = z.object({id: z.string().regex(/^[a-f0-9]{32}$/), path: z.string().min(1), expectedHash: z.string().regex(/^[a-f0-9]{64}$/), cap: z.number().int().min(1).max(12), policy: z.enum(['balanced', 'coverage'])})
-type Capture = {id: string; source: string; sourceHash: string; duration: number; frames: {path: string; time: number; hash: string}[]; gaps: unknown[]}
+const requestSchema = z.object({
+ id: z.string().regex(/^[a-f0-9]{32}$/),
+ path: z.string().min(1),
+ expectedHash: z.string().regex(/^[a-f0-9]{64}$/),
+ cap: z.number().int().min(1).max(12),
+ policy: z.enum(['balanced', 'coverage'])
+})
+type Capture = {
+ id: string
+ source: string
+ sourceHash: string
+ duration: number
+ frames: {path: string; time: number; hash: string}[]
+ gaps: unknown[]
+}
 export function coverageTimes(duration: number, cap: number): number[] {
  const count = Math.min(cap, Math.max(1, Math.ceil(duration / 5)))
- return Array.from({length: count}, (_, index) => Math.min(Math.max(0, duration - 0.05), (duration * (index + 0.5)) / count))
+ return Array.from({length: count}, (_, index) =>
+  Math.min(Math.max(0, duration - 0.05), (duration * (index + 0.5)) / count)
+ )
 }
 export class NativeVisualFrames {
  private cancels = new Map<string, AbortController>()
@@ -26,7 +41,12 @@ export class NativeVisualFrames {
  get started() {
   return this.cancels.size > 0
  }
- private command(executable: 'ffmpeg.exe' | 'ffprobe.exe', args: string[], signal: AbortSignal, stream?: (bytes: Buffer) => void) {
+ private command(
+  executable: 'ffmpeg.exe' | 'ffprobe.exe',
+  args: string[],
+  signal: AbortSignal,
+  stream?: (bytes: Buffer) => void
+ ) {
   return mediaCommand(this.resources, executable, args, signal, stream)
  }
  dispose() {
@@ -48,7 +68,12 @@ export class NativeVisualFrames {
    directory = join(base, id)
   try {
    const item = await lstat(directory)
-   if (item.isSymbolicLink() || !item.isDirectory() || !(await realpath(directory)).startsWith((await realpath(base)) + sep)) throw new Error('画面清理目录无效')
+   if (
+    item.isSymbolicLink() ||
+    !item.isDirectory() ||
+    !(await realpath(directory)).startsWith((await realpath(base)) + sep)
+   )
+    throw new Error('画面清理目录无效')
   } catch (error) {
    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return true
    throw error
@@ -69,7 +94,11 @@ export class NativeVisualFrames {
    if (hash !== request.expectedHash) throw new Error('原文件已改变，请重新建立任务')
    const directory = join(this.root, 'native-visual', request.id)
    await mkdir(directory, {recursive: true})
-   if ((await lstat(directory)).isSymbolicLink() || !(await realpath(directory)).startsWith((await realpath(join(this.root, 'native-visual'))) + sep)) throw new Error('画面暂存目录无效')
+   if (
+    (await lstat(directory)).isSymbolicLink() ||
+    !(await realpath(directory)).startsWith((await realpath(join(this.root, 'native-visual'))) + sep)
+   )
+    throw new Error('画面暂存目录无效')
    const frames: Capture['frames'] = []
    let duration = 0
    if (['.png', '.jpg', '.jpeg', '.webp'].includes(extname(source).toLowerCase())) {
@@ -78,44 +107,94 @@ export class NativeVisualFrames {
     if (image.isEmpty()) throw new Error('图片无法读取')
     const ratio = Math.min(1, 1600 / Math.max(size.width, size.height))
     const path = join(directory, 'frame-1.png')
-    await writeFile(path, image.resize({width: Math.round(size.width * ratio), height: Math.round(size.height * ratio)}).toPNG())
+    await writeFile(
+     path,
+     image.resize({width: Math.round(size.width * ratio), height: Math.round(size.height * ratio)}).toPNG()
+    )
     frames.push({path, time: 0, hash: await digest(path)})
    } else {
-    const metadata = JSON.parse(await this.command('ffprobe.exe', ['-v', 'error', '-show_entries', 'format=duration:stream=codec_type,duration', '-of', 'json', source], controller.signal))
+    const metadata = JSON.parse(
+     await this.command(
+      'ffprobe.exe',
+      ['-v', 'error', '-show_entries', 'format=duration:stream=codec_type,duration', '-of', 'json', source],
+      controller.signal
+     )
+    )
     duration = z.coerce.number().positive().finite().parse(metadata.format?.duration)
-    if (!Array.isArray(metadata.streams) || !metadata.streams.some((stream: {codec_type?: string}) => stream.codec_type === 'video')) throw new Error('源文件没有视频画面')
+    if (
+     !Array.isArray(metadata.streams) ||
+     !metadata.streams.some((stream: {codec_type?: string}) => stream.codec_type === 'video')
+    )
+     throw new Error('源文件没有视频画面')
     let times = coverageTimes(duration, request.cap)
     if (request.policy === 'balanced') {
      const bins = times.map(time => ({time, score: -1}))
      let pending = Buffer.alloc(0),
       previous: Buffer | undefined,
       index = 0
-     await this.command('ffmpeg.exe', ['-hide_banner', '-loglevel', 'error', '-nostdin', '-i', source, '-an', '-vf', 'fps=1/5,scale=32:18,format=gray', '-f', 'rawvideo', 'pipe:1'], controller.signal, bytes => {
-      pending = Buffer.concat([pending, bytes])
-      while (pending.length >= 576) {
-       const pixels = Buffer.from(pending.subarray(0, 576))
-       pending = pending.subarray(576)
-       const time = Math.min(duration - 0.05, index++ * 5)
-       let change = 0,
-        light = 0
-       for (let point = 0; point < pixels.length; point++) {
-        light += pixels[point]
-        change += previous ? Math.abs(pixels[point] - previous[point]) : 0
+     await this.command(
+      'ffmpeg.exe',
+      [
+       '-hide_banner',
+       '-loglevel',
+       'error',
+       '-nostdin',
+       '-i',
+       source,
+       '-an',
+       '-vf',
+       'fps=1/5,scale=32:18,format=gray',
+       '-f',
+       'rawvideo',
+       'pipe:1'
+      ],
+      controller.signal,
+      bytes => {
+       pending = Buffer.concat([pending, bytes])
+       while (pending.length >= 576) {
+        const pixels = Buffer.from(pending.subarray(0, 576))
+        pending = pending.subarray(576)
+        const time = Math.min(duration - 0.05, index++ * 5)
+        let change = 0,
+         light = 0
+        for (let point = 0; point < pixels.length; point++) {
+         light += pixels[point]
+         change += previous ? Math.abs(pixels[point] - previous[point]) : 0
+        }
+        const bin = bins[Math.min(bins.length - 1, Math.floor((time / duration) * bins.length))],
+         score = previous ? change / 576 : 1
+        if (light / 576 > 4 && score > bin.score) {
+         bin.time = Math.max(0, time)
+         bin.score = score
+        }
+        previous = pixels
        }
-       const bin = bins[Math.min(bins.length - 1, Math.floor((time / duration) * bins.length))],
-        score = previous ? change / 576 : 1
-       if (light / 576 > 4 && score > bin.score) {
-        bin.time = Math.max(0, time)
-        bin.score = score
-       }
-       previous = pixels
       }
-     })
+     )
      times = bins.map(bin => bin.time)
     }
     for (const [index, time] of times.entries()) {
      const path = join(directory, `frame-${index + 1}.png`)
-     await this.command('ffmpeg.exe', ['-hide_banner', '-loglevel', 'error', '-nostdin', '-ss', String(time), '-i', source, '-frames:v', '1', '-vf', 'scale=1600:1600:force_original_aspect_ratio=decrease', '-y', path], controller.signal)
+     await this.command(
+      'ffmpeg.exe',
+      [
+       '-hide_banner',
+       '-loglevel',
+       'error',
+       '-nostdin',
+       '-ss',
+       String(time),
+       '-i',
+       source,
+       '-frames:v',
+       '1',
+       '-vf',
+       'scale=1600:1600:force_original_aspect_ratio=decrease',
+       '-y',
+       path
+      ],
+      controller.signal
+     )
      if (nativeImage.createFromPath(path).isEmpty()) throw new Error('截取的画面无法读取')
      frames.push({path, time, hash: await digest(path)})
     }

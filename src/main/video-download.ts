@@ -1,7 +1,14 @@
 import {open, rename, stat} from 'node:fs/promises'
 import {videoMediaUrl} from './video-policy'
 
-export async function downloadVideoMedia(media: string, destination: string, request: (url: string, init: RequestInit) => Promise<Response>, progress: (text: string) => void, signal: AbortSignal, idleMs = 60000) {
+export async function downloadVideoMedia(
+ media: string,
+ destination: string,
+ request: (url: string, init: RequestInit) => Promise<Response>,
+ progress: (text: string) => void,
+ signal: AbortSignal,
+ idleMs = 60000
+) {
  const idle = new AbortController(),
   active = AbortSignal.any([signal, idle.signal])
  let timer: ReturnType<typeof setTimeout> | undefined,
@@ -56,7 +63,9 @@ export async function downloadVideoMedia(media: string, destination: string, req
     }
     bytes += value.length
     if (Date.now() - last > 1000) {
-     progress(`下载视频：${(bytes / 1048576).toFixed(1)} MB${expected ? ' / ' + (expected / 1048576).toFixed(1) + ' MB' : ''}`)
+     progress(
+      `下载视频：${(bytes / 1048576).toFixed(1)} MB${expected ? ' / ' + (expected / 1048576).toFixed(1) + ' MB' : ''}`
+     )
      last = Date.now()
     }
    }

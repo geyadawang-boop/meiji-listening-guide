@@ -1,13 +1,25 @@
 import {z} from 'zod'
 import type {KnowledgeHit} from '../shared/knowledge'
-const answerSchema = z.object({paragraphs: z.array(z.object({text: z.string().min(1), citations: z.array(z.object({id: z.string(), quote: z.string().min(1)})).min(1)})).max(12), limitation: z.string()})
+const answerSchema = z.object({
+ paragraphs: z
+  .array(
+   z.object({text: z.string().min(1), citations: z.array(z.object({id: z.string(), quote: z.string().min(1)})).min(1)})
+  )
+  .max(12),
+ limitation: z.string()
+})
 export function verifyKnowledgeAnswer(value: unknown, hits: KnowledgeHit[]) {
  const answer = answerSchema.parse(value)
  const normalize = (text: string) => text.replace(/\s+/g, '')
  for (const paragraph of answer.paragraphs)
   for (const citation of paragraph.citations) {
    const source = hits.find(hit => hit.evidence_id === citation.id)
-   if (!source || normalize(citation.quote).length < 6 || !normalize(source.content).includes(normalize(citation.quote))) throw new Error('回答引用未通过原文核验，请重新提问')
+   if (
+    !source ||
+    normalize(citation.quote).length < 6 ||
+    !normalize(source.content).includes(normalize(citation.quote))
+   )
+    throw new Error('回答引用未通过原文核验，请重新提问')
   }
  return answer
 }

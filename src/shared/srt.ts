@@ -22,13 +22,15 @@ export function parseSrt(raw: string): Segment[] {
   const start = milliseconds(m[1]),
    end = milliseconds(m[2]),
    text = lines.slice(2).join('\n').trim()
-  if (!text || end <= start || (result.length && start < result[result.length - 1].end)) throw new Error('字幕为空或时间没有递增')
+  if (!text || end <= start || (result.length && start < result[result.length - 1].end))
+   throw new Error('字幕为空或时间没有递增')
   if (+lines[0] !== result.length + 1) throw new Error('字幕序号不连续')
   result.push({start, end, text})
  }
  return result
 }
-export const toSrt = (segments: Segment[]) => segments.map((s, i) => `${i + 1}\n${time(s.start)} --> ${time(s.end)}\n${s.text}`).join('\n\n') + '\n'
+export const toSrt = (segments: Segment[]) =>
+ segments.map((s, i) => `${i + 1}\n${time(s.start)} --> ${time(s.end)}\n${s.text}`).join('\n\n') + '\n'
 export function mergeSegments(parts: {offset: number; segments: Segment[]}[]): Segment[] {
  const result = parts.flatMap(p => p.segments.map(s => ({...s, start: s.start + p.offset, end: s.end + p.offset})))
  parseSrt(toSrt(result))
@@ -38,7 +40,10 @@ const normalize = (s: string) => s.replace(/[\p{P}\p{Z}\s]/gu, '').toLowerCase()
 export function verifyNotes(notes: LectureNotes, segments: Segment[]): LectureNotes {
  segments = segments.filter(s => !s.uncertain)
  const all = normalize(segments.map(s => s.text).join(''))
- const verify = <T extends {quote: string; timestamp: string}>(point: T, group: 'key' | 'not' | 'uncertain'): T & {verified: boolean} => {
+ const verify = <T extends {quote: string; timestamp: string}>(
+  point: T,
+  group: 'key' | 'not' | 'uncertain'
+ ): T & {verified: boolean} => {
   const stamp = milliseconds(point.timestamp)
   const nearby = normalize(
    segments
@@ -50,9 +55,16 @@ export function verifyNotes(notes: LectureNotes, segments: Segment[]): LectureNo
   const negative = /不考|了解即可|不作要求|跳过|不用看|不是重点|不重要|不要求/.test(quote)
   const positive = /重点|要考|会考|可能考|很重要|一定要掌握|必考|去年考过|记一下|要会算|要求掌握|必须掌握/.test(quote)
   const trigger = group === 'key' ? positive && !negative : group === 'not' ? negative : true
-  return {...point, verified: quote.length >= 3 && all.includes(quote) && nearby.includes(quote) && trigger && !quote.startsWith('学生')}
+  return {
+   ...point,
+   verified: quote.length >= 3 && all.includes(quote) && nearby.includes(quote) && trigger && !quote.startsWith('学生')
+  }
  }
- return {keyPoints: notes.keyPoints.map(p => verify(p, 'key')), notTested: notes.notTested.map(p => verify(p, 'not')), uncertain: (notes.uncertain || []).map(p => verify(p, 'uncertain'))}
+ return {
+  keyPoints: notes.keyPoints.map(p => verify(p, 'key')),
+  notTested: notes.notTested.map(p => verify(p, 'not')),
+  uncertain: (notes.uncertain || []).map(p => verify(p, 'uncertain'))
+ }
 }
 export function keywordCandidates(questions: {stem: string; knowledgePoints: string[]}[], topics: string[]): number[] {
  const keys = topics.map(normalize).filter(Boolean)

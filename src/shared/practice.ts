@@ -4,7 +4,9 @@ export function questionOptions(stem: string) {
  return options.length >= 2 && new Set(options.map(o => o.key)).size === options.length ? options : []
 }
 export function answerChoices(answer: string, allowed: string[]) {
- const match = /^(?:参考答案|正确答案|答案)?\s*[:：]?\s*([A-H](?:[、,，\s]*[A-H])*)(?=[.。\s、，,:：]|$)/.exec(answer.trim())
+ const match = /^(?:参考答案|正确答案|答案)?\s*[:：]?\s*([A-H](?:[、,，\s]*[A-H])*)(?=[.。\s、，,:：]|$)/.exec(
+  answer.trim()
+ )
  const keys = match?.[1].match(/[A-H]/g) || []
  return keys.length && keys.every(k => allowed.includes(k)) ? [...new Set(keys)].sort() : []
 }

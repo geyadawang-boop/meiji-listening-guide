@@ -9,8 +9,20 @@ import {parseDocument} from './documents'
 import type {KnowledgeList, KnowledgeSearch, KnowledgeHit} from '../shared/knowledge'
 
 const replySchema = z.discriminatedUnion('kind', [
- z.object({protocol: z.literal(BACKEND_PROTOCOL), id: z.number().int().positive(), kind: z.literal('progress'), message: z.string().max(4000)}),
- z.object({protocol: z.literal(BACKEND_PROTOCOL), id: z.number().int().positive(), kind: z.literal('result'), ok: z.boolean(), result: z.unknown().optional(), error: z.string().optional()})
+ z.object({
+  protocol: z.literal(BACKEND_PROTOCOL),
+  id: z.number().int().positive(),
+  kind: z.literal('progress'),
+  message: z.string().max(4000)
+ }),
+ z.object({
+  protocol: z.literal(BACKEND_PROTOCOL),
+  id: z.number().int().positive(),
+  kind: z.literal('result'),
+  ok: z.boolean(),
+  result: z.unknown().optional(),
+  error: z.string().optional()
+ })
 ])
 /** Knowledge work runs in an isolated TypeScript/Node process, including CPU inference. */
 export class KnowledgeBase {
@@ -34,7 +46,11 @@ export class KnowledgeBase {
  }
  private start() {
   if (this.worker) return this.worker
-  const child = utilityProcess.fork(fileURLToPath(new URL('./knowledge-worker.js', import.meta.url)), [this.resources, this.root], {stdio: 'pipe', serviceName: '本地知识库'})
+  const child = utilityProcess.fork(
+   fileURLToPath(new URL('./knowledge-worker.js', import.meta.url)),
+   [this.resources, this.root],
+   {stdio: 'pipe', serviceName: '本地知识库'}
+  )
   this.worker = child
   const fail = (error: Error) => {
    if (this.worker !== child) return
@@ -69,7 +85,10 @@ export class KnowledgeBase {
     finish(error)
    }
    const cancel = () => abort(new Error('知识库处理已取消，已有资料保留'))
-   const timer = setTimeout(() => abort(new Error('知识库处理超时，已有资料保留')), action === 'vector-rebuild' ? 900000 : action === 'search' ? 180000 : 120000)
+   const timer = setTimeout(
+    () => abort(new Error('知识库处理超时，已有资料保留')),
+    action === 'vector-rebuild' ? 900000 : action === 'search' ? 180000 : 120000
+   )
    const finish = (error?: Error, result?: unknown) => {
     if (this.active?.id !== id) return
     this.active = undefined
@@ -95,8 +114,29 @@ export class KnowledgeBase {
  generation(locator: string) {
   return this.request<string | null>('generation', {locator})
  }
- importSubtitle(url: string, title: string, srt: string, category: string, signal: AbortSignal, sourceMethod = '站内字幕', expectedGeneration?: string | null) {
-  return this.request<{unchanged: boolean; entry: {generation_id: string}}>('import', {title, text: srt, locator: url, sourceHash: createHash('sha256').update(srt).digest('hex'), category, origin: 'bilibili-subtitle', sourceMethod, expectedGeneration}, signal)
+ importSubtitle(
+  url: string,
+  title: string,
+  srt: string,
+  category: string,
+  signal: AbortSignal,
+  sourceMethod = '站内字幕',
+  expectedGeneration?: string | null
+ ) {
+  return this.request<{unchanged: boolean; entry: {generation_id: string}}>(
+   'import',
+   {
+    title,
+    text: srt,
+    locator: url,
+    sourceHash: createHash('sha256').update(srt).digest('hex'),
+    category,
+    origin: 'bilibili-subtitle',
+    sourceMethod,
+    expectedGeneration
+   },
+   signal
+  )
  }
  search(query: string, ids?: string[]) {
   return this.request<KnowledgeSearch>('search', {query, ids})
@@ -105,7 +145,8 @@ export class KnowledgeBase {
   if ((await stat(path)).size > 100000000) throw new Error('资料超过 100 MB，请按章节导入')
   const bytes = await readFile(path),
    sourceHash = createHash('sha256').update(bytes).digest('hex')
-  const parsed = extname(path).toLowerCase() === '.srt' ? {text: bytes.toString('utf8'), needsOcr: false} : await parseDocument(path)
+  const parsed =
+   extname(path).toLowerCase() === '.srt' ? {text: bytes.toString('utf8'), needsOcr: false} : await parseDocument(path)
   if (parsed.needsOcr) throw new Error('这份 PDF 主要是图片，请先识别文字后再导入知识库')
   if (
    createHash('sha256')
@@ -118,7 +159,8 @@ export class KnowledgeBase {
  async verify(hits: KnowledgeHit[]) {
   for (const hit of hits) {
    const current = await this.request<KnowledgeHit>('citation', {evidenceId: hit.evidence_id})
-   if (current.digest !== hit.digest || current.generation_id !== hit.generation_id) throw new Error('问答期间资料已改变，请重新检索')
+   if (current.digest !== hit.digest || current.generation_id !== hit.generation_id)
+    throw new Error('问答期间资料已改变，请重新检索')
   }
  }
 }

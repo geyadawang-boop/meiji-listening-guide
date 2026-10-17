@@ -5,10 +5,33 @@ import {questionSchema} from '../../shared/types'
 import {readTranscript} from '../transcript'
 import type {ApplicationContext} from '../main'
 import type {IpcHandler} from './handler'
-export function createCoursesHandler(context: Pick<ApplicationContext, 'db' | 'directory' | 'flows' | 'idSchema' | 'job' | 'jobs' | 'libraryRoot' | 'pick' | 'root'>): IpcHandler {
+export function createCoursesHandler(
+ context: Pick<
+  ApplicationContext,
+  'db' | 'directory' | 'flows' | 'idSchema' | 'job' | 'jobs' | 'libraryRoot' | 'pick' | 'root'
+ >
+): IpcHandler {
  const {db, directory, flows, idSchema, job, jobs, libraryRoot, pick, root} = context
  return {
-  actions: new Set(['courses', 'lecture:delete', 'course:delete', 'course:create', 'course:detail', 'sessions', 'session:create', 'session:delete', 'pick', 'files:add', 'files:remove', 'questions:split', 'questions:save', 'lecture:create', 'lecture:transcript', 'lecture:courseware', 'lecture:detail']),
+  actions: new Set([
+   'courses',
+   'lecture:delete',
+   'course:delete',
+   'course:create',
+   'course:detail',
+   'sessions',
+   'session:create',
+   'session:delete',
+   'pick',
+   'files:add',
+   'files:remove',
+   'questions:split',
+   'questions:save',
+   'lecture:create',
+   'lecture:transcript',
+   'lecture:courseware',
+   'lecture:detail'
+  ]),
   async invoke(action, object) {
    const id = () => z.string().uuid().parse(object.id),
     courseId = () => z.string().uuid().parse(object.courseId)
@@ -55,7 +78,10 @@ export function createCoursesHandler(context: Pick<ApplicationContext, 'db' | 'd
      return db.deleteSession(courseId(), id())
     }
     case 'pick':
-     return pick(z.enum(['transcript', 'document', 'srt', 'courseware']).parse(object.kind), object.courseId ? idSchema.parse(object.courseId) : undefined)
+     return pick(
+      z.enum(['transcript', 'document', 'srt', 'courseware']).parse(object.kind),
+      object.courseId ? idSchema.parse(object.courseId) : undefined
+     )
     case 'files:add': {
      const course = courseId()
      db.course(course)
@@ -63,7 +89,13 @@ export function createCoursesHandler(context: Pick<ApplicationContext, 'db' | 'd
       kind = z.enum(['senior_notes', 'past_exam']).parse(object.kind)
      const added = []
      for (const path of paths) {
-      const file = await importDocument(root, course, kind, path, await directory(kind === 'past_exam' ? '历年卷' : '笔记', course))
+      const file = await importDocument(
+       root,
+       course,
+       kind,
+       path,
+       await directory(kind === 'past_exam' ? '历年卷' : '笔记', course)
+      )
       db.insertFile(file)
       added.push(file)
      }
@@ -85,17 +117,33 @@ export function createCoursesHandler(context: Pick<ApplicationContext, 'db' | 'd
       original = await readTranscript(source)
      const parsed = ppt ? await parseCourseware(ppt) : {text: '', needsOcr: false}
      if (parsed.needsOcr) throw new Error('课件是扫描 PDF，请使用 PPTX 或文字 PDF')
-     const lecture = db.createLecture(course, z.string().min(1).max(200).parse(object.title), '', ppt ? await copyInto(root, course, ppt, 'courseware', await directory('PPT', course)) : '', parsed.text)
+     const lecture = db.createLecture(
+      course,
+      z.string().min(1).max(200).parse(object.title),
+      '',
+      ppt ? await copyInto(root, course, ppt, 'courseware', await directory('PPT', course)) : '',
+      parsed.text
+     )
      const path = await copyInto(root, course, source, 'transcripts', await directory('语音原文', course))
-     db.db.prepare('UPDATE lectures SET transcript_path=?,transcript_text=?,time_estimated=?,status=? WHERE id=?').run(path, original.text, original.estimated ? 1 : 0, '待校订', lecture.id)
+     db.db
+      .prepare('UPDATE lectures SET transcript_path=?,transcript_text=?,time_estimated=?,status=? WHERE id=?')
+      .run(path, original.text, original.estimated ? 1 : 0, '待校订', lecture.id)
      return db.lecture(lecture.id)
     }
     case 'lecture:transcript': {
      const lecture = db.lecture(id()),
       source = z.string().min(1).parse(object.path),
       original = await readTranscript(source),
-      path = await copyInto(root, lecture.course_id, source, 'transcripts', await directory('语音原文', lecture.course_id))
-     db.db.prepare('UPDATE lectures SET transcript_path=?,transcript_text=?,time_estimated=?,status=? WHERE id=?').run(path, original.text, original.estimated ? 1 : 0, '待校订', lecture.id)
+      path = await copyInto(
+       root,
+       lecture.course_id,
+       source,
+       'transcripts',
+       await directory('语音原文', lecture.course_id)
+      )
+     db.db
+      .prepare('UPDATE lectures SET transcript_path=?,transcript_text=?,time_estimated=?,status=? WHERE id=?')
+      .run(path, original.text, original.estimated ? 1 : 0, '待校订', lecture.id)
      db.db.prepare('DELETE FROM correction_checkpoints WHERE lecture_id=?').run(lecture.id)
      db.db.prepare('DELETE FROM subtitles WHERE lecture_id=?').run(lecture.id)
      db.db.prepare('DELETE FROM lecture_notes WHERE lecture_id=?').run(lecture.id)
@@ -107,8 +155,16 @@ export function createCoursesHandler(context: Pick<ApplicationContext, 'db' | 'd
       source = z.string().min(1).parse(object.path),
       parsed = await parseCourseware(source)
      if (parsed.needsOcr) throw new Error('课件是扫描件，需要先 OCR 为文本 PDF')
-     const path = await copyInto(root, lecture.course_id, source, 'courseware', await directory('PPT', lecture.course_id))
-     db.db.prepare('UPDATE lectures SET ppt_path=?,ppt_text=?,ppt_processed=0 WHERE id=?').run(path, parsed.text, lecture.id)
+     const path = await copyInto(
+      root,
+      lecture.course_id,
+      source,
+      'courseware',
+      await directory('PPT', lecture.course_id)
+     )
+     db.db
+      .prepare('UPDATE lectures SET ppt_path=?,ppt_text=?,ppt_processed=0 WHERE id=?')
+      .run(path, parsed.text, lecture.id)
      db.db.prepare('DELETE FROM correction_checkpoints WHERE lecture_id=?').run(lecture.id)
      db.db.prepare('DELETE FROM subtitles WHERE lecture_id=?').run(lecture.id)
      db.db.prepare('DELETE FROM lecture_notes WHERE lecture_id=?').run(lecture.id)

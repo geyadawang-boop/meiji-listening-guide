@@ -9,7 +9,12 @@ export class IdentityStore {
  get(): Identity {
   if (!existsSync(this.path)) return {...defaultIdentity}
   const value = identitySchema.parse(JSON.parse(readFileSync(this.path, 'utf8')))
-  return {...value, persona: value.persona.trim() ? value.persona : defaultIdentity.persona, userName: value.userName === '你' ? defaultIdentity.userName : value.userName, assistantName: value.assistantName === '听课助手' ? defaultIdentity.assistantName : value.assistantName}
+  return {
+   ...value,
+   persona: value.persona.trim() ? value.persona : defaultIdentity.persona,
+   userName: value.userName === '你' ? defaultIdentity.userName : value.userName,
+   assistantName: value.assistantName === '听课助手' ? defaultIdentity.assistantName : value.assistantName
+  }
  }
  save(value: unknown) {
   const parsed = identitySchema.parse(value)

@@ -7,7 +7,9 @@ export class ZhiyunBrowser {
  ) {}
  private ensure() {
   if (this.view) return this.view
-  const view = new WebContentsView({webPreferences: {partition: 'persist:zhiyun', contextIsolation: true, nodeIntegration: false, sandbox: true}})
+  const view = new WebContentsView({
+   webPreferences: {partition: 'persist:zhiyun', contextIsolation: true, nodeIntegration: false, sandbox: true}
+  })
   this.view = view
   view.setVisible(false)
   this.window.contentView.addChildView(view)
@@ -27,7 +29,9 @@ export class ZhiyunBrowser {
    if (!allowed(url)) event.preventDefault()
   })
   view.webContents.session.setPermissionRequestHandler((_wc, _permission, callback) => callback(false))
-  void view.webContents.loadURL('https://onlineroom.cmc.zju.edu.cn/').catch(() => this.error('智云课堂无法打开，请检查网络后刷新'))
+  void view.webContents
+   .loadURL('https://onlineroom.cmc.zju.edu.cn/')
+   .catch(() => this.error('智云课堂无法打开，请检查网络后刷新'))
   return view
  }
  bounds(bounds: {x: number; y: number; width: number; height: number}, visible: boolean) {
@@ -36,7 +40,12 @@ export class ZhiyunBrowser {
    return
   }
   const view = this.ensure()
-  view.setBounds({x: Math.max(0, Math.round(bounds.x)), y: Math.max(0, Math.round(bounds.y)), width: Math.max(0, Math.round(bounds.width)), height: Math.max(0, Math.round(bounds.height))})
+  view.setBounds({
+   x: Math.max(0, Math.round(bounds.x)),
+   y: Math.max(0, Math.round(bounds.y)),
+   width: Math.max(0, Math.round(bounds.width)),
+   height: Math.max(0, Math.round(bounds.height))
+  })
   view.setVisible(true)
  }
  refresh() {

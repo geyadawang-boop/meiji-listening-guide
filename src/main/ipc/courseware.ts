@@ -47,7 +47,28 @@ export function createCoursewareHandler(
   | 'window'
  >
 ): IpcHandler {
- const {api, biliFixture, db, derivedDependencies, emit, fetchBiliSubtitle, idSchema, job, libraryRoot, pptExtractor, saveBiliSubtitle, saveTranscribedVideo, saveVideoPdf, subtitleDerived, subtitleSync, syncDependencies, videoPpt, videoProgress, videoSeriesCache, window} = context
+ const {
+  api,
+  biliFixture,
+  db,
+  derivedDependencies,
+  emit,
+  fetchBiliSubtitle,
+  idSchema,
+  job,
+  libraryRoot,
+  pptExtractor,
+  saveBiliSubtitle,
+  saveTranscribedVideo,
+  saveVideoPdf,
+  subtitleDerived,
+  subtitleSync,
+  syncDependencies,
+  videoPpt,
+  videoProgress,
+  videoSeriesCache,
+  window
+ } = context
  return {
   actions: new Set([
    'subtitle-sync:list',
@@ -100,7 +121,8 @@ export function createCoursewareHandler(
       if (new Set(urls).size !== urls.length) throw new Error('不要重复选择分集')
       const sources: DerivedSource[] = urls.map(url => {
        const item = task.items.find(item => item.url === url)
-       if (!item || item.status !== '已完成' || !item.path || !item.hash || !item.generation) throw new Error('请选择已成功同步的分集')
+       if (!item || item.status !== '已完成' || !item.path || !item.hash || !item.generation)
+        throw new Error('请选择已成功同步的分集')
        return {url, title: item.title, path: item.path, hash: item.hash, generation: item.generation}
       })
       const modes = z.array(summaryMode).min(1).max(4).parse(object.modes)
@@ -110,13 +132,21 @@ export function createCoursewareHandler(
     case 'subtitle-sync:attach':
      return job('指定同步字幕', async signal => {
       const task = (await subtitleSync.list()).find(task => task.id === id()),
-       selector = object.url ? subtitleLocator(z.string().parse(object.url)) : z.number().int().positive().parse(object.page)
-      const matches = task?.items.filter(item => (typeof selector === 'string' ? item.url === selector : item.page === selector)) || []
+       selector = object.url
+        ? subtitleLocator(z.string().parse(object.url))
+        : z.number().int().positive().parse(object.page)
+      const matches =
+       task?.items.filter(item => (typeof selector === 'string' ? item.url === selector : item.page === selector)) || []
       if (!task || matches.length !== 1) throw new Error('请按视频网址明确选择本次同步的分集')
       const item = matches[0],
        page = item.page
       const directory = await libraryDirectory(libraryRoot, '语音原文', task.courseName)
-      const result = await dialog.showOpenDialog(window, {title: `为 P${page} 选择已有字幕`, defaultPath: directory, properties: ['openFile'], filters: [{name: '字幕 SRT', extensions: ['srt']}]})
+      const result = await dialog.showOpenDialog(window, {
+       title: `为 P${page} 选择已有字幕`,
+       defaultPath: directory,
+       properties: ['openFile'],
+       filters: [{name: '字幕 SRT', extensions: ['srt']}]
+      })
       if (result.canceled || !result.filePaths[0]) return null
       signal.throwIfAborted()
       const input = result.filePaths[0]
@@ -151,7 +181,8 @@ export function createCoursewareHandler(
        series = videoSeriesCache.get(url)
       if (!series) throw new Error('请先读取课程列表，再选择分集')
       const pages = z.array(z.number().int().positive()).min(1).max(1000).parse(object.pages)
-      if (new Set(pages).size !== pages.length || pages.some(page => !series.episodes.some(item => item.page === page))) throw new Error('所选分集无效')
+      if (new Set(pages).size !== pages.length || pages.some(page => !series.episodes.some(item => item.page === page)))
+       throw new Error('所选分集无效')
       const selectedCourse = object.courseId ? db.course(idSchema.parse(object.courseId)).name : undefined
       const category = z
        .string()
@@ -189,7 +220,16 @@ export function createCoursewareHandler(
     case 'video-ppt:series':
      return job('video-directory', async signal => {
       const url = bilibiliUrl(z.string().parse(object.url))
-      const series = biliFixture ? parseVideoSeries(url, {pages: (await fetch(biliFixture + '/x/player/pagelist?bvid=' + new URL(url).pathname.split('/').filter(Boolean).at(-1), {signal}).then(response => response.json())).data}) : await readVideoSeries(url, signal)
+      const series = biliFixture
+       ? parseVideoSeries(url, {
+          pages: (
+           await fetch(
+            biliFixture + '/x/player/pagelist?bvid=' + new URL(url).pathname.split('/').filter(Boolean).at(-1),
+            {signal}
+           ).then(response => response.json())
+          ).data
+         })
+       : await readVideoSeries(url, signal)
       videoSeriesCache.set(url, series)
       return series
      })
@@ -197,13 +237,26 @@ export function createCoursewareHandler(
      return job('video-subtitle', signal => fetchBiliSubtitle(z.string().parse(object.url), signal))
     case 'video-ppt:subtitle-import': {
      const selectedCourse = object.courseId ? db.course(idSchema.parse(object.courseId)).name : undefined
-     const result = await dialog.showOpenDialog(window, {title: '载入已保存的字幕', defaultPath: await libraryDirectory(libraryRoot, '语音原文', selectedCourse), properties: ['openFile'], filters: [{name: '字幕 SRT', extensions: ['srt']}]})
+     const result = await dialog.showOpenDialog(window, {
+      title: '载入已保存的字幕',
+      defaultPath: await libraryDirectory(libraryRoot, '语音原文', selectedCourse),
+      properties: ['openFile'],
+      filters: [{name: '字幕 SRT', extensions: ['srt']}]
+     })
      if (result.canceled || !result.filePaths[0]) return null
      const path = result.filePaths[0]
      if ((await stat(path)).size > 4000000) throw new Error('字幕文件过大')
      const srt = await readFile(path, 'utf8'),
       segments = parseSrt(srt)
-     return {title: basename(path, extname(path)), page: 1, source: '已有 SRT 字幕', warning: '原文按文件内容载入，未自动校正。', srt, count: segments.length, savedPath: path}
+     return {
+      title: basename(path, extname(path)),
+      page: 1,
+      source: '已有 SRT 字幕',
+      warning: '原文按文件内容载入，未自动校正。',
+      srt,
+      count: segments.length,
+      savedPath: path
+     }
     }
     case 'video-ppt:subtitle-save': {
      const url = z.string().parse(object.url),
@@ -229,7 +282,8 @@ export function createCoursewareHandler(
        series = videoSeriesCache.get(url)
       if (!series) throw new Error('请先读取课程列表，再选择分集')
       const pages = z.array(z.number().int().positive()).min(1).max(1000).parse(object.pages)
-      if (new Set(pages).size !== pages.length || pages.some(p => !series.episodes.some(e => e.page === p))) throw new Error('所选分集无效')
+      if (new Set(pages).size !== pages.length || pages.some(p => !series.episodes.some(e => e.page === p)))
+       throw new Error('所选分集无效')
       const selectedCourse = object.courseId ? db.course(idSchema.parse(object.courseId)).name : undefined
       const selected = series.episodes.filter(e => pages.includes(e.page)),
        results: VideoBatchItem[] = []
@@ -250,16 +304,33 @@ export function createCoursewareHandler(
          videoProgress(`P${episode.page} 无可用站内字幕，正在下载并离线转写`)
          const videoId = new URL(episode.url).pathname.split('/').filter(Boolean).at(-1)!
          const outputName = videoId + '-P' + episode.page + '-离线转写.srt'
-         const task = await videoPpt.create(videoId + '-P' + episode.page + '-字幕转写', {kind: 'subtitle', outputName, courseName: selectedCourse, url: episode.url, page: episode.page})
+         const task = await videoPpt.create(videoId + '-P' + episode.page + '-字幕转写', {
+          kind: 'subtitle',
+          outputName,
+          courseName: selectedCourse,
+          url: episode.url,
+          page: episode.page
+         })
          await snapanyDownload(window, episode.url, task.video, videoProgress, signal)
          const saved = await saveTranscribedVideo(task, outputName, selectedCourse, signal, episode.page)
          path = saved.savedPath
          cleanupWarning = saved.cleanupWarning
         }
-        results.push({page: episode.page, title: episode.title, status: '已完成', path, ...(cleanupWarning ? {error: cleanupWarning} : {})})
+        results.push({
+         page: episode.page,
+         title: episode.title,
+         status: '已完成',
+         path,
+         ...(cleanupWarning ? {error: cleanupWarning} : {})
+        })
        } catch (error) {
         signal.throwIfAborted()
-        results.push({page: episode.page, title: episode.title, status: '失败', error: error instanceof Error ? error.message : '字幕处理失败'})
+        results.push({
+         page: episode.page,
+         title: episode.title,
+         status: '失败',
+         error: error instanceof Error ? error.message : '字幕处理失败'
+        })
        }
       }
       return results
@@ -270,15 +341,25 @@ export function createCoursewareHandler(
        srt = z.string().min(1).max(4000000).parse(object.srt)
       const title = folderName(z.string().min(1).max(200).parse(object.title))
       const selectedCourse = object.courseId ? db.course(idSchema.parse(object.courseId)).name : undefined
-      const result = await summarizeVideo(srt, mode, (prompt, input, active) => api.json(prompt, input, value => value, active), videoProgress, signal)
+      const result = await summarizeVideo(
+       srt,
+       mode,
+       (prompt, input, active) => api.json(prompt, input, value => value, active),
+       videoProgress,
+       signal
+      )
       const suffix = noteTitles[mode]
-      const path = await reserveFile(await libraryDirectory(libraryRoot, '笔记', selectedCourse), title + '-' + suffix + '.md')
+      const path = await reserveFile(
+       await libraryDirectory(libraryRoot, '笔记', selectedCourse),
+       title + '-' + suffix + '.md'
+      )
       const evidence = path.replace(/\.md$/i, '.json'),
        record = JSON.stringify(result.points, null, 2)
       try {
        await writeFile(path, result.markdown, 'utf8')
        await writeFile(evidence, record, 'utf8')
-       if ((await readFile(path, 'utf8')) !== result.markdown || (await readFile(evidence, 'utf8')) !== record) throw new Error('摘要保存校验失败')
+       if ((await readFile(path, 'utf8')) !== result.markdown || (await readFile(evidence, 'utf8')) !== record)
+        throw new Error('摘要保存校验失败')
       } catch (error) {
        await rm(path, {force: true})
        await rm(evidence, {force: true})
@@ -293,20 +374,35 @@ export function createCoursewareHandler(
       const page = new URL(url).searchParams.get('p') || '1'
       const videoId = new URL(url).pathname.split('/').filter(Boolean).at(-1)!
       const outputName = videoId + '-P' + page + '-离线转写.srt'
-      const task = await videoPpt.create(videoId + '-P' + page + '-字幕转写', {kind: 'subtitle', outputName, courseName: selectedCourse, url, page: Number(page)})
+      const task = await videoPpt.create(videoId + '-P' + page + '-字幕转写', {
+       kind: 'subtitle',
+       outputName,
+       courseName: selectedCourse,
+       url,
+       page: Number(page)
+      })
       videoProgress('正在下载视频用于离线字幕转写')
       await snapanyDownload(window, url, task.video, videoProgress, signal)
       return saveTranscribedVideo(task, outputName, selectedCourse, signal, Number(page))
      })
     case 'video-ppt:subtitle-transcribe-local': {
      const selectedCourse = object.courseId ? db.course(idSchema.parse(object.courseId)).name : undefined
-     const result = await dialog.showOpenDialog(window, {title: '选择要转写的本地视频', properties: ['openFile'], filters: [{name: '视频', extensions: ['mp4', 'mkv', 'mov', 'webm']}]})
+     const result = await dialog.showOpenDialog(window, {
+      title: '选择要转写的本地视频',
+      properties: ['openFile'],
+      filters: [{name: '视频', extensions: ['mp4', 'mkv', 'mov', 'webm']}]
+     })
      if (result.canceled || !result.filePaths[0]) return null
      return job('video-subtitle', async signal => {
       const input = result.filePaths[0]
       videoProgress('正在复制本地视频用于字幕转写；原文件保持不变')
       const outputName = folderName(basename(input, extname(input))) + '-离线转写.srt'
-      const task = await videoPpt.local(input, signal, {kind: 'subtitle', outputName, courseName: selectedCourse, page: 1})
+      const task = await videoPpt.local(input, signal, {
+       kind: 'subtitle',
+       outputName,
+       courseName: selectedCourse,
+       page: 1
+      })
       return saveTranscribedVideo(task, outputName, selectedCourse, signal)
      })
     }
@@ -321,7 +417,16 @@ export function createCoursewareHandler(
        const srt = bytes.toString('utf8'),
         segments = parseSrt(srt)
        await videoPpt.discardCompleted(meta.id)
-       return {title: meta.name, page: meta.page, source: '已保存的字幕', warning: '已核对原有字幕并清理本次临时视频。', srt, count: segments.length, savedPath: path, cleanupWarning: ''}
+       return {
+        title: meta.name,
+        page: meta.page,
+        source: '已保存的字幕',
+        warning: '已核对原有字幕并清理本次临时视频。',
+        srt,
+        count: segments.length,
+        savedPath: path,
+        cleanupWarning: ''
+       }
       }
       try {
        if (!(await stat(meta.video)).isFile()) throw new Error('视频文件无效')
@@ -331,7 +436,13 @@ export function createCoursewareHandler(
        videoProgress('视频尚未完整下载，正在重新下载本分集')
        await snapanyDownload(window, meta.url, meta.video, videoProgress, signal)
       }
-      return saveTranscribedVideo({id: meta.id, dir: meta.dir, video: meta.video, name: meta.name}, meta.outputName, meta.courseName, signal, meta.page)
+      return saveTranscribedVideo(
+       {id: meta.id, dir: meta.dir, video: meta.video, name: meta.name},
+       meta.outputName,
+       meta.courseName,
+       signal,
+       meta.page
+      )
      })
     case 'video-ppt:batch':
      return job('video-batch', async signal => {
@@ -339,7 +450,8 @@ export function createCoursewareHandler(
        series = videoSeriesCache.get(url)
       if (!series) throw new Error('请先读取课程列表，再选择分集')
       const pages = z.array(z.number().int().positive()).min(1).max(1000).parse(object.pages)
-      if (new Set(pages).size !== pages.length || pages.some(p => !series.episodes.some(e => e.page === p))) throw new Error('所选分集无效')
+      if (new Set(pages).size !== pages.length || pages.some(p => !series.episodes.some(e => e.page === p)))
+       throw new Error('所选分集无效')
       const selectedCourse = object.courseId ? db.course(idSchema.parse(object.courseId)).name : undefined,
        prompt = z
         .string()
@@ -396,7 +508,9 @@ export function createCoursewareHandler(
       if (object.path) task = await videoPpt.local(z.string().min(1).parse(object.path), signal)
       else {
        const url = bilibiliUrl(z.string().parse(object.url))
-       task = await videoPpt.create(new URL(url).pathname.split('/').filter(Boolean).at(-1) + '-P' + (new URL(url).searchParams.get('p') || '1'))
+       task = await videoPpt.create(
+        new URL(url).pathname.split('/').filter(Boolean).at(-1) + '-P' + (new URL(url).searchParams.get('p') || '1')
+       )
        await snapanyDownload(window, url, task.video, videoProgress, signal)
       }
       const source = await videoPpt.prepare(task, signal)
@@ -411,14 +525,21 @@ export function createCoursewareHandler(
       )
      })
     case 'video-ppt:pick': {
-     const result = await dialog.showOpenDialog(window, {title: '选择已下载的视频', properties: ['openFile'], filters: [{name: '视频', extensions: ['mp4', 'mkv', 'mov', 'webm']}]})
+     const result = await dialog.showOpenDialog(window, {
+      title: '选择已下载的视频',
+      properties: ['openFile'],
+      filters: [{name: '视频', extensions: ['mp4', 'mkv', 'mov', 'webm']}]
+     })
      return result.canceled ? null : result.filePaths[0]
     }
     case 'video-ppt:source':
      return job('video-ppt', async signal => {
-      if (object.path) return videoPpt.prepare(await videoPpt.local(z.string().min(1).parse(object.path), signal), signal)
+      if (object.path)
+       return videoPpt.prepare(await videoPpt.local(z.string().min(1).parse(object.path), signal), signal)
       const url = bilibiliUrl(z.string().parse(object.url)),
-       task = await videoPpt.create(new URL(url).pathname.split('/').filter(Boolean).at(-1) + '-P' + (new URL(url).searchParams.get('p') || '1'))
+       task = await videoPpt.create(
+        new URL(url).pathname.split('/').filter(Boolean).at(-1) + '-P' + (new URL(url).searchParams.get('p') || '1')
+       )
       await snapanyDownload(window, url, task.video, videoProgress, signal)
       return videoPpt.prepare(task, signal)
      })
@@ -439,11 +560,28 @@ export function createCoursewareHandler(
     case 'video-ppt:export':
      return job('video-ppt', async signal => {
       if (object.checked !== true) throw new Error('请先检查课件预览，再确认导出')
-      const choices = z.array(z.object({page: z.number().int().positive(), keep: z.boolean(), crop: z.object({left: z.number(), right: z.number(), top: z.number(), bottom: z.number()})})).parse(object.pages)
-      return saveVideoPdf(id(), object.courseId ? db.course(idSchema.parse(object.courseId)).name : undefined, choices, signal)
+      const choices = z
+       .array(
+        z.object({
+         page: z.number().int().positive(),
+         keep: z.boolean(),
+         crop: z.object({left: z.number(), right: z.number(), top: z.number(), bottom: z.number()})
+        })
+       )
+       .parse(object.pages)
+      return saveVideoPdf(
+       id(),
+       object.courseId ? db.course(idSchema.parse(object.courseId)).name : undefined,
+       choices,
+       signal
+      )
      })
     case 'ppt-extract:pick': {
-     const result = await dialog.showOpenDialog(window, {title: '选择需要截取的 PPT', properties: ['openFile'], filters: [{name: '图片型 PowerPoint', extensions: ['pptx']}]})
+     const result = await dialog.showOpenDialog(window, {
+      title: '选择需要截取的 PPT',
+      properties: ['openFile'],
+      filters: [{name: '图片型 PowerPoint', extensions: ['pptx']}]
+     })
      return result.canceled ? null : result.filePaths[0]
     }
     case 'ppt-extract:analyze':
@@ -462,7 +600,13 @@ export function createCoursewareHandler(
     case 'ppt-extract:export':
      return job('ppt-extract', async signal => {
       const choices = z
-       .array(z.object({page: z.number().int().positive(), keep: z.boolean(), crop: z.object({left: z.number(), right: z.number(), top: z.number(), bottom: z.number()})}))
+       .array(
+        z.object({
+         page: z.number().int().positive(),
+         keep: z.boolean(),
+         crop: z.object({left: z.number(), right: z.number(), top: z.number(), bottom: z.number()})
+        })
+       )
        .max(500)
        .parse(object.pages)
       const result = await pptExtractor.export(idSchema.parse(object.id), choices, signal)
@@ -483,7 +627,9 @@ export function createCoursewareHandler(
        await deleteConvertedPpt(result.sourcePath, result.sourceHash, path, result.buffer, result.kept, () => {
         db.db.transaction(() => {
          db.db.prepare('UPDATE lectures SET ppt_path=? WHERE ppt_path=?').run(path, result.sourcePath)
-         db.db.prepare('UPDATE course_files SET path=?,filename=? WHERE path=?').run(path, result.sourceName.replace(/\.pptx?$/i, '') + '-截取.pdf', result.sourcePath)
+         db.db
+          .prepare('UPDATE course_files SET path=?,filename=? WHERE path=?')
+          .run(path, result.sourceName.replace(/\.pptx?$/i, '') + '-截取.pdf', result.sourcePath)
         })()
         db.db.pragma('wal_checkpoint(FULL)')
        })

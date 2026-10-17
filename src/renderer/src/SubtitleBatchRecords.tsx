@@ -3,7 +3,21 @@ import type {SubtitleSyncTask} from '../../shared/subtitle-sync'
 import type {SubtitleDerivedTask} from '../../shared/subtitle-derived'
 import {noteTitles, type VideoNoteMode} from '../../shared/video-notes'
 const invoke = <T,>(action: string, args?: unknown) => window.assistant.invoke<T>(action, args)
-export function SubtitleBatchRecords({visible, tasks, busy, run, refresh, courseName}: {visible: boolean; tasks: SubtitleSyncTask[]; busy: boolean; run: (fn: () => Promise<void>) => Promise<void>; refresh: () => Promise<void>; courseName?: string}) {
+export function SubtitleBatchRecords({
+ visible,
+ tasks,
+ busy,
+ run,
+ refresh,
+ courseName
+}: {
+ visible: boolean
+ tasks: SubtitleSyncTask[]
+ busy: boolean
+ run: (fn: () => Promise<void>) => Promise<void>
+ refresh: () => Promise<void>
+ courseName?: string
+}) {
  const [derived, setDerived] = useState<SubtitleDerivedTask[]>([]),
   [notice, setNotice] = useState(''),
   [error, setError] = useState('')
@@ -59,7 +73,10 @@ export function SubtitleBatchRecords({visible, tasks, busy, run, refresh, course
               disabled={busy}
               onClick={() =>
                action(async () => {
-                const result = await invoke<SubtitleSyncTask | null>('subtitle-sync:attach', {id: task.id, url: item.url})
+                const result = await invoke<SubtitleSyncTask | null>('subtitle-sync:attach', {
+                 id: task.id,
+                 url: item.url
+                })
                 if (result) setNotice('指定字幕已同步，来源标为用户指定 SRT')
                })
               }
@@ -84,7 +101,10 @@ export function SubtitleBatchRecords({visible, tasks, busy, run, refresh, course
          >
           核对并继续同步
          </button>
-         <button disabled={busy || !task.items.some(item => item.status === '已完成')} onClick={() => setDraft({task, urls: [], modes: []})}>
+         <button
+          disabled={busy || !task.items.some(item => item.status === '已完成')}
+          onClick={() => setDraft({task, urls: [], modes: []})}
+         >
           选择生成笔记
          </button>
         </div>
@@ -100,13 +120,26 @@ export function SubtitleBatchRecords({visible, tasks, busy, run, refresh, course
        收起选择
       </button>
      </header>
-     <p className="hint">只整理勾选的分集和形式。生成时会将这些字幕交给当前连接的模型；字幕同步和本地检索不会调用模型。</p>
+     <p className="hint">
+      只整理勾选的分集和形式。生成时会将这些字幕交给当前连接的模型；字幕同步和本地检索不会调用模型。
+     </p>
      <div className="batch-options">
       {draft.task.items
        .filter(item => item.status === '已完成')
        .map(item => (
         <label key={item.url}>
-         <input type="checkbox" aria-label={`整理 ${item.title}`} disabled={busy} checked={draft.urls.includes(item.url)} onChange={event => setDraft({...draft, urls: event.target.checked ? [...draft.urls, item.url] : draft.urls.filter(url => url !== item.url)})} />
+         <input
+          type="checkbox"
+          aria-label={`整理 ${item.title}`}
+          disabled={busy}
+          checked={draft.urls.includes(item.url)}
+          onChange={event =>
+           setDraft({
+            ...draft,
+            urls: event.target.checked ? [...draft.urls, item.url] : draft.urls.filter(url => url !== item.url)
+           })
+          }
+         />
          <span>
           P{item.page} · {item.title}
          </span>
@@ -116,7 +149,17 @@ export function SubtitleBatchRecords({visible, tasks, busy, run, refresh, course
      <div className="row batch-mode-options">
       {(Object.keys(noteTitles) as VideoNoteMode[]).map(mode => (
        <label key={mode}>
-        <input type="checkbox" disabled={busy} checked={draft.modes.includes(mode)} onChange={event => setDraft({...draft, modes: event.target.checked ? [...draft.modes, mode] : draft.modes.filter(value => value !== mode)})} />
+        <input
+         type="checkbox"
+         disabled={busy}
+         checked={draft.modes.includes(mode)}
+         onChange={event =>
+          setDraft({
+           ...draft,
+           modes: event.target.checked ? [...draft.modes, mode] : draft.modes.filter(value => value !== mode)
+          })
+         }
+        />
         {noteTitles[mode]}
        </label>
       ))}
@@ -126,8 +169,14 @@ export function SubtitleBatchRecords({visible, tasks, busy, run, refresh, course
       disabled={busy || !draft.urls.length || !draft.modes.length}
       onClick={() =>
        action(async () => {
-        const result = await invoke<SubtitleDerivedTask>('subtitle-derived:start', {id: draft.task.id, urls: draft.urls, modes: draft.modes})
-        setNotice(`笔记任务结束：完成 ${result.items.filter(item => item.status === '已完成').length}，失败 ${result.items.filter(item => item.status === '失败').length}`)
+        const result = await invoke<SubtitleDerivedTask>('subtitle-derived:start', {
+         id: draft.task.id,
+         urls: draft.urls,
+         modes: draft.modes
+        })
+        setNotice(
+         `笔记任务结束：完成 ${result.items.filter(item => item.status === '已完成').length}，失败 ${result.items.filter(item => item.status === '失败').length}`
+        )
         setDraft(null)
        })
       }
@@ -175,7 +224,9 @@ export function SubtitleBatchRecords({visible, tasks, busy, run, refresh, course
                 onClick={() =>
                  action(async () => {
                   const existing = item.outputs?.find(output => output.path.endsWith('.' + format))
-                  const path = existing?.path || (await invoke<string>('video-ppt:notes-export', {path: item.outputs![0].path, format}))
+                  const path =
+                   existing?.path ||
+                   (await invoke<string>('video-ppt:notes-export', {path: item.outputs![0].path, format}))
                   await invoke('library:reveal', {path})
                   setNotice(`${format.toUpperCase()} 已保存：${path}`)
                  })

@@ -18,7 +18,21 @@ export function Modal({title, children, close}: {title: string; children: ReactN
   </div>
  )
 }
-export function FilePicker({label, paths, set, transcript = false, courseware = false, courseId}: {label: string; paths: string[]; set: (p: string[]) => void; transcript?: boolean; courseware?: boolean; courseId?: string}) {
+export function FilePicker({
+ label,
+ paths,
+ set,
+ transcript = false,
+ courseware = false,
+ courseId
+}: {
+ label: string
+ paths: string[]
+ set: (p: string[]) => void
+ transcript?: boolean
+ courseware?: boolean
+ courseId?: string
+}) {
  return (
   <div
    className="file-picker"
@@ -33,7 +47,15 @@ export function FilePicker({label, paths, set, transcript = false, courseware = 
    }}
   >
    <label>{label}</label>
-   <button type="button" onClick={() => void invoke<string[]>('pick', {kind: transcript ? 'transcript' : courseware ? 'courseware' : 'document', courseId}).then(p => p.length && set(transcript ? p : [...paths, ...p]))}>
+   <button
+    type="button"
+    onClick={() =>
+     void invoke<string[]>('pick', {
+      kind: transcript ? 'transcript' : courseware ? 'courseware' : 'document',
+      courseId
+     }).then(p => p.length && set(transcript ? p : [...paths, ...p]))
+    }
+   >
     {transcript ? '选择或拖入原文' : '选择或拖入文件'}
    </button>
    {paths.map((p, i) => (

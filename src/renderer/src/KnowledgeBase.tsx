@@ -2,17 +2,39 @@ import {useEffect, useRef, useState} from 'react'
 import {KnowledgeClassification} from './KnowledgeClassification'
 import type {KnowledgeEntry, KnowledgeList, KnowledgeHit, KnowledgeSearch} from '../../shared/knowledge'
 const invoke = <T,>(action: string, args?: unknown) => window.assistant.invoke<T>(action, args)
-type Answer = {answer: {paragraphs: {text: string; citations: {id: string; quote: string}[]}[]; limitation: string}; sources: KnowledgeHit[]}
-type VectorState = {model: string; bundled: boolean; active: boolean; selection_error: string | null; index: 'ready' | 'stale' | 'not_built'; vector_count: number}
+type Answer = {
+ answer: {paragraphs: {text: string; citations: {id: string; quote: string}[]}[]; limitation: string}
+ sources: KnowledgeHit[]
+}
+type VectorState = {
+ model: string
+ bundled: boolean
+ active: boolean
+ selection_error: string | null
+ index: 'ready' | 'stale' | 'not_built'
+ vector_count: number
+}
 export function KnowledgeIcon() {
  return (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+  <svg
+   viewBox="0 0 24 24"
+   fill="none"
+   stroke="currentColor"
+   strokeWidth="1.7"
+   strokeLinecap="round"
+   strokeLinejoin="round"
+   aria-hidden="true"
+  >
    <path d="M12 5c-3-2-7-2-9-1v15c3-1 6-1 9 1 3-2 6-2 9-1V4c-2-1-6-1-9 1v15M6 8h3m-3 4h3m6-4h3m-3 4h3" />
   </svg>
  )
 }
 export function KnowledgeBase({visible, close}: {visible: boolean; close: () => void}) {
- const [data, setData] = useState<KnowledgeList>({entries: [], stats: {totalVideos: 0, totalChunks: 0}, retrieval: 'keyword'})
+ const [data, setData] = useState<KnowledgeList>({
+  entries: [],
+  stats: {totalVideos: 0, totalChunks: 0},
+  retrieval: 'keyword'
+ })
  const [category, setCategory] = useState(''),
   [importCategory, setImportCategory] = useState(''),
   [query, setQuery] = useState('')
@@ -29,7 +51,14 @@ export function KnowledgeBase({visible, close}: {visible: boolean; close: () => 
  const [moving, setMoving] = useState<{entry: KnowledgeEntry; target: string} | null>(null)
  const [facets, setFacets] = useState<Record<string, string>>({})
  const working = useRef(false)
- const entries = data.entries.filter(entry => (!category || entry.folder === category) && Object.entries(facets).every(([key, value]) => !value || entry.classification?.[key as keyof NonNullable<KnowledgeEntry['classification']>] === value))
+ const entries = data.entries.filter(
+  entry =>
+   (!category || entry.folder === category) &&
+   Object.entries(facets).every(
+    ([key, value]) =>
+     !value || entry.classification?.[key as keyof NonNullable<KnowledgeEntry['classification']>] === value
+   )
+ )
  const categories = Array.from(new Set(data.entries.map(entry => entry.folder).filter(Boolean))).sort()
  async function refresh() {
   setData(await invoke<KnowledgeList>('knowledge:list'))
@@ -69,7 +98,10 @@ export function KnowledgeBase({visible, close}: {visible: boolean; close: () => 
   })
  }
  async function organize(selected: KnowledgeEntry[], target: string, wholeCategory = false) {
-  const result = await invoke<{changed: number; unchanged: number; failures: {title: string; error: string}[]}>('knowledge:organize', {target: target.trim(), items: selected.map(entry => ({id: entry.bvid, generation: entry.generation_id}))})
+  const result = await invoke<{changed: number; unchanged: number; failures: {title: string; error: string}[]}>(
+   'knowledge:organize',
+   {target: target.trim(), items: selected.map(entry => ({id: entry.bvid, generation: entry.generation_id}))}
+  )
   await refresh()
   setSearch(null)
   setAnswer(null)
@@ -83,7 +115,12 @@ export function KnowledgeBase({visible, close}: {visible: boolean; close: () => 
   }
  }
  return (
-  <section className="learning-window ppt-extract-page knowledge-window" aria-label="知识库" hidden={!visible} style={!visible ? {display: 'none'} : undefined}>
+  <section
+   className="learning-window ppt-extract-page knowledge-window"
+   aria-label="知识库"
+   hidden={!visible}
+   style={!visible ? {display: 'none'} : undefined}
+  >
    <datalist id="knowledge-categories">
     {categories.map(item => (
      <option key={item} value={item} />
@@ -135,19 +172,36 @@ export function KnowledgeBase({visible, close}: {visible: boolean; close: () => 
      <div className="row">
       <label>
        导入分类
-       <input aria-label="导入分类" placeholder="例如：牙体牙髓病学" value={importCategory} maxLength={100} onChange={event => setImportCategory(event.target.value)} />
+       <input
+        aria-label="导入分类"
+        placeholder="例如：牙体牙髓病学"
+        value={importCategory}
+        maxLength={100}
+        onChange={event => setImportCategory(event.target.value)}
+       />
       </label>
       <button
        className="primary"
        disabled={busy}
        onClick={() =>
         void run(async () => {
-         const results = await invoke<{name: string; ok: boolean; error?: string; result?: {unchanged: boolean}}[]>('knowledge:import', {category: importCategory.trim()})
+         const results = await invoke<{name: string; ok: boolean; error?: string; result?: {unchanged: boolean}}[]>(
+          'knowledge:import',
+          {category: importCategory.trim()}
+         )
          if (results.length) {
           await refresh()
           setSearch(null)
           setAnswer(null)
-          setNotice(results.map(item => (item.ok ? item.name + (item.result?.unchanged ? '：已有相同版本' : '：已导入') : item.name + '：' + item.error)).join('\n'))
+          setNotice(
+           results
+            .map(item =>
+             item.ok
+              ? item.name + (item.result?.unchanged ? '：已有相同版本' : '：已导入')
+              : item.name + '：' + item.error
+            )
+            .join('\n')
+          )
          }
         })
        }
@@ -167,14 +221,25 @@ export function KnowledgeBase({visible, close}: {visible: boolean; close: () => 
        重建索引
       </button>
      </div>
-     <p className="hint">支持有文字的 PDF、Word、TXT、Markdown 和 SRT。原文件保留，知识库单独保存文字版本；更新资料请再次导入。图片型 PDF 需先识别文字。</p>
+     <p className="hint">
+      支持有文字的 PDF、Word、TXT、Markdown 和 SRT。原文件保留，知识库单独保存文字版本；更新资料请再次导入。图片型 PDF
+      需先识别文字。
+     </p>
     </section>
     <section className="knowledge-card">
      <header>
       <div>
        <h3>本地语义检索</h3>
        <p className="hint">
-        {!vector ? '正在检查本地模型…' : vector.index === 'ready' ? `模型已启用，已建立 ${vector.vector_count} 个向量片段。` : vector.active ? '模型已启用；导入或更新资料后，请建立语义索引。' : vector.bundled ? '已附带中文模型，启用后可以建立语义索引。' : '本地模型文件不可用，仍可使用关键词检索。'}
+        {!vector
+         ? '正在检查本地模型…'
+         : vector.index === 'ready'
+           ? `模型已启用，已建立 ${vector.vector_count} 个向量片段。`
+           : vector.active
+             ? '模型已启用；导入或更新资料后，请建立语义索引。'
+             : vector.bundled
+               ? '已附带中文模型，启用后可以建立语义索引。'
+               : '本地模型文件不可用，仍可使用关键词检索。'}
        </p>
       </div>
       <div className="row">
@@ -215,9 +280,19 @@ export function KnowledgeBase({visible, close}: {visible: boolean; close: () => 
       <div className="row">
        <label>
         分类新名称
-        <input aria-label="分类新名称" list="knowledge-categories" value={categoryTarget} maxLength={100} placeholder="输入新名称或选择现有分类" onChange={event => setCategoryTarget(event.target.value)} />
+        <input
+         aria-label="分类新名称"
+         list="knowledge-categories"
+         value={categoryTarget}
+         maxLength={100}
+         placeholder="输入新名称或选择现有分类"
+         onChange={event => setCategoryTarget(event.target.value)}
+        />
        </label>
-       <button disabled={busy || !categoryTarget.trim() || categoryTarget.trim() === category || !entries.length} onClick={() => void run(() => organize(entries, categoryTarget, true))}>
+       <button
+        disabled={busy || !categoryTarget.trim() || categoryTarget.trim() === category || !entries.length}
+        onClick={() => void run(() => organize(entries, categoryTarget, true))}
+       >
         {categories.includes(categoryTarget.trim()) ? '合并分类' : '重命名分类'}
        </button>
       </div>
@@ -235,7 +310,13 @@ export function KnowledgeBase({visible, close}: {visible: boolean; close: () => 
       })
      }}
     >
-     <input aria-label="知识库检索词" placeholder="输入知识点，查找相关原文…" value={query} maxLength={2000} onChange={event => setQuery(event.target.value)} />
+     <input
+      aria-label="知识库检索词"
+      placeholder="输入知识点，查找相关原文…"
+      value={query}
+      maxLength={2000}
+      onChange={event => setQuery(event.target.value)}
+     />
      <button disabled={busy || !query.trim()} className="primary">
       检索原文
      </button>
@@ -253,7 +334,9 @@ export function KnowledgeBase({visible, close}: {visible: boolean; close: () => 
       根据资料回答
      </button>
     </form>
-    <p className="hint">检索在本机进行；点击“根据资料回答”会将问题和检索片段交给当前连接的模型。回答附可查看的原文引用。</p>
+    <p className="hint">
+     检索在本机进行；点击“根据资料回答”会将问题和检索片段交给当前连接的模型。回答附可查看的原文引用。
+    </p>
     {busy && (
      <div className="row">
       <p role="status">{progressText || '正在处理知识库资料…'}</p>
@@ -338,7 +421,13 @@ export function KnowledgeBase({visible, close}: {visible: boolean; close: () => 
          }}
         >
          <option value="">全部</option>
-         {Array.from(new Set(data.entries.map(entry => entry.classification?.[key as keyof NonNullable<KnowledgeEntry['classification']>]).filter((value): value is string => typeof value === 'string' && !!value)))
+         {Array.from(
+          new Set(
+           data.entries
+            .map(entry => entry.classification?.[key as keyof NonNullable<KnowledgeEntry['classification']>])
+            .filter((value): value is string => typeof value === 'string' && !!value)
+          )
+         )
           .sort()
           .map(value => (
            <option key={value}>{value}</option>
@@ -431,7 +520,14 @@ export function KnowledgeBase({visible, close}: {visible: boolean; close: () => 
       <div className="row">
        <label>
         目标分类
-        <input aria-label="目标分类" list="knowledge-categories" maxLength={100} placeholder="留空移到未分类" value={moving.target} onChange={event => setMoving({...moving, target: event.target.value})} />
+        <input
+         aria-label="目标分类"
+         list="knowledge-categories"
+         maxLength={100}
+         placeholder="留空移到未分类"
+         value={moving.target}
+         onChange={event => setMoving({...moving, target: event.target.value})}
+        />
        </label>
        <button disabled={busy} onClick={() => void run(() => organize([moving.entry], moving.target))}>
         保存分类

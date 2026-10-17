@@ -4,10 +4,34 @@ import {readFile, mkdir, lstat, copyFile, rename, rm} from 'node:fs/promises'
 import {join, resolve, sep, dirname} from 'node:path'
 import {z} from 'zod'
 import type {RuntimeManifest, RuntimeStatus} from '../shared/runtime'
-const file = z.object({path: z.string().min(1).max(500), size: z.number().int().nonnegative(), sha256: z.string().regex(/^[a-f0-9]{64}$/)})
-const manifest = z.object({schema: z.literal(1), productVersion: z.string(), components: z.array(z.object({id: z.string(), label: z.string(), directory: z.string(), files: z.array(file).max(50000), bytes: z.number()})).max(10)})
+const file = z.object({
+ path: z.string().min(1).max(500),
+ size: z.number().int().nonnegative(),
+ sha256: z.string().regex(/^[a-f0-9]{64}$/)
+})
+const manifest = z.object({
+ schema: z.literal(1),
+ productVersion: z.string(),
+ components: z
+  .array(
+   z.object({
+    id: z.string(),
+    label: z.string(),
+    directory: z.string(),
+    files: z.array(file).max(50000),
+    bytes: z.number()
+   })
+  )
+  .max(10)
+})
 export function contained(root: string, relative: string) {
- if (!relative || relative.includes('\\') || relative.includes(':') || relative.split('/').some(x => !x || x === '.' || x === '..')) throw new Error('组件路径无效')
+ if (
+  !relative ||
+  relative.includes('\\') ||
+  relative.includes(':') ||
+  relative.split('/').some(x => !x || x === '.' || x === '..')
+ )
+  throw new Error('组件路径无效')
  const target = resolve(root, relative)
  if (!target.startsWith(resolve(root) + sep)) throw new Error('组件路径越界')
  return target
@@ -41,7 +65,15 @@ export class RuntimeComponents {
  }
  async status(): Promise<RuntimeStatus> {
   const data = await this.manifest()
-  return {version: this.version, components: data.components.map(c => ({id: c.id, label: c.label, bytes: c.bytes, installed: c.files.every(f => existsSync(contained(join(this.resources, c.directory), f.path)))}))}
+  return {
+   version: this.version,
+   components: data.components.map(c => ({
+    id: c.id,
+    label: c.label,
+    bytes: c.bytes,
+    installed: c.files.every(f => existsSync(contained(join(this.resources, c.directory), f.path)))
+   }))
+  }
  }
  async install(id: string, source: string, signal: AbortSignal, progress: (message: string) => void) {
   const catalog = await this.manifest(),
@@ -50,7 +82,8 @@ export class RuntimeComponents {
   const target = contained(this.resources, component.directory)
   if (existsSync(target)) throw new Error('组件目录已存在；请使用完整更新包修复，避免覆盖正在使用的文件')
   const descriptor = JSON.parse(await readFile(await regular(source, 'component.json'), 'utf8'))
-  if (descriptor.id !== id || descriptor.productVersion !== this.version) throw new Error('请选择与当前应用版本一致的组件包')
+  if (descriptor.id !== id || descriptor.productVersion !== this.version)
+   throw new Error('请选择与当前应用版本一致的组件包')
   const payload = join(source, 'payload'),
    stage = join(this.resources, '.component-' + randomUUID())
   await mkdir(stage)
@@ -66,7 +99,8 @@ export class RuntimeComponents {
        signal.throwIfAborted()
        const entry = component.files[cursor++],
         input = await regular(payload, entry.path)
-       if ((await lstat(input)).size !== entry.size || (await hashFile(input)) !== entry.sha256) throw new Error('组件校验失败：' + entry.path)
+       if ((await lstat(input)).size !== entry.size || (await hashFile(input)) !== entry.sha256)
+        throw new Error('组件校验失败：' + entry.path)
        const output = contained(stage, entry.path)
        await mkdir(dirname(output), {recursive: true})
        await copyFile(input, output)

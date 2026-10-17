@@ -66,7 +66,12 @@ export function CourseList({
           )}
          </span>
         </button>
-        <button className="course-fold" aria-label={(folded ? '展开课程 ' : '折叠课程 ') + label} aria-expanded={!folded} onClick={() => setCollapsed(v => ({...v, [c.id]: !folded}))}>
+        <button
+         className="course-fold"
+         aria-label={(folded ? '展开课程 ' : '折叠课程 ') + label}
+         aria-expanded={!folded}
+         onClick={() => setCollapsed(v => ({...v, [c.id]: !folded}))}
+        >
          <DshChevronDownIcon />
         </button>
         <button
@@ -88,7 +93,12 @@ export function CourseList({
           .filter(s => s.course_id === c.id)
           .map(s => (
            <div className="session-row" key={s.id}>
-            <button disabled={busy} className={'session-card ' + (s.id === selectedSession && active ? 'selected' : '')} aria-label={c.name + ' ' + s.title} onClick={() => selectSession(c.id, s.id)}>
+            <button
+             disabled={busy}
+             className={'session-card ' + (s.id === selectedSession && active ? 'selected' : '')}
+             aria-label={c.name + ' ' + s.title}
+             onClick={() => selectSession(c.id, s.id)}
+            >
              <MessageNavIcon />
              <span>{s.title}</span>
             </button>
@@ -106,7 +116,12 @@ export function CourseList({
             </button>
            </div>
           ))}
-         <button className="new-session" disabled={busy} aria-label={'新建会话 ' + c.name} onClick={() => newSession(c.id)}>
+         <button
+          className="new-session"
+          disabled={busy}
+          aria-label={'新建会话 ' + c.name}
+          onClick={() => newSession(c.id)}
+         >
           <span aria-hidden="true">＋</span>新建会话
          </button>
         </div>

@@ -29,12 +29,43 @@ function Result({text}: {text: string}) {
  )
 }
 type Skill = {id: string; name: string; description: string; body: string; enabled: boolean}
-type Server = {id: string; name: string; endpoint: string; enabled: boolean; allowed_tools: string[]; tools: {name: string; description: string; read_only_declared: boolean; input_schema: unknown}[]}
-type Agent = {task_id: string; question: string; status: string; note: string; limitations: string; error_code?: string; turns: number; events: {kind: string; message?: string}[]; sources: {source_id: string; title: string; read: boolean; text: string; url: string}[]}
-type Flow = {workflow_id: string; question: string; status: string; revision: number; fence: number; outcome_unknown: boolean; notice?: string; steps: {name: string; status: string; answer: string}[]}
+type Server = {
+ id: string
+ name: string
+ endpoint: string
+ enabled: boolean
+ allowed_tools: string[]
+ tools: {name: string; description: string; read_only_declared: boolean; input_schema: unknown}[]
+}
+type Agent = {
+ task_id: string
+ question: string
+ status: string
+ note: string
+ limitations: string
+ error_code?: string
+ turns: number
+ events: {kind: string; message?: string}[]
+ sources: {source_id: string; title: string; read: boolean; text: string; url: string}[]
+}
+type Flow = {
+ workflow_id: string
+ question: string
+ status: string
+ revision: number
+ fence: number
+ outcome_unknown: boolean
+ notice?: string
+ steps: {name: string; status: string; answer: string}[]
+}
 type Overview = {
  root: string
- extensions: {revision: number; skills: Skill[]; standing_instructions: {enabled: boolean; body: string}; plugins: {id: string; name: string; enabled: boolean; description: string}[]}
+ extensions: {
+  revision: number
+  skills: Skill[]
+  standing_instructions: {enabled: boolean; body: string}
+  plugins: {id: string; name: string; enabled: boolean; description: string}[]
+ }
  mcp: {revision: number; servers: Server[]}
  tasks: Agent[]
  workflows: Flow[]
@@ -44,7 +75,18 @@ type Material = {binding: {bvid: string; [key: string]: unknown}; title: string;
 const invoke = <T,>(action: string, args?: unknown) => window.assistant.invoke<T>(action, args)
 const request = <T,>(action: string, args: unknown = {}) => invoke<T>('tools:request', {action, args})
 const op = () => crypto.randomUUID().replaceAll('-', '')
-const labels: Record<string, string> = {legacy_saved: '旧保存记录（待重新核验）', running: '正在运行', completed: '已完成', stopped: '已停止', failed: '失败', paused: '待继续', unknown: '结果待确认', pending: '待运行', verifying: '核验来源', requesting: '正在分析'}
+const labels: Record<string, string> = {
+ legacy_saved: '旧保存记录（待重新核验）',
+ running: '正在运行',
+ completed: '已完成',
+ stopped: '已停止',
+ failed: '失败',
+ paused: '待继续',
+ unknown: '结果待确认',
+ pending: '待运行',
+ verifying: '核验来源',
+ requesting: '正在分析'
+}
 export function ToolsIcon() {
  return (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
@@ -109,15 +151,39 @@ export function ToolsWorkbench({visible, close}: {visible: boolean; close: () =>
    })
  }, [visible])
  useEffect(() => {
-  if (!visible || !data || (!data.tasks.some(task => task.status === 'running') && !data.workflows.some(task => task.status === 'running'))) return
+  if (
+   !visible ||
+   !data ||
+   (!data.tasks.some(task => task.status === 'running') && !data.workflows.some(task => task.status === 'running'))
+  )
+   return
   const timer = setInterval(() => void refresh().catch(reason => setError(String(reason))), 2000)
   return () => clearInterval(timer)
  }, [visible, data?.tasks.map(task => task.status).join(), data?.workflows.map(task => task.status).join()])
- const toggle = (value: string, list: string[], set: (values: string[]) => void) => set(list.includes(value) ? list.filter(item => item !== value) : [...list, value])
- const editExtension = (change: unknown) => request('extension-change', {op: op(), revision: data!.extensions.revision, change})
- const editServer = (server: Server, allowed: string[], enabled: boolean) => request('mcp-change', {op: op(), revision: data!.mcp.revision, change: {kind: 'server', id: server.id, name: server.name, endpoint: server.endpoint, allowed_tools: allowed, enabled}})
+ const toggle = (value: string, list: string[], set: (values: string[]) => void) =>
+  set(list.includes(value) ? list.filter(item => item !== value) : [...list, value])
+ const editExtension = (change: unknown) =>
+  request('extension-change', {op: op(), revision: data!.extensions.revision, change})
+ const editServer = (server: Server, allowed: string[], enabled: boolean) =>
+  request('mcp-change', {
+   op: op(),
+   revision: data!.mcp.revision,
+   change: {
+    kind: 'server',
+    id: server.id,
+    name: server.name,
+    endpoint: server.endpoint,
+    allowed_tools: allowed,
+    enabled
+   }
+  })
  return (
-  <section className="ppt-extract-page learning-window" aria-label="工具与工作流" hidden={!visible} style={!visible ? {display: 'none'} : undefined}>
+  <section
+   className="ppt-extract-page learning-window"
+   aria-label="工具与工作流"
+   hidden={!visible}
+   style={!visible ? {display: 'none'} : undefined}
+  >
    <aside className="learning-menu">
     <h2>工具与工作流</h2>
     <p>
@@ -153,7 +219,12 @@ export function ToolsWorkbench({visible, close}: {visible: boolean; close: () =>
       <section className="knowledge-card">
        <h3>本次资料范围</h3>
        <div className="row">
-        <input placeholder="查找知识库资料" aria-label="查找研究资料" value={query} onChange={e => setQuery(e.target.value)} />
+        <input
+         placeholder="查找知识库资料"
+         aria-label="查找研究资料"
+         value={query}
+         onChange={e => setQuery(e.target.value)}
+        />
         <button disabled={busy} onClick={() => void run(() => loadMaterials())}>
          查找
         </button>
@@ -165,7 +236,13 @@ export function ToolsWorkbench({visible, close}: {visible: boolean; close: () =>
            type="checkbox"
            checked={chosen.some(item => item.binding.bvid === material.binding.bvid)}
            disabled={busy || (chosen.length >= 6 && !chosen.some(item => item.binding.bvid === material.binding.bvid))}
-           onChange={() => setChosen(old => (old.some(item => item.binding.bvid === material.binding.bvid) ? old.filter(item => item.binding.bvid !== material.binding.bvid) : [...old, material]))}
+           onChange={() =>
+            setChosen(old =>
+             old.some(item => item.binding.bvid === material.binding.bvid)
+              ? old.filter(item => item.binding.bvid !== material.binding.bvid)
+              : [...old, material]
+            )
+           }
           />
           {material.title}
           <small>{material.kind}</small>
@@ -177,8 +254,16 @@ export function ToolsWorkbench({visible, close}: {visible: boolean; close: () =>
          更多资料
         </button>
        )}
-       <p className="hint">已选 {chosen.length} 份；不选时可搜索当前资料库。最多六份，选择在翻页时保留，来源改变会要求重新选择。</p>
-       <textarea aria-label="研究问题" placeholder="希望依据这些资料解决什么问题？" value={question} maxLength={flow ? 800 : 1500} onChange={e => setQuestion(e.target.value)} />
+       <p className="hint">
+        已选 {chosen.length} 份；不选时可搜索当前资料库。最多六份，选择在翻页时保留，来源改变会要求重新选择。
+       </p>
+       <textarea
+        aria-label="研究问题"
+        placeholder="希望依据这些资料解决什么问题？"
+        value={question}
+        maxLength={flow ? 800 : 1500}
+        onChange={e => setQuestion(e.target.value)}
+       />
        <label className="media-check">
         <input type="checkbox" checked={flow} onChange={e => setFlow(e.target.checked)} />
         两步工作流：先整理材料，再综合回答
@@ -215,13 +300,28 @@ export function ToolsWorkbench({visible, close}: {visible: boolean; close: () =>
            <option value="searxng">SearXNG</option>
           </select>
          </label>
-         {webProvider === 'searxng' && <input aria-label="搜索实例地址" placeholder="公开 HTTPS 实例地址" value={webEndpoint} onChange={e => setWebEndpoint(e.target.value)} />}
+         {webProvider === 'searxng' && (
+          <input
+           aria-label="搜索实例地址"
+           placeholder="公开 HTTPS 实例地址"
+           value={webEndpoint}
+           onChange={e => setWebEndpoint(e.target.value)}
+          />
+         )}
         </div>
        )}
        {!flow && (channels.includes('web_pages') || channels.includes('arxiv_fulltext')) && (
         <label>
          本轮正文网址
-         <textarea aria-label="本轮正文网址" value={fulltextTargets} onChange={e => setFulltextTargets(e.target.value)} maxLength={9000} placeholder={'每行一个公开 HTTPS 网址；论文须固定版本并指定物理页。\nhttps://arxiv.org/abs/1706.03762v7 | 1,2\nhttps://example.com/article'} />
+         <textarea
+          aria-label="本轮正文网址"
+          value={fulltextTargets}
+          onChange={e => setFulltextTargets(e.target.value)}
+          maxLength={9000}
+          placeholder={
+           '每行一个公开 HTTPS 网址；论文须固定版本并指定物理页。\nhttps://arxiv.org/abs/1706.03762v7 | 1,2\nhttps://example.com/article'
+          }
+         />
          <small>最多四个网址；至多两篇论文、每篇四页。仅后台读取所填网址，不自动浏览其他页面。</small>
         </label>
        )}
@@ -232,7 +332,11 @@ export function ToolsWorkbench({visible, close}: {visible: boolean; close: () =>
           .filter(skill => skill.enabled)
           .map(skill => (
            <label className="media-check" key={skill.id}>
-            <input type="checkbox" checked={skills.includes(skill.id)} onChange={() => toggle(skill.id, skills, setSkills)} />
+            <input
+             type="checkbox"
+             checked={skills.includes(skill.id)}
+             onChange={() => toggle(skill.id, skills, setSkills)}
+            />
             {skill.name}
            </label>
           ))}
@@ -242,14 +346,21 @@ export function ToolsWorkbench({visible, close}: {visible: boolean; close: () =>
           .flatMap(server =>
            server.allowed_tools.map(name => (
             <label key={server.id + name} className="media-check">
-             <input type="checkbox" checked={mcp.includes(server.id + ':' + name)} onChange={() => toggle(server.id + ':' + name, mcp, setMcp)} />
+             <input
+              type="checkbox"
+              checked={mcp.includes(server.id + ':' + name)}
+              onChange={() => toggle(server.id + ':' + name, mcp, setMcp)}
+             />
              {server.name} · {name}
             </label>
            ))
           )}
         </>
        )}
-       <p className="hint">点击开始才将已选资料交给当前模型。研究 Agent 最多八轮，只执行勾选渠道和工具；来源存在性核验不等于结论正确。两步工作流保留每一步结果，失败后可继续。</p>
+       <p className="hint">
+        点击开始才将已选资料交给当前模型。研究 Agent
+        最多八轮，只执行勾选渠道和工具；来源存在性核验不等于结论正确。两步工作流保留每一步结果，失败后可继续。
+       </p>
        <button
         className="primary"
         disabled={busy || !question.trim() || (flow && !chosen.length) || (!flow && !channels.length)}
@@ -259,7 +370,8 @@ export function ToolsWorkbench({visible, close}: {visible: boolean; close: () =>
            op: op(),
            question,
            channels,
-           web_search: webProvider === 'searxng' ? {provider: webProvider, endpoint: webEndpoint} : {provider: webProvider},
+           web_search:
+            webProvider === 'searxng' ? {provider: webProvider, endpoint: webEndpoint} : {provider: webProvider},
            fulltext: fulltextTargets.trim()
             ? fulltextTargets
                .trim()
@@ -316,14 +428,30 @@ export function ToolsWorkbench({visible, close}: {visible: boolean; close: () =>
         {!['completed', 'legacy_saved'].includes(task.status) && (
          <button
           disabled={busy || (task.outcome_unknown && !retryConsent.includes(task.workflow_id))}
-          onClick={() => void run(() => request('workflow-action', {id: task.workflow_id, op: op(), revision: task.revision, fence: task.fence, retry_unknown: task.status !== 'running' && task.outcome_unknown && retryConsent.includes(task.workflow_id), kind: task.status === 'running' ? 'stop' : 'resume'}))}
+          onClick={() =>
+           void run(() =>
+            request('workflow-action', {
+             id: task.workflow_id,
+             op: op(),
+             revision: task.revision,
+             fence: task.fence,
+             retry_unknown:
+              task.status !== 'running' && task.outcome_unknown && retryConsent.includes(task.workflow_id),
+             kind: task.status === 'running' ? 'stop' : 'resume'
+            })
+           )
+          }
          >
           {task.status === 'running' ? '停止工作流' : '继续工作流'}
          </button>
         )}
         {task.outcome_unknown && (
          <label className="media-check">
-          <input type="checkbox" checked={retryConsent.includes(task.workflow_id)} onChange={() => toggle(task.workflow_id, retryConsent, setRetryConsent)} />
+          <input
+           type="checkbox"
+           checked={retryConsent.includes(task.workflow_id)}
+           onChange={() => toggle(task.workflow_id, retryConsent, setRetryConsent)}
+          />
           已核对保存记录，同意重新请求未确认的步骤（可能再次消耗模型额度）
          </label>
         )}
@@ -351,7 +479,9 @@ export function ToolsWorkbench({visible, close}: {visible: boolean; close: () =>
           {labels[task.status] || task.status} · {task.turns}/8 轮
          </span>
         </header>
-        {task.status === 'running' && <button onClick={() => void run(() => request('agent-stop', {id: task.task_id}))}>停止研究</button>}
+        {task.status === 'running' && (
+         <button onClick={() => void run(() => request('agent-stop', {id: task.task_id}))}>停止研究</button>
+        )}
         {task.error_code && <p className="alert">{task.error_code}</p>}
         {task.note && <Result text={task.note} />}
         {task.limitations && <p className="hint">{task.limitations}</p>}
@@ -423,15 +553,34 @@ export function ToolsWorkbench({visible, close}: {visible: boolean; close: () =>
         <input type="checkbox" checked={rulesEnabled} onChange={e => setRulesEnabled(e.target.checked)} />
         在后续任务中启用
        </label>
-       <button disabled={busy} onClick={() => void run(() => editExtension({kind: 'instructions', enabled: rulesEnabled, body: rules}))}>
+       <button
+        disabled={busy}
+        onClick={() => void run(() => editExtension({kind: 'instructions', enabled: rulesEnabled, body: rules}))}
+       >
         保存要求
        </button>
       </section>
       <section className="knowledge-card">
        <h3>{editing ? '编辑学习方法' : '添加学习方法（Skill）'}</h3>
-       <input aria-label="方法名称" placeholder="英文短名，例如 compare-sources" value={skillName} onChange={e => setSkillName(e.target.value)} />
-       <input aria-label="方法说明" placeholder="方法说明" value={description} onChange={e => setDescription(e.target.value)} />
-       <textarea aria-label="方法正文" placeholder="具体学习步骤；不会执行其中的系统命令" maxLength={6000} value={body} onChange={e => setBody(e.target.value)} />
+       <input
+        aria-label="方法名称"
+        placeholder="英文短名，例如 compare-sources"
+        value={skillName}
+        onChange={e => setSkillName(e.target.value)}
+       />
+       <input
+        aria-label="方法说明"
+        placeholder="方法说明"
+        value={description}
+        onChange={e => setDescription(e.target.value)}
+       />
+       <textarea
+        aria-label="方法正文"
+        placeholder="具体学习步骤；不会执行其中的系统命令"
+        maxLength={6000}
+        value={body}
+        onChange={e => setBody(e.target.value)}
+       />
        <button
         disabled={busy || !skillName || !description || !body}
         onClick={() =>
@@ -462,7 +611,21 @@ export function ToolsWorkbench({visible, close}: {visible: boolean; close: () =>
          >
           编辑
          </button>
-         <button disabled={busy} onClick={() => void run(() => editExtension({kind: 'skill', id: skill.id, name: skill.name, description: skill.description, body: skill.body, enabled: !skill.enabled}))}>
+         <button
+          disabled={busy}
+          onClick={() =>
+           void run(() =>
+            editExtension({
+             kind: 'skill',
+             id: skill.id,
+             name: skill.name,
+             description: skill.description,
+             body: skill.body,
+             enabled: !skill.enabled
+            })
+           )
+          }
+         >
           {skill.enabled ? '停用' : '启用'}
          </button>
          <button disabled={busy} onClick={() => void run(() => editExtension({kind: 'remove', id: skill.id}))}>
@@ -475,7 +638,12 @@ export function ToolsWorkbench({visible, close}: {visible: boolean; close: () =>
        <h3>内置工具组</h3>
        {data.extensions.plugins.map(plugin => (
         <label className="media-check" key={plugin.id}>
-         <input type="checkbox" disabled={busy} checked={plugin.enabled} onChange={() => void run(() => editExtension({kind: 'plugin', id: plugin.id, enabled: !plugin.enabled}))} />
+         <input
+          type="checkbox"
+          disabled={busy}
+          checked={plugin.enabled}
+          onChange={() => void run(() => editExtension({kind: 'plugin', id: plugin.id, enabled: !plugin.enabled}))}
+         />
          <span>
           {plugin.name}
           <small>{plugin.description}</small>
@@ -488,14 +656,31 @@ export function ToolsWorkbench({visible, close}: {visible: boolean; close: () =>
     {tab === 'MCP 工具' && data && (
      <>
       <section className="knowledge-card">
-       <p className="hint">接入公开 HTTPS MCP 的只读工具。先读取清单、再勾选允许工具、最后在研究页选择本轮工具；不自动执行远端工具，不支持密钥连接。</p>
-       <input aria-label="MCP名称" placeholder="连接名称" value={serverName} onChange={e => setServerName(e.target.value)} />
-       <input aria-label="MCP地址" placeholder="https://.../mcp" value={endpoint} onChange={e => setEndpoint(e.target.value)} />
+       <p className="hint">
+        接入公开 HTTPS MCP
+        的只读工具。先读取清单、再勾选允许工具、最后在研究页选择本轮工具；不自动执行远端工具，不支持密钥连接。
+       </p>
+       <input
+        aria-label="MCP名称"
+        placeholder="连接名称"
+        value={serverName}
+        onChange={e => setServerName(e.target.value)}
+       />
+       <input
+        aria-label="MCP地址"
+        placeholder="https://.../mcp"
+        value={endpoint}
+        onChange={e => setEndpoint(e.target.value)}
+       />
        <button
         disabled={busy || !serverName || !endpoint}
         onClick={() =>
          void run(async () => {
-          await request('mcp-change', {op: op(), revision: data.mcp.revision, change: {kind: 'server', id: null, name: serverName, endpoint, enabled: false, allowed_tools: []}})
+          await request('mcp-change', {
+           op: op(),
+           revision: data.mcp.revision,
+           change: {kind: 'server', id: null, name: serverName, endpoint, enabled: false, allowed_tools: []}
+          })
           setEndpoint('')
           setServerName('')
          })
@@ -509,13 +694,28 @@ export function ToolsWorkbench({visible, close}: {visible: boolean; close: () =>
         <h3>{server.name}</h3>
         <p>{server.endpoint}</p>
         <div className="row">
-         <button disabled={busy} onClick={() => void run(() => request('mcp-discover', {op: op(), id: server.id, revision: data.mcp.revision}))}>
+         <button
+          disabled={busy}
+          onClick={() =>
+           void run(() => request('mcp-discover', {op: op(), id: server.id, revision: data.mcp.revision}))
+          }
+         >
           读取工具清单
          </button>
-         <button disabled={busy || !server.allowed_tools.length} onClick={() => void run(() => editServer(server, server.allowed_tools, !server.enabled))}>
+         <button
+          disabled={busy || !server.allowed_tools.length}
+          onClick={() => void run(() => editServer(server, server.allowed_tools, !server.enabled))}
+         >
           {server.enabled ? '停用连接' : '启用连接'}
          </button>
-         <button disabled={busy} onClick={() => void run(() => request('mcp-change', {op: op(), revision: data.mcp.revision, change: {kind: 'remove', id: server.id}}))}>
+         <button
+          disabled={busy}
+          onClick={() =>
+           void run(() =>
+            request('mcp-change', {op: op(), revision: data.mcp.revision, change: {kind: 'remove', id: server.id}})
+           )
+          }
+         >
           删除连接
          </button>
         </div>
@@ -527,7 +727,17 @@ export function ToolsWorkbench({visible, close}: {visible: boolean; close: () =>
              type="checkbox"
              disabled={busy || !tool.read_only_declared}
              checked={server.allowed_tools.includes(tool.name)}
-             onChange={() => void run(() => editServer(server, server.allowed_tools.includes(tool.name) ? server.allowed_tools.filter(name => name !== tool.name) : [...server.allowed_tools, tool.name], false))}
+             onChange={() =>
+              void run(() =>
+               editServer(
+                server,
+                server.allowed_tools.includes(tool.name)
+                 ? server.allowed_tools.filter(name => name !== tool.name)
+                 : [...server.allowed_tools, tool.name],
+                false
+               )
+              )
+             }
             />
             {tool.name} · {tool.read_only_declared ? '声明只读' : '未声明只读，禁用'}
            </label>
@@ -548,7 +758,8 @@ export function ToolsWorkbench({visible, close}: {visible: boolean; close: () =>
        <div className="row" key={item.id}>
         <span>{item.label}</span>
         <span>
-         {item.state === 'detected' ? '已找到' : item.state === 'missing' ? '当前环境未找到' : '待检查'} {item.version || ''}
+         {item.state === 'detected' ? '已找到' : item.state === 'missing' ? '当前环境未找到' : '待检查'}{' '}
+         {item.version || ''}
         </span>
        </div>
       ))}

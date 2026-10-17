@@ -4,7 +4,17 @@ import {useEffect, useState, type ReactNode} from 'react'
 import {DshCopyIcon} from './ChatIcons'
 
 // Agent message structure and waiting duration follow ElecKoi MessageBubble / ChatWaitingReply.
-export function ChatMessage({role, content, children, pending = false}: {role: 'user' | 'assistant'; content: string; children: ReactNode; pending?: boolean}) {
+export function ChatMessage({
+ role,
+ content,
+ children,
+ pending = false
+}: {
+ role: 'user' | 'assistant'
+ content: string
+ children: ReactNode
+ pending?: boolean
+}) {
  const identity = useContext(IdentityContext)
  return (
   <article className={`message message-agent ${role === 'user' ? 'mine' : 'theirs'}`}>

@@ -30,4 +30,15 @@ export type MediaCatalog = {
  subtitles?: string[]
  formats?: {id: string; height: number | null; extension: string; video_codec: string; audio_codec: string}[]
 }
-export type MediaJob = {id: string; title: string; state: string; stage: string; progress: {downloaded?: number; total?: number; speed?: number; eta?: number}; error_message: string; warning: string; output: string; source_url: string; files: string[]}
+export type MediaJob = {
+ id: string
+ title: string
+ state: string
+ stage: string
+ progress: {downloaded?: number; total?: number; speed?: number; eta?: number}
+ error_message: string
+ warning: string
+ output: string
+ source_url: string
+ files: string[]
+}

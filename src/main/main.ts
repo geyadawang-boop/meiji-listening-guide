@@ -74,12 +74,21 @@ else
   })
 async function startApplication() {
  const root = app.getPath('userData')
- const runtime = new RuntimeComponents(app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'resources'), app.getVersion())
+ const runtime = new RuntimeComponents(
+  app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'resources'),
+  app.getVersion()
+ )
  diagnostic(root, 'application', 'startup', {code: app.getVersion()})
  const portable =
   process.env.LISTENING_ASSISTANT_DATA && !process.env.LISTENING_ASSISTANT_PORTABLE_TEST
    ? null
-   : await openPortableLibrary(process.env.LISTENING_ASSISTANT_PORTABLE_TEST || (app.isPackaged ? dirname(process.execPath) : app.getAppPath()), root, process.env.LISTENING_ASSISTANT_PORTABLE_TEST ? join(root, '资料') : join(app.getPath('documents'), '听课助手资料'))
+   : await openPortableLibrary(
+      process.env.LISTENING_ASSISTANT_PORTABLE_TEST || (app.isPackaged ? dirname(process.execPath) : app.getAppPath()),
+      root,
+      process.env.LISTENING_ASSISTANT_PORTABLE_TEST
+       ? join(root, '资料')
+       : join(app.getPath('documents'), '听课助手资料')
+     )
  store = portable?.store || new Store(root)
  const db = store,
   settings = new SettingsStore(root),
@@ -90,12 +99,22 @@ async function startApplication() {
   libraryRoot,
   db.courses().map(c => c.name)
  )
- const directory = (category: 'PPT' | '语音原文' | '笔记' | '历年卷', courseId: string) => libraryDirectory(libraryRoot, category, db.course(courseId).name)
+ const directory = (category: 'PPT' | '语音原文' | '笔记' | '历年卷', courseId: string) =>
+  libraryDirectory(libraryRoot, category, db.course(courseId).name)
  const saveNoteFile = async (lectureId: string) => {
   const detail = db.lectureDetail(lectureId)
-  await writeFile(join(await directory('笔记', detail.lecture.course_id), folderName(detail.lecture.title) + '-' + lectureId + '-听课笔记.md'), markdown(detail, 'notes'), 'utf8')
+  await writeFile(
+   join(
+    await directory('笔记', detail.lecture.course_id),
+    folderName(detail.lecture.title) + '-' + lectureId + '-听课笔记.md'
+   ),
+   markdown(detail, 'notes'),
+   'utf8'
+  )
  }
- db.db.prepare("UPDATE lectures SET status='上次任务中断，可继续校订' WHERE status='预处理中' OR status LIKE '校订中%'").run()
+ db.db
+  .prepare("UPDATE lectures SET status='上次任务中断，可继续校订' WHERE status='预处理中' OR status LIKE '校订中%'")
+  .run()
  const window = new BrowserWindow({
   width: 1500,
   height: 950,
@@ -104,20 +123,29 @@ async function startApplication() {
   title: '梅酱的听课指南',
   icon: join(app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'resources'), 'icon.png'),
   backgroundColor: '#f9fafb',
-  webPreferences: {preload: join(mainDir, '../preload/preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true}
+  webPreferences: {
+   preload: join(mainDir, '../preload/preload.cjs'),
+   contextIsolation: true,
+   nodeIntegration: false,
+   sandbox: true
+  }
  })
  mainWindow = window
  const emit = (e: EventPayload) => {
   if (!window.isDestroyed()) window.webContents.send('assistant:event', e)
  }
  const zhiyunSession = session.fromPartition('persist:zhiyun')
- const zhiyunBrowser = new ZhiyunBrowser(window, message => emit({kind: 'progress', data: {stage: '智云登录', message, error: true}}))
+ const zhiyunBrowser = new ZhiyunBrowser(window, message =>
+  emit({kind: 'progress', data: {stage: '智云登录', message, error: true}})
+ )
  const zhiyun = new Zhiyun(
   async (url, init) => {
    const headers = new Headers(init?.headers)
    if (new URL(url).origin === 'https://onlineroom.cmc.zju.edu.cn') {
     // Reuse the website's own session internally; credentials never enter renderer data or logs.
-    const cookie = (await zhiyunSession.cookies.get({url: 'https://onlineroom.cmc.zju.edu.cn'})).find(c => c.name === '_token')
+    const cookie = (await zhiyunSession.cookies.get({url: 'https://onlineroom.cmc.zju.edu.cn'})).find(
+     c => c.name === '_token'
+    )
     if (cookie) {
      let value = cookie.value
      try {
@@ -132,26 +160,41 @@ async function startApplication() {
   message => emit({kind: 'progress', data: {stage: '智云课堂', message}})
  )
  const codex = new CodexClient(
-  process.env.LISTENING_ASSISTANT_CODEX_FIXTURE && process.env.LISTENING_ASSISTANT_DATA ? process.execPath : join(app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'resources'), 'codex', 'bin', 'codex.exe'),
+  process.env.LISTENING_ASSISTANT_CODEX_FIXTURE && process.env.LISTENING_ASSISTANT_DATA
+   ? process.execPath
+   : join(app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'resources'), 'codex', 'bin', 'codex.exe'),
   join(root, 'codex-account'),
   join(root, 'codex-workspace'),
   settings,
   message => emit({kind: 'progress', data: {stage: 'Codex', message}}),
-  process.env.LISTENING_ASSISTANT_CODEX_FIXTURE && process.env.LISTENING_ASSISTANT_DATA ? [process.env.LISTENING_ASSISTANT_CODEX_FIXTURE] : []
+  process.env.LISTENING_ASSISTANT_CODEX_FIXTURE && process.env.LISTENING_ASSISTANT_DATA
+   ? [process.env.LISTENING_ASSISTANT_CODEX_FIXTURE]
+   : []
  )
  const deepseek = new CodexClient(
-  process.env.LISTENING_ASSISTANT_CODEX_FIXTURE && process.env.LISTENING_ASSISTANT_DATA ? process.execPath : join(app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'resources'), 'codex', 'bin', 'codex.exe'),
+  process.env.LISTENING_ASSISTANT_CODEX_FIXTURE && process.env.LISTENING_ASSISTANT_DATA
+   ? process.execPath
+   : join(app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'resources'), 'codex', 'bin', 'codex.exe'),
   join(root, 'deepseek-account'),
   join(root, 'deepseek-workspace'),
   settings,
   message => emit({kind: 'progress', data: {stage: 'DeepSeek', message: message.replace(/Codex/g, 'DeepSeek')}}),
-  process.env.LISTENING_ASSISTANT_CODEX_FIXTURE && process.env.LISTENING_ASSISTANT_DATA ? [process.env.LISTENING_ASSISTANT_CODEX_FIXTURE] : [],
+  process.env.LISTENING_ASSISTANT_CODEX_FIXTURE && process.env.LISTENING_ASSISTANT_DATA
+   ? [process.env.LISTENING_ASSISTANT_CODEX_FIXTURE]
+   : [],
   () => validateDeepSeek(settings.profile())
  )
  const routed = modelRouter(() => (settings.get().connection === 'deepseek' ? deepseek : codex))
- const testApi = process.env.LISTENING_ASSISTANT_TEST_API === '1' && process.env.LISTENING_ASSISTANT_DATA ? new Api(settings, net.fetch.bind(net)) : undefined
+ const testApi =
+  process.env.LISTENING_ASSISTANT_TEST_API === '1' && process.env.LISTENING_ASSISTANT_DATA
+   ? new Api(settings, net.fetch.bind(net))
+   : undefined
  const api = testApi || routed
- const knowledge = new KnowledgeBase(app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'resources'), join(libraryRoot, '知识库数据'), message => emit({kind: 'progress', data: {stage: '知识库', message}}))
+ const knowledge = new KnowledgeBase(
+  app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'resources'),
+  join(libraryRoot, '知识库数据'),
+  message => emit({kind: 'progress', data: {stage: '知识库', message}})
+ )
  const visualConnection = () => {
   const value = settings.get(),
    connection = value.connection || 'codex',
@@ -179,7 +222,11 @@ async function startApplication() {
  const subtitleDerived = new SubtitleDerived(join(libraryRoot, '笔记生成记录'), libraryRoot)
  const biliSession = session.fromPartition('persist:meijiang-bili-resources')
  biliSession.setPermissionRequestHandler((_contents, _permission, callback) => callback(false))
- const biliFixture = process.env.LISTENING_ASSISTANT_DATA && /^http:\/\/127\.0\.0\.1:\d+$/.test(process.env.LISTENING_ASSISTANT_BILI_FIXTURE || '') ? process.env.LISTENING_ASSISTANT_BILI_FIXTURE : undefined
+ const biliFixture =
+  process.env.LISTENING_ASSISTANT_DATA &&
+  /^http:\/\/127\.0\.0\.1:\d+$/.test(process.env.LISTENING_ASSISTANT_BILI_FIXTURE || '')
+   ? process.env.LISTENING_ASSISTANT_BILI_FIXTURE
+   : undefined
  const biliResources = new BiliResources(
   biliFixture
    ? (url, init) => {
@@ -188,7 +235,11 @@ async function startApplication() {
      }
    : (biliSession.fetch.bind(biliSession) as typeof fetch)
  )
- const media = new MediaBackend(app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'resources'), join(libraryRoot, '媒体下载'), biliResources)
+ const media = new MediaBackend(
+  app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'resources'),
+  join(libraryRoot, '媒体下载'),
+  biliResources
+ )
  const visual = new VisualTasks(join(libraryRoot, '画面识别成果'), media)
  const biliDiscussion = new BiliDiscussion(
   biliResources,
@@ -231,10 +282,18 @@ async function startApplication() {
  const pptExtractor = new PptExtractor(routed, message => emit({kind: 'progress', data: {stage: '截取 PPT', message}}))
  const videoProgress = (message: string) => emit({kind: 'progress', data: {stage: '视频提取 PPT', message}})
  const videoPpt = new VideoPpt(join(libraryRoot, '视频提取临时任务'), routed, videoProgress)
- async function saveVideoPdf(videoId: string, selectedCourse: string | undefined, choices: Parameters<VideoPpt['export']>[1], signal: AbortSignal) {
+ async function saveVideoPdf(
+  videoId: string,
+  selectedCourse: string | undefined,
+  choices: Parameters<VideoPpt['export']>[1],
+  signal: AbortSignal
+ ) {
   videoProgress('正在生成 PDF 并逐页检查图片像素')
   const result = await videoPpt.export(videoId, choices, signal),
-   path = await reserveFile(await libraryDirectory(libraryRoot, 'PPT', selectedCourse), folderName(result.sourceName.replace(/\.(mp4|mkv|mov|webm)$/i, '')) + '-视频课件.pdf')
+   path = await reserveFile(
+    await libraryDirectory(libraryRoot, 'PPT', selectedCourse),
+    folderName(result.sourceName.replace(/\.(mp4|mkv|mov|webm)$/i, '')) + '-视频课件.pdf'
+   )
   try {
    await writeFile(path, result.buffer)
    signal.throwIfAborted()
@@ -284,7 +343,16 @@ async function startApplication() {
    cleanupWarning = '字幕已保存，但临时视频清理失败：' + (error instanceof Error ? error.message : String(error))
   }
   videoProgress(cleanupWarning ? '字幕已保存，临时视频需要手动检查' : '字幕已保存并检查，临时视频已清理')
-  return {title: folderName(basename(task.name, extname(task.name))), page, source: '本地 Whisper 转写', warning: '自动转写可能有错，请核对后作为课堂原文使用。' + cleanupWarning, cleanupWarning, srt: transcript.srt, count: transcript.count, savedPath: path}
+  return {
+   title: folderName(basename(task.name, extname(task.name))),
+   page,
+   source: '本地 Whisper 转写',
+   warning: '自动转写可能有错，请核对后作为课堂原文使用。' + cleanupWarning,
+   cleanupWarning,
+   srt: transcript.srt,
+   count: transcript.count,
+   savedPath: path
+  }
  }
  async function job<T>(key: string, fn: (signal: AbortSignal) => Promise<T>): Promise<T> {
   if (jobs.size) throw new Error('当前已有任务运行，请等待完成或取消')
@@ -294,14 +362,24 @@ async function startApplication() {
    return await fn(controller.signal)
   } catch (error) {
    const message = controller.signal.aborted ? '任务已取消' : error instanceof Error ? error.message : '任务失败'
-   emit({kind: 'progress', data: {lectureId: key.startsWith('lecture:') ? key.slice(8) : undefined, stage: '任务停止', message, error: true}})
+   emit({
+    kind: 'progress',
+    data: {lectureId: key.startsWith('lecture:') ? key.slice(8) : undefined, stage: '任务停止', message, error: true}
+   })
    throw new Error(message)
   } finally {
    jobs.delete(key)
   }
  }
  const pick = async (kind: string, course?: string) => {
-  const extensions = kind === 'srt' ? ['srt'] : kind === 'transcript' ? ['docx', 'txt', 'md', 'srt'] : kind === 'courseware' ? ['ppt', 'pptx', 'pdf', 'docx', 'txt', 'md'] : ['pdf', 'docx', 'txt', 'md']
+  const extensions =
+   kind === 'srt'
+    ? ['srt']
+    : kind === 'transcript'
+      ? ['docx', 'txt', 'md', 'srt']
+      : kind === 'courseware'
+        ? ['ppt', 'pptx', 'pdf', 'docx', 'txt', 'md']
+        : ['pdf', 'docx', 'txt', 'md']
   const category = kind === 'transcript' ? '语音原文' : kind === 'courseware' ? 'PPT' : '笔记'
   const result = await dialog.showOpenDialog(window, {
    defaultPath: await libraryDirectory(libraryRoot, category, course ? db.course(course).name : undefined),
@@ -323,7 +401,11 @@ async function startApplication() {
      const address = new URL(target)
      return fetch(biliFixture + address.pathname + address.search, {...init, headers, credentials: 'omit'})
     }
-    return ses.fetch(target, {...init, headers, credentials: new URL(target).hostname === 'api.bilibili.com' ? 'include' : 'omit'})
+    return ses.fetch(target, {
+     ...init,
+     headers,
+     credentials: new URL(target).hostname === 'api.bilibili.com' ? 'include' : 'omit'
+    })
    },
    signal
   )
@@ -331,7 +413,13 @@ async function startApplication() {
  const saveBiliSubtitle = async (url: string, title: string, srt: string, selectedCourse: string | undefined) => {
   const parsed = new URL(bilibiliUrl(url))
   parseSrt(srt)
-  const name = parsed.pathname.split('/').filter(Boolean).at(-1) + '-P' + (parsed.searchParams.get('p') || '1') + '-' + folderName(title) + '.srt'
+  const name =
+   parsed.pathname.split('/').filter(Boolean).at(-1) +
+   '-P' +
+   (parsed.searchParams.get('p') || '1') +
+   '-' +
+   folderName(title) +
+   '.srt'
   const path = await reserveFile(await libraryDirectory(libraryRoot, '语音原文', selectedCourse), name)
   try {
    await writeFile(path, srt, 'utf8')
@@ -356,7 +444,9 @@ async function startApplication() {
    // retryable; the existing offline-transcription button is a separate choice.
    const subtitle = await fetchBiliSubtitle(item.url, signal)
    const digest = createHash('sha256').update(subtitle.srt).digest('hex')
-   const prior = (await subtitleSync.list()).flatMap(task => (task.courseName === selectedCourse ? task.items : [])).find(row => row.url === item.url && row.hash === digest && row.path)
+   const prior = (await subtitleSync.list())
+    .flatMap(task => (task.courseName === selectedCourse ? task.items : []))
+    .find(row => row.url === item.url && row.hash === digest && row.path)
    if (prior?.path) {
     try {
      const path = await managedFile(libraryRoot, prior.path)
@@ -378,11 +468,27 @@ async function startApplication() {
    srt: string,
    category: string,
    signal: AbortSignal
-  ) => knowledge.importSubtitle(subtitleLocator(item.url), `P${item.page} · ${item.title}`, srt, category, signal, item.sourceMethod, item.generation)
+  ) =>
+   knowledge.importSubtitle(
+    subtitleLocator(item.url),
+    `P${item.page} · ${item.title}`,
+    srt,
+    category,
+    signal,
+    item.sourceMethod,
+    item.generation
+   )
  })
  const derivedDependencies = {
   generation: (url: string) => knowledge.generation(url),
-  summarize: (srt: string, mode: z.infer<typeof summaryMode>, signal: AbortSignal) => summarizeVideo(srt, mode, (prompt, input, active) => api.json(prompt, input, value => value, active), videoProgress, signal),
+  summarize: (srt: string, mode: z.infer<typeof summaryMode>, signal: AbortSignal) =>
+   summarizeVideo(
+    srt,
+    mode,
+    (prompt, input, active) => api.json(prompt, input, value => value, active),
+    videoProgress,
+    signal
+   ),
   progress: videoProgress
  }
  const context = {
@@ -433,15 +539,28 @@ async function startApplication() {
   zhiyun,
   zhiyunBrowser
  }
- const handlers = [createKnowledgeHandler(context), createCoursewareHandler(context), createResourcesHandler(context), createResearchHandler(context), createStudyHandler(context), createDesktopHandler(context), createCoursesHandler(context), createLearningHandler(context)]
+ const handlers = [
+  createKnowledgeHandler(context),
+  createCoursewareHandler(context),
+  createResourcesHandler(context),
+  createResearchHandler(context),
+  createStudyHandler(context),
+  createDesktopHandler(context),
+  createCoursesHandler(context),
+  createLearningHandler(context)
+ ]
  ipcMain.handle('assistant:invoke', async (event, action: string, args: unknown) => {
-  if (event.sender !== window.webContents || event.senderFrame !== window.webContents.mainFrame) throw new Error('拒绝未知页面请求')
+  if (event.sender !== window.webContents || event.senderFrame !== window.webContents.mainFrame)
+   throw new Error('拒绝未知页面请求')
   const object = z.record(z.string(), z.unknown()).parse(args || {})
   const validated = z.string().min(1).max(100).parse(action)
   try {
    return await dispatch(handlers, validated, object)
   } catch (error) {
-   diagnostic(root, 'ipc', 'request-failed', {action: validated, code: error instanceof z.ZodError ? 'INPUT_INVALID' : jobs.size ? 'TASK_FAILED' : 'REQUEST_FAILED'})
+   diagnostic(root, 'ipc', 'request-failed', {
+    action: validated,
+    code: error instanceof z.ZodError ? 'INPUT_INVALID' : jobs.size ? 'TASK_FAILED' : 'REQUEST_FAILED'
+   })
    throw error
   }
  })

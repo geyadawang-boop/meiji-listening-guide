@@ -1,5 +1,12 @@
 import {useEffect, useState} from 'react'
-type Task = {id: string; source: string; duration: number; output?: string; preparation?: {status: string; error?: string}; frames: {time: number; status: string; text?: string; error?: string}[]}
+type Task = {
+ id: string
+ source: string
+ duration: number
+ output?: string
+ preparation?: {status: string; error?: string}
+ frames: {time: number; status: string; text?: string; error?: string}[]
+}
 const invoke = <T,>(action: string, args?: unknown) => window.assistant.invoke<T>(action, args)
 export function VisualIcon() {
  return (
@@ -45,7 +52,12 @@ export function VisualAnalysis({visible, close}: {visible: boolean; close: () =>
   }
  }
  return (
-  <section className="ppt-extract-page learning-window" aria-label="画面识别" hidden={!visible} style={!visible ? {display: 'none'} : undefined}>
+  <section
+   className="ppt-extract-page learning-window"
+   aria-label="画面识别"
+   hidden={!visible}
+   style={!visible ? {display: 'none'} : undefined}
+  >
    <aside className="learning-menu">
     <h2>画面识别</h2>
     <p>
@@ -63,11 +75,21 @@ export function VisualAnalysis({visible, close}: {visible: boolean; close: () =>
      </div>
     </header>
     <section className="knowledge-card">
-     <p className="hint">先在本机选择图片或视频并提取画面，点击“识别所选画面”才发送画面到当前连接模型。文本模型未必支持图片；失败时保留恢复任务。</p>
+     <p className="hint">
+      先在本机选择图片或视频并提取画面，点击“识别所选画面”才发送画面到当前连接模型。文本模型未必支持图片；失败时保留恢复任务。
+     </p>
      <div className="row">
       <label>
        最多画面数
-       <input aria-label="最多识别画面数" type="number" min={1} max={12} value={cap} disabled={busy} onChange={e => setCap(Number(e.target.value))} />
+       <input
+        aria-label="最多识别画面数"
+        type="number"
+        min={1}
+        max={12}
+        value={cap}
+        disabled={busy}
+        onChange={e => setCap(Number(e.target.value))}
+       />
       </label>
       <label>
        选帧方式

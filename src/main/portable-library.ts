@@ -25,7 +25,8 @@ export async function openPortableLibrary(appDirectory: string, machineRoot: str
   // Only course files/database migrate. Account and settings directories stay on this computer.
   for (const category of categories) {
    const source = join(legacyLibrary, category)
-   if (await exists(source)) await cp(source, join(libraryRoot, category), {recursive: true, force: false, errorOnExist: false})
+   if (await exists(source))
+    await cp(source, join(libraryRoot, category), {recursive: true, force: false, errorOnExist: false})
   }
   const legacyDatabase = join(machineRoot, 'assistant.db')
   if (await exists(legacyDatabase)) {
@@ -60,7 +61,11 @@ export async function openPortableLibrary(appDirectory: string, machineRoot: str
      store.db.prepare('UPDATE course_files SET path=? WHERE id=?').run(path, row.id)
     })
   }
-  for (const row of store.db.prepare('SELECT id,ppt_path,transcript_path FROM lectures').all() as {id: string; ppt_path: string; transcript_path: string}[]) {
+  for (const row of store.db.prepare('SELECT id,ppt_path,transcript_path FROM lectures').all() as {
+   id: string
+   ppt_path: string
+   transcript_path: string
+  }[]) {
    const ppt = await relocate(row.ppt_path),
     transcript = await relocate(row.transcript_path)
    if (ppt !== row.ppt_path || transcript !== row.transcript_path)

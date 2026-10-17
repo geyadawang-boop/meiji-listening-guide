@@ -2,10 +2,19 @@ import {z} from 'zod'
 import type {PracticeQuestion} from '../shared/types'
 import {answerChoices, compareChoices, questionOptions} from '../shared/practice'
 type Source = {url: string; text: string}
-export type AnswerDependencies = {search: (query: string, signal?: AbortSignal) => Promise<Source[]>; json: <T>(system: string, input: unknown, parse: (v: unknown) => T, signal?: AbortSignal) => Promise<T>; progress: (message: string) => void}
+export type AnswerDependencies = {
+ search: (query: string, signal?: AbortSignal) => Promise<Source[]>
+ json: <T>(system: string, input: unknown, parse: (v: unknown) => T, signal?: AbortSignal) => Promise<T>
+ progress: (message: string) => void
+}
 type Dependencies = AnswerDependencies
 const normalize = (text: string) => text.replace(/[\p{P}\p{Z}\s]/gu, '').toLowerCase()
-export async function prepareAnswer(question: PracticeQuestion, course: string, deps: Dependencies, signal?: AbortSignal) {
+export async function prepareAnswer(
+ question: PracticeQuestion,
+ course: string,
+ deps: Dependencies,
+ signal?: AbortSignal
+) {
  const q = {...question}
  if (q.answerSource && q.answer && q.explanation) {
   q.correctOptionKeys = answerChoices(
@@ -32,7 +41,15 @@ export async function prepareAnswer(question: PracticeQuestion, course: string, 
     )
     const source = sources.find(s => s.url === found.sourceUrl),
      stem = normalize(q.stem.split(/\n\s*A[.、．)）:：]/)[0]).slice(0, 60)
-    if (source && found.answer && found.quote.length >= 20 && source.text.includes(found.quote) && stem.length >= 8 && normalize(found.quote).includes(stem) && normalize(found.quote).includes('答案' + normalize(found.answer))) {
+    if (
+     source &&
+     found.answer &&
+     found.quote.length >= 20 &&
+     source.text.includes(found.quote) &&
+     stem.length >= 8 &&
+     normalize(found.quote).includes(stem) &&
+     normalize(found.quote).includes('答案' + normalize(found.answer))
+    ) {
      q.answer = found.answer
      q.explanation = found.explanation
      q.answerSource = 'searched'
@@ -68,8 +85,14 @@ export async function prepareAnswer(question: PracticeQuestion, course: string, 
  return q
 }
 export async function gradeAnswer(q: PracticeQuestion, response: string, deps: Dependencies, signal?: AbortSignal) {
- if (q.correctOptionKeys?.length) return {response, verdict: compareChoices(response, q.correctOptionKeys) ? ('correct' as const) : ('incorrect' as const), feedback: compareChoices(response, q.correctOptionKeys) ? '选项正确。' : '所选选项与参考答案不一致。'}
- if (normalize(response) === normalize(q.answer || '')) return {response, verdict: 'correct' as const, feedback: '回答与参考答案一致。'}
+ if (q.correctOptionKeys?.length)
+  return {
+   response,
+   verdict: compareChoices(response, q.correctOptionKeys) ? ('correct' as const) : ('incorrect' as const),
+   feedback: compareChoices(response, q.correctOptionKeys) ? '选项正确。' : '所选选项与参考答案不一致。'
+  }
+ if (normalize(response) === normalize(q.answer || ''))
+  return {response, verdict: 'correct' as const, feedback: '回答与参考答案一致。'}
  try {
   const schema = z.object({verdict: z.enum(['correct', 'incorrect', 'review']), feedback: z.string().min(1)})
   const result = await deps.json(
@@ -93,15 +116,29 @@ function xmlText(text: string) {
   .replace(/&gt;/g, '>')
   .replace(/&quot;/g, '"')
 }
-export async function searchAnswers(query: string, key: string, fetcher: typeof fetch, signal?: AbortSignal): Promise<Source[]> {
+export async function searchAnswers(
+ query: string,
+ key: string,
+ fetcher: typeof fetch,
+ signal?: AbortSignal
+): Promise<Source[]> {
  const timeout = AbortSignal.any([AbortSignal.timeout(20000), ...(signal ? [signal] : [])])
  if (key) {
-  const response = await fetcher('https://api.tavily.com/search', {method: 'POST', headers: {Authorization: 'Bearer ' + key, 'Content-Type': 'application/json'}, body: JSON.stringify({query, max_results: 5, include_raw_content: true, search_depth: 'basic'}), signal: timeout})
+  const response = await fetcher('https://api.tavily.com/search', {
+   method: 'POST',
+   headers: {Authorization: 'Bearer ' + key, 'Content-Type': 'application/json'},
+   body: JSON.stringify({query, max_results: 5, include_raw_content: true, search_depth: 'basic'}),
+   signal: timeout
+  })
   if (!response.ok) throw new Error('答案搜索暂不可用')
   const data = (await response.json()) as {results: {url: string; raw_content?: string; content: string}[]}
-  return data.results.filter(r => /^https?:\/\//.test(r.url)).map(r => ({url: r.url, text: (r.raw_content || r.content || '').slice(0, 15000)}))
+  return data.results
+   .filter(r => /^https?:\/\//.test(r.url))
+   .map(r => ({url: r.url, text: (r.raw_content || r.content || '').slice(0, 15000)}))
  }
- const response = await fetcher('https://www.bing.com/search?format=rss&q=' + encodeURIComponent(query), {signal: timeout})
+ const response = await fetcher('https://www.bing.com/search?format=rss&q=' + encodeURIComponent(query), {
+  signal: timeout
+ })
  if (!response.ok) throw new Error('答案搜索暂不可用')
  const rss = (await response.text()).slice(0, 150000)
  if (!/<rss\b/.test(rss)) throw new Error('答案搜索暂不可用')

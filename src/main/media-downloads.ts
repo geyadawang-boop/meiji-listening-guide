@@ -5,15 +5,31 @@ import type {BiliResources} from './bili-resources'
 import {backendRequest, BACKEND_PROTOCOL} from '../shared/backend-protocol'
 const apiPaths = ['/x/web-interface/view', '/x/player/wbi/playurl', '/x/player/v2'] as const
 const replySchema = z.discriminatedUnion('kind', [
- z.object({protocol: z.literal(BACKEND_PROTOCOL), kind: z.literal('bili-api'), key: z.number().int().positive(), path: z.enum(apiPaths), params: z.record(z.string(), z.string())}),
- z.object({protocol: z.literal(BACKEND_PROTOCOL), kind: z.literal('result'), id: z.number().int().positive(), ok: z.boolean(), result: z.unknown().optional(), error: z.string().optional()})
+ z.object({
+  protocol: z.literal(BACKEND_PROTOCOL),
+  kind: z.literal('bili-api'),
+  key: z.number().int().positive(),
+  path: z.enum(apiPaths),
+  params: z.record(z.string(), z.string())
+ }),
+ z.object({
+  protocol: z.literal(BACKEND_PROTOCOL),
+  kind: z.literal('result'),
+  id: z.number().int().positive(),
+  ok: z.boolean(),
+  result: z.unknown().optional(),
+  error: z.string().optional()
+ })
 ])
 /** The parent owns platform login; worker receives API data without exported cookie files. */
 export class NativeDownloads {
  private worker: UtilityProcess | undefined
  private sequence = 0
  private disposed = false
- private pending = new Map<number, {resolve: (value: unknown) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout>}>()
+ private pending = new Map<
+  number,
+  {resolve: (value: unknown) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout>}
+ >()
  private apiCalls = new Set<AbortController>()
  constructor(
   private resources: string,
@@ -25,7 +41,11 @@ export class NativeDownloads {
  }
  private start() {
   if (this.worker) return this.worker
-  const worker = utilityProcess.fork(fileURLToPath(new URL('./media-download-worker.js', import.meta.url)), [this.resources, this.root], {stdio: 'pipe', serviceName: '原生媒体下载'})
+  const worker = utilityProcess.fork(
+   fileURLToPath(new URL('./media-download-worker.js', import.meta.url)),
+   [this.resources, this.root],
+   {stdio: 'pipe', serviceName: '原生媒体下载'}
+  )
   this.worker = worker
   worker.stdout?.on('data', () => {})
   worker.stderr?.on('data', () => {})
@@ -49,10 +69,20 @@ export class NativeDownloads {
      const controller = new AbortController()
      this.apiCalls.add(controller)
      try {
-      const data = await this.api.readMedia(reply.path, reply.params, AbortSignal.any([controller.signal, AbortSignal.timeout(40000)]))
+      const data = await this.api.readMedia(
+       reply.path,
+       reply.params,
+       AbortSignal.any([controller.signal, AbortSignal.timeout(40000)])
+      )
       if (this.worker === worker) worker.postMessage({kind: 'bili-result', key: reply.key, ok: true, data})
      } catch (error) {
-      if (this.worker === worker) worker.postMessage({kind: 'bili-result', key: reply.key, ok: false, error: error instanceof Error ? error.message : '站点读取失败'})
+      if (this.worker === worker)
+       worker.postMessage({
+        kind: 'bili-result',
+        key: reply.key,
+        ok: false,
+        error: error instanceof Error ? error.message : '站点读取失败'
+       })
      } finally {
       this.apiCalls.delete(controller)
      }

@@ -30,7 +30,14 @@ export function LearningRail({current, select}: {current: string | null; select:
  return (
   <>
    {learningViews.map(item => (
-    <button key={item.id} title={item.title} aria-label={item.title} aria-current={current === item.id ? 'page' : undefined} className={current === item.id ? 'active' : ''} onClick={() => select(item.id)}>
+    <button
+     key={item.id}
+     title={item.title}
+     aria-label={item.title}
+     aria-current={current === item.id ? 'page' : undefined}
+     className={current === item.id ? 'active' : ''}
+     onClick={() => select(item.id)}
+    >
      <LearningIcon view={item.id} />
     </button>
    ))}

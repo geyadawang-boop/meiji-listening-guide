@@ -11,7 +11,8 @@ export async function managedFile(root: string, path: string) {
  const info = await lstat(target),
   actual = await realpath(target),
   actualRel = relative(base, actual)
- if (info.isSymbolicLink() || !info.isFile() || actualRel.startsWith('..') || isAbsolute(actualRel)) throw new Error('不能操作文件夹、链接或资料目录以外的文件')
+ if (info.isSymbolicLink() || !info.isFile() || actualRel.startsWith('..') || isAbsolute(actualRel))
+  throw new Error('不能操作文件夹、链接或资料目录以外的文件')
  return target
 }
 export async function listLibrary(root: string): Promise<LibraryFile[]> {
@@ -23,7 +24,14 @@ export async function listLibrary(root: string): Promise<LibraryFile[]> {
    if (entry.isDirectory()) await walk(path, category, course || entry.name)
    else if (entry.isFile()) {
     const info = await lstat(path)
-    result.push({path: relative(root, path), name: entry.name, category, course, size: info.size, modified: info.mtime.toISOString()})
+    result.push({
+     path: relative(root, path),
+     name: entry.name,
+     category,
+     course,
+     size: info.size,
+     modified: info.mtime.toISOString()
+    })
    }
   }
  }

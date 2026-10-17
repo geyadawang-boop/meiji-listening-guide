@@ -18,5 +18,10 @@ export function courseLabel(name: string): string {
  return year ? `${year} · ${courseSubject(name)}` : name
 }
 export function sortCoursesForNavigation(courses: Course[]): Course[] {
- return [...courses].sort((a, b) => courseYear(b.name).localeCompare(courseYear(a.name)) || a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id))
+ return [...courses].sort(
+  (a, b) =>
+   courseYear(b.name).localeCompare(courseYear(a.name)) ||
+   a.created_at.localeCompare(b.created_at) ||
+   a.id.localeCompare(b.id)
+ )
 }

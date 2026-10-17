@@ -3,7 +3,17 @@ import {reasoningOptions} from '../../shared/reasoning'
 import type {Settings} from '../../shared/types'
 
 // Model/parameter tabs and draft confirmation follow ElecKoi ModelPicker (AGPL-3.0).
-export function ChatModelPicker({settings, busy, save, close}: {settings: Settings; busy: boolean; save: (value: Settings) => Promise<boolean>; close: () => void}) {
+export function ChatModelPicker({
+ settings,
+ busy,
+ save,
+ close
+}: {
+ settings: Settings
+ busy: boolean
+ save: (value: Settings) => Promise<boolean>
+ close: () => void
+}) {
  const [draft, setDraft] = useState(settings),
   [tab, setTab] = useState<'models' | 'parameters'>('models'),
   [query, setQuery] = useState('')
@@ -17,11 +27,25 @@ export function ChatModelPicker({settings, busy, save, close}: {settings: Settin
   return () => previous?.focus()
  }, [])
  function choose(id: string, model?: string) {
-  setDraft(d => ({...d, activeProfile: id, profiles: d.profiles.map(p => (p.id === id ? {...p, model: model ?? p.model} : p))}))
+  setDraft(d => ({
+   ...d,
+   activeProfile: id,
+   profiles: d.profiles.map(p => (p.id === id ? {...p, model: model ?? p.model} : p))
+  }))
  }
  function reasoning(value: string) {
   if (!profile) return
-  setDraft(d => ({...d, profiles: d.profiles.map(p => (p.id === profile.id ? {...p, parameters: {...p.parameters, [p.model]: {...p.parameters?.[p.model], reasoningEffort: value || undefined}}} : p))}))
+  setDraft(d => ({
+   ...d,
+   profiles: d.profiles.map(p =>
+    p.id === profile.id
+     ? {
+        ...p,
+        parameters: {...p.parameters, [p.model]: {...p.parameters?.[p.model], reasoningEffort: value || undefined}}
+       }
+     : p
+   )
+  }))
  }
  function key(event: React.KeyboardEvent) {
   if (event.key === 'Escape' && !busy) {
@@ -49,7 +73,15 @@ export function ChatModelPicker({settings, busy, save, close}: {settings: Settin
     if (e.target === e.currentTarget && !busy) close()
    }}
   >
-   <section className="chat-model-panel" ref={panel} tabIndex={-1} role="dialog" aria-modal="true" aria-label="模型设置" onKeyDown={key}>
+   <section
+    className="chat-model-panel"
+    ref={panel}
+    tabIndex={-1}
+    role="dialog"
+    aria-modal="true"
+    aria-label="模型设置"
+    onKeyDown={key}
+   >
     <header>
      <div className="chat-model-title">
       <strong>模型设置</strong>
@@ -71,7 +103,13 @@ export function ChatModelPicker({settings, busy, save, close}: {settings: Settin
      <div className="chat-model-browser">
       <div className="chat-model-configs">
        {draft.profiles.map(p => (
-        <button type="button" key={p.id} aria-pressed={p.id === draft.activeProfile} disabled={busy} onClick={() => choose(p.id)}>
+        <button
+         type="button"
+         key={p.id}
+         aria-pressed={p.id === draft.activeProfile}
+         disabled={busy}
+         onClick={() => choose(p.id)}
+        >
          <span className="model-choice-dot" />
          <span>
           <strong>{p.name}</strong>
@@ -86,7 +124,13 @@ export function ChatModelPicker({settings, busy, save, close}: {settings: Settin
         {[...new Set(profile ? [profile.model, ...(profile.models || [])] : [])]
          .filter(m => m && m.toLowerCase().includes(query.toLowerCase()))
          .map(m => (
-          <button type="button" key={m} aria-pressed={m === profile?.model} disabled={busy} onClick={() => profile && choose(profile.id, m)}>
+          <button
+           type="button"
+           key={m}
+           aria-pressed={m === profile?.model}
+           disabled={busy}
+           onClick={() => profile && choose(profile.id, m)}
+          >
            <span className="model-choice-dot" />
            {m}
           </button>
@@ -102,7 +146,12 @@ export function ChatModelPicker({settings, busy, save, close}: {settings: Settin
       </div>
       <label>
        推理强度
-       <select aria-label="对话推理强度" disabled={busy || !profile} value={effort} onChange={e => reasoning(e.target.value)}>
+       <select
+        aria-label="对话推理强度"
+        disabled={busy || !profile}
+        value={effort}
+        onChange={e => reasoning(e.target.value)}
+       >
         {reasoningOptions.map(o => (
          <option key={o.value} value={o.value}>
           {o.label}

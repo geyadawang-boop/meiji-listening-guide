@@ -1,9 +1,44 @@
 import {useState} from 'react'
 const invoke = <T,>(action: string, args?: unknown) => window.assistant.invoke<T>(action, args)
-type Item = {id: string; text: string; labels: string[]; selected: boolean; author?: string; url: string; time_sec?: number; root_id?: string; parent_id?: string; note?: string}
-type Pack = {ref: string; items: Item[]; coverage: {comments: {status: string; root_pages?: number}; danmaku: {status: string; segments_requested?: number[]; segments_total?: number}}}
-const coverageLabel = (status: string) => (({complete: '本次范围已取得', partial: '部分取得', empty: '当前范围无记录', failed: '未取得', unknown: '范围尚未确认', unavailable: '暂不可用'}) as Record<string, string>)[status] || '范围需要核对'
-const labels: Record<string, string> = {correction: '纠错候选', alternative: '不同观点', counterexample: '反例候选', supplement: '补充资料', marker: '内容标识', discussion: '一般讨论'}
+type Item = {
+ id: string
+ text: string
+ labels: string[]
+ selected: boolean
+ author?: string
+ url: string
+ time_sec?: number
+ root_id?: string
+ parent_id?: string
+ note?: string
+}
+type Pack = {
+ ref: string
+ items: Item[]
+ coverage: {
+  comments: {status: string; root_pages?: number}
+  danmaku: {status: string; segments_requested?: number[]; segments_total?: number}
+ }
+}
+const coverageLabel = (status: string) =>
+ (
+  ({
+   complete: '本次范围已取得',
+   partial: '部分取得',
+   empty: '当前范围无记录',
+   failed: '未取得',
+   unknown: '范围尚未确认',
+   unavailable: '暂不可用'
+  }) as Record<string, string>
+ )[status] || '范围需要核对'
+const labels: Record<string, string> = {
+ correction: '纠错候选',
+ alternative: '不同观点',
+ counterexample: '反例候选',
+ supplement: '补充资料',
+ marker: '内容标识',
+ discussion: '一般讨论'
+}
 export function Discussion() {
  const [url, setUrl] = useState(''),
   [pages, setPages] = useState(2),
@@ -26,7 +61,10 @@ export function Discussion() {
   }
  }
  function change(id: string, key: string, value: unknown) {
-  setPack(current => current && {...current, items: current.items.map(item => (item.id === id ? {...item, [key]: value} : item))})
+  setPack(
+   current =>
+    current && {...current, items: current.items.map(item => (item.id === id ? {...item, [key]: value} : item))}
+  )
  }
  return (
   <section className="knowledge-card" aria-label="评论与弹幕">
@@ -49,7 +87,15 @@ export function Discussion() {
     />
     <label>
      评论页数
-     <input aria-label="评论页数" type="number" min={1} max={10} value={pages} disabled={busy} onChange={e => setPages(Number(e.target.value))} />
+     <input
+      aria-label="评论页数"
+      type="number"
+      min={1}
+      max={10}
+      value={pages}
+      disabled={busy}
+      onChange={e => setPages(Number(e.target.value))}
+     />
     </label>
     <button
      disabled={busy || !url.trim()}
@@ -66,8 +112,12 @@ export function Discussion() {
     <>
      <p className="hint">
       评论：{coverageLabel(pack.coverage.comments.status)}
-      {pack.coverage.comments.root_pages != null ? `（${pack.coverage.comments.root_pages} 页）` : ''} · 弹幕：{coverageLabel(pack.coverage.danmaku.status)}
-      {pack.coverage.danmaku.segments_total ? `（采集 ${pack.coverage.danmaku.segments_requested?.length || 0}/${pack.coverage.danmaku.segments_total} 个时段）` : ''} · 共 {pack.items.length} 条。采集有页数和时段上限，不能当作所有历史讨论。
+      {pack.coverage.comments.root_pages != null ? `（${pack.coverage.comments.root_pages} 页）` : ''} · 弹幕：
+      {coverageLabel(pack.coverage.danmaku.status)}
+      {pack.coverage.danmaku.segments_total
+       ? `（采集 ${pack.coverage.danmaku.segments_requested?.length || 0}/${pack.coverage.danmaku.segments_total} 个时段）`
+       : ''}{' '}
+      · 共 {pack.items.length} 条。采集有页数和时段上限，不能当作所有历史讨论。
      </p>
      <div className="row">
       <input aria-label="筛选讨论" placeholder="筛选文字" value={filter} onChange={e => setFilter(e.target.value)} />
@@ -79,7 +129,13 @@ export function Discussion() {
        .map(item => (
         <article className="batch-item" key={item.id}>
          <label className="media-switch">
-          <input disabled={busy} type="checkbox" aria-label={`保留 ${item.id}`} checked={item.selected} onChange={e => change(item.id, 'selected', e.target.checked)} />
+          <input
+           disabled={busy}
+           type="checkbox"
+           aria-label={`保留 ${item.id}`}
+           checked={item.selected}
+           onChange={e => change(item.id, 'selected', e.target.checked)}
+          />
           <strong>
            {item.author || '观众讨论'}{' '}
            {item.time_sec != null
@@ -95,14 +151,26 @@ export function Discussion() {
           {item.parent_id ? ` · 回复 ${item.parent_id}` : ''}
          </p>
          <div className="row">
-          <select aria-label={`分类 ${item.id}`} disabled={busy} value={item.labels[0]} onChange={e => change(item.id, 'labels', [e.target.value])}>
+          <select
+           aria-label={`分类 ${item.id}`}
+           disabled={busy}
+           value={item.labels[0]}
+           onChange={e => change(item.id, 'labels', [e.target.value])}
+          >
            {Object.entries(labels).map(([key, label]) => (
             <option key={key} value={key}>
              {label}
             </option>
            ))}
           </select>
-          <input aria-label={`备注 ${item.id}`} placeholder="核对备注" maxLength={500} value={item.note || ''} disabled={busy} onChange={e => change(item.id, 'note', e.target.value)} />
+          <input
+           aria-label={`备注 ${item.id}`}
+           placeholder="核对备注"
+           maxLength={500}
+           value={item.note || ''}
+           disabled={busy}
+           onChange={e => change(item.id, 'note', e.target.value)}
+          />
          </div>
         </article>
        ))}
@@ -112,7 +180,16 @@ export function Discussion() {
       disabled={busy || !pack.items.some(item => item.selected)}
       onClick={() =>
        void run(async () => {
-        const result = await invoke<{path: string}>('media:discussion-import', {ref: pack.ref, category, changes: pack.items.map(item => ({id: item.id, selected: item.selected, label: item.labels[0], note: item.note || ''}))})
+        const result = await invoke<{path: string}>('media:discussion-import', {
+         ref: pack.ref,
+         category,
+         changes: pack.items.map(item => ({
+          id: item.id,
+          selected: item.selected,
+          label: item.labels[0],
+          note: item.note || ''
+         }))
+        })
         setNotice(`所选讨论已保存并导入知识库：${result.path}`)
         setPack(null)
        })

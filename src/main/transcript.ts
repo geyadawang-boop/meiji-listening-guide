@@ -22,7 +22,9 @@ export function splitTranscript(text: string) {
  const rows: {text: string; stamp: number | null}[] = []
  for (const block of blocks) {
   const match = /^(?:\[|【)?(\d{1,2}:\d{2}(?::\d{2})?)(?:\]|】)?\s*[:：]?\s*(.*)$/.exec(block)
-  const stamp = match ? milliseconds(match[1].split(':').length === 2 ? '00:' + match[1].padStart(5, '0') : match[1].padStart(8, '0')) : null
+  const stamp = match
+   ? milliseconds(match[1].split(':').length === 2 ? '00:' + match[1].padStart(5, '0') : match[1].padStart(8, '0'))
+   : null
   const value = match ? match[2] : block
   if (value) rows.push({text: value, stamp})
   else if (stamp !== null) rows.push({text: '', stamp})

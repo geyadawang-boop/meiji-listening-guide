@@ -1,7 +1,17 @@
 import {useEffect, useState} from 'react'
 import type {Course, LibraryFile} from '../../shared/types'
 import {FolderNavIcon, TrashIcon} from './ManagementIcons'
-export function FileManager({busy, close, changed, initialCourse = '全部课程'}: {initialCourse?: string; busy: boolean; close: () => void; changed: () => Promise<unknown>}) {
+export function FileManager({
+ busy,
+ close,
+ changed,
+ initialCourse = '全部课程'
+}: {
+ initialCourse?: string
+ busy: boolean
+ close: () => void
+ changed: () => Promise<unknown>
+}) {
  const [files, setFiles] = useState<LibraryFile[]>([]),
   [filter, setFilter] = useState('全部'),
   [search, setSearch] = useState(''),
@@ -13,7 +23,10 @@ export function FileManager({busy, close, changed, initialCourse = '全部课程
   [creating, setCreating] = useState(false),
   [name, setName] = useState('')
  async function load() {
-  const [f, c] = await Promise.all([window.assistant.invoke<LibraryFile[]>('library:list'), window.assistant.invoke<Course[]>('courses')])
+  const [f, c] = await Promise.all([
+   window.assistant.invoke<LibraryFile[]>('library:list'),
+   window.assistant.invoke<Course[]>('courses')
+  ])
   setFiles(f)
   setCourses(c)
  }
@@ -54,7 +67,9 @@ export function FileManager({busy, close, changed, initialCourse = '全部课程
  }
  const courseNames = [...new Set([...courses.map(c => c.name), ...files.map(f => f.course).filter(Boolean)])]
  const selectedFiles = files.filter(f => course === '全部课程' || f.course === course)
- const visible = selectedFiles.filter(f => (filter === '全部' || f.category === filter) && `${f.name} ${f.course}`.includes(search))
+ const visible = selectedFiles.filter(
+  f => (filter === '全部' || f.category === filter) && `${f.name} ${f.course}`.includes(search)
+ )
  return (
   <section className="file-management" role="dialog" aria-label="文件管理">
    <header>
@@ -81,7 +96,13 @@ export function FileManager({busy, close, changed, initialCourse = '全部课程
       void create()
      }}
     >
-     <input autoFocus aria-label="新课程名称" placeholder="输入课程名称" value={name} onChange={e => setName(e.target.value)} />
+     <input
+      autoFocus
+      aria-label="新课程名称"
+      placeholder="输入课程名称"
+      value={name}
+      onChange={e => setName(e.target.value)}
+     />
      <button className="primary" disabled={working || !name.trim()}>
       创建
      </button>
@@ -102,7 +123,12 @@ export function FileManager({busy, close, changed, initialCourse = '全部课程
     ))}
    </nav>
    <div className="file-management-tools">
-    <input aria-label="搜索资料文件" placeholder="搜索文件或课程…" value={search} onChange={e => setSearch(e.target.value)} />
+    <input
+     aria-label="搜索资料文件"
+     placeholder="搜索文件或课程…"
+     value={search}
+     onChange={e => setSearch(e.target.value)}
+    />
     <button onClick={() => void load().catch(e => setError(String(e)))}>刷新</button>
     <button onClick={() => void window.assistant.invoke('library:open')}>打开资料文件夹</button>
    </div>
@@ -128,12 +154,26 @@ export function FileManager({busy, close, changed, initialCourse = '全部课程
        </small>
       </div>
       {/\.(pdf|pptx?|docx?|txt|md|srt)$/i.test(f.name) && (
-       <button aria-label={`打开文件 ${f.name}`} onClick={() => void window.assistant.invoke('library:open-file', {path: f.path}).catch(e => setError(String(e)))}>
+       <button
+        aria-label={`打开文件 ${f.name}`}
+        onClick={() =>
+         void window.assistant.invoke('library:open-file', {path: f.path}).catch(e => setError(String(e)))
+        }
+       >
         {/\.pdf$/i.test(f.name) ? '打开 PDF' : '打开'}
        </button>
       )}
-      <button onClick={() => void window.assistant.invoke('library:reveal', {path: f.path}).catch(e => setError(String(e)))}>定位</button>
-      <button className="icon-danger" aria-label={`删除文件 ${f.name}`} disabled={busy || working} onClick={() => setPending(f)}>
+      <button
+       onClick={() => void window.assistant.invoke('library:reveal', {path: f.path}).catch(e => setError(String(e)))}
+      >
+       定位
+      </button>
+      <button
+       className="icon-danger"
+       aria-label={`删除文件 ${f.name}`}
+       disabled={busy || working}
+       onClick={() => setPending(f)}
+      >
        <TrashIcon />
       </button>
      </article>

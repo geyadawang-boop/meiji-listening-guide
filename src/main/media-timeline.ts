@@ -1,9 +1,17 @@
 export type MediaInterval = {start: number; end: number}
 export function checkedMediaIntervals(ranges: MediaInterval[], duration: number) {
- if (!Number.isFinite(duration) || duration <= 0 || ranges.length === 0 || ranges.length > 201) throw new Error('媒体保留时间范围无效')
+ if (!Number.isFinite(duration) || duration <= 0 || ranges.length === 0 || ranges.length > 201)
+  throw new Error('媒体保留时间范围无效')
  let end = 0
  return ranges.map(range => {
-  if (!Number.isFinite(range.start) || !Number.isFinite(range.end) || range.start < end || range.end <= range.start || range.end > duration + 0.001) throw new Error('媒体保留时间范围越界或重叠')
+  if (
+   !Number.isFinite(range.start) ||
+   !Number.isFinite(range.end) ||
+   range.start < end ||
+   range.end <= range.start ||
+   range.end > duration + 0.001
+  )
+   throw new Error('媒体保留时间范围越界或重叠')
   end = range.end
   return {...range}
  })

@@ -6,7 +6,10 @@ import {NativeWindowsJob} from './windows-native'
 export class NativeWeixinLocal {
  private worker: ChildProcess | undefined
  private job: NativeWindowsJob | undefined
- private pending = new Map<number, {resolve: (value: unknown) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout>}>()
+ private pending = new Map<
+  number,
+  {resolve: (value: unknown) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout>}
+ >()
  private sequence = 0
  private closed = false
  private fail = () => {
@@ -24,7 +27,13 @@ export class NativeWeixinLocal {
   if (this.closed) throw new Error('本机微信读取后台已关闭')
   if (this.worker) return this.worker
   const job = new NativeWindowsJob(),
-   worker = fork(fileURLToPath(new URL('./im-weixin-local-worker.js', import.meta.url)), [], {execPath: process.execPath, execArgv: [], env: {...process.env, ELECTRON_RUN_AS_NODE: '1'}, silent: true, windowsHide: true})
+   worker = fork(fileURLToPath(new URL('./im-weixin-local-worker.js', import.meta.url)), [], {
+    execPath: process.execPath,
+    execArgv: [],
+    env: {...process.env, ELECTRON_RUN_AS_NODE: '1'},
+    silent: true,
+    windowsHide: true
+   })
   this.job = job
   this.worker = worker
   worker.stdout?.on('data', () => {})
@@ -44,7 +53,14 @@ export class NativeWeixinLocal {
   }
   worker.on('message', (raw: unknown) => {
    try {
-    const value = z.object({id: z.number().int().positive(), ok: z.boolean(), result: z.unknown().optional(), error: z.string().max(1000).optional()}).parse(raw),
+    const value = z
+      .object({
+       id: z.number().int().positive(),
+       ok: z.boolean(),
+       result: z.unknown().optional(),
+       error: z.string().max(1000).optional()
+      })
+      .parse(raw),
      item = this.pending.get(value.id)
     if (!item) return
     this.pending.delete(value.id)

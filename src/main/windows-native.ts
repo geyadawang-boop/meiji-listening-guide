@@ -7,9 +7,30 @@ function createApi() {
   crypt = koffi.load('crypt32.dll'),
   pointer = koffi.pointer('void')
  const blob = koffi.struct({size: 'uint32_t', data: pointer})
- const basic = koffi.struct({processTime: 'int64_t', jobTime: 'int64_t', flags: 'uint32_t', minSet: 'size_t', maxSet: 'size_t', active: 'uint32_t', affinity: 'size_t', priority: 'uint32_t', scheduling: 'uint32_t'})
- const io = koffi.struct(Object.fromEntries(['readOps', 'writeOps', 'otherOps', 'readBytes', 'writeBytes', 'otherBytes'].map(name => [name, 'uint64_t'])))
- const limits = koffi.struct({basic, io, processMemory: 'size_t', jobMemory: 'size_t', peakProcess: 'size_t', peakJob: 'size_t'})
+ const basic = koffi.struct({
+  processTime: 'int64_t',
+  jobTime: 'int64_t',
+  flags: 'uint32_t',
+  minSet: 'size_t',
+  maxSet: 'size_t',
+  active: 'uint32_t',
+  affinity: 'size_t',
+  priority: 'uint32_t',
+  scheduling: 'uint32_t'
+ })
+ const io = koffi.struct(
+  Object.fromEntries(
+   ['readOps', 'writeOps', 'otherOps', 'readBytes', 'writeBytes', 'otherBytes'].map(name => [name, 'uint64_t'])
+  )
+ )
+ const limits = koffi.struct({
+  basic,
+  io,
+  processMemory: 'size_t',
+  jobMemory: 'size_t',
+  peakProcess: 'size_t',
+  peakJob: 'size_t'
+ })
  const security = koffi.struct({size: 'uint32_t', descriptor: pointer, inherit: 'int32_t'})
  const startup = koffi.struct({
   cb: 'uint32_t',
@@ -33,25 +54,74 @@ function createApi() {
  })
  const startupEx = koffi.struct({startup, attributes: pointer}),
   info = koffi.struct({process: pointer, thread: pointer, pid: 'uint32_t', tid: 'uint32_t'})
- const fn = (name: string, result: string, args: Parameters<typeof kernel.func>[3]) => kernel.func('__stdcall', name, result, args)
+ const fn = (name: string, result: string, args: Parameters<typeof kernel.func>[3]) =>
+  kernel.func('__stdcall', name, result, args)
  return {
   blob,
   limits,
   security,
   startupEx,
   info,
-  protect: crypt.func('__stdcall', 'CryptProtectData', 'int32_t', [koffi.pointer(blob), pointer, pointer, pointer, pointer, 'uint32_t', koffi.out(koffi.pointer(blob))]),
-  unprotect: crypt.func('__stdcall', 'CryptUnprotectData', 'int32_t', [koffi.pointer(blob), pointer, pointer, pointer, pointer, 'uint32_t', koffi.out(koffi.pointer(blob))]),
+  protect: crypt.func('__stdcall', 'CryptProtectData', 'int32_t', [
+   koffi.pointer(blob),
+   pointer,
+   pointer,
+   pointer,
+   pointer,
+   'uint32_t',
+   koffi.out(koffi.pointer(blob))
+  ]),
+  unprotect: crypt.func('__stdcall', 'CryptUnprotectData', 'int32_t', [
+   koffi.pointer(blob),
+   pointer,
+   pointer,
+   pointer,
+   pointer,
+   'uint32_t',
+   koffi.out(koffi.pointer(blob))
+  ]),
   localFree: fn('LocalFree', 'void *', [pointer]),
   lastError: fn('GetLastError', 'uint32_t', []),
   close: fn('CloseHandle', 'int32_t', [pointer]),
   createJob: fn('CreateJobObjectW', 'void *', [pointer, 'str16']),
   setJob: fn('SetInformationJobObject', 'int32_t', [pointer, 'int32_t', koffi.pointer(limits), 'uint32_t']),
-  initAttributes: fn('InitializeProcThreadAttributeList', 'int32_t', [pointer, 'uint32_t', 'uint32_t', koffi.inout(koffi.pointer('size_t'))]),
-  updateAttributes: fn('UpdateProcThreadAttribute', 'int32_t', [pointer, 'uint32_t', 'size_t', pointer, 'size_t', pointer, pointer]),
+  initAttributes: fn('InitializeProcThreadAttributeList', 'int32_t', [
+   pointer,
+   'uint32_t',
+   'uint32_t',
+   koffi.inout(koffi.pointer('size_t'))
+  ]),
+  updateAttributes: fn('UpdateProcThreadAttribute', 'int32_t', [
+   pointer,
+   'uint32_t',
+   'size_t',
+   pointer,
+   'size_t',
+   pointer,
+   pointer
+  ]),
   deleteAttributes: fn('DeleteProcThreadAttributeList', 'void', [pointer]),
-  createFile: fn('CreateFileW', 'void *', ['str16', 'uint32_t', 'uint32_t', koffi.pointer(security), 'uint32_t', 'uint32_t', pointer]),
-  createProcess: fn('CreateProcessW', 'int32_t', ['str16', pointer, pointer, pointer, 'int32_t', 'uint32_t', pointer, 'str16', koffi.pointer(startupEx), koffi.out(koffi.pointer(info))]),
+  createFile: fn('CreateFileW', 'void *', [
+   'str16',
+   'uint32_t',
+   'uint32_t',
+   koffi.pointer(security),
+   'uint32_t',
+   'uint32_t',
+   pointer
+  ]),
+  createProcess: fn('CreateProcessW', 'int32_t', [
+   'str16',
+   pointer,
+   pointer,
+   pointer,
+   'int32_t',
+   'uint32_t',
+   pointer,
+   'str16',
+   koffi.pointer(startupEx),
+   koffi.out(koffi.pointer(info))
+  ]),
   open: fn('OpenProcess', 'void *', ['uint32_t', 'int32_t', 'uint32_t']),
   assignJob: fn('AssignProcessToJobObject', 'int32_t', [pointer, pointer]),
   wait: fn('WaitForSingleObject', 'uint32_t', [pointer, 'uint32_t']),
@@ -72,7 +142,8 @@ export function windowsProtect(raw: Buffer, decrypt = false) {
   output: {size?: number; data?: bigint} = {}
  checked((decrypt ? a.unprotect : a.protect)({size: raw.length, data: raw}, null, null, null, null, 1, output))
  try {
-  if (!output.data || !Number.isSafeInteger(output.size) || output.size! < 0 || output.size! > 16 * 1024 * 1024) throw new Error('系统加密输出无效')
+  if (!output.data || !Number.isSafeInteger(output.size) || output.size! < 0 || output.size! > 16 * 1024 * 1024)
+   throw new Error('系统加密输出无效')
   return Buffer.from(koffi.decode(output.data, 'uint8_t', output.size!))
  } finally {
   if (output.data) a.localFree(output.data)
@@ -80,7 +151,9 @@ export function windowsProtect(raw: Buffer, decrypt = false) {
 }
 export function windowsArgument(input: string) {
  if (input.includes('\0')) throw new Error('进程参数包含空字符')
- return !input || /[\s"]/.test(input) ? '"' + input.replace(/(\\*)"/g, '$1$1\\"').replace(/(\\+)$/, '$1$1') + '"' : input
+ return !input || /[\s"]/.test(input)
+  ? '"' + input.replace(/(\\*)"/g, '$1$1\\"').replace(/(\\+)$/, '$1$1') + '"'
+  : input
 }
 /** Atomic Windows Job membership before the child runs. Closing the handle also stops descendants. */
 export class NativeWindowsJob {
@@ -109,7 +182,8 @@ export class NativeWindowsJob {
  }
  spawn(args: string[], cwd: string, environment: Record<string, string | undefined>) {
   const a = api()
-  if (!this.handle || !args.length || !isAbsolute(args[0]) || !isAbsolute(cwd)) throw new Error('进程所属任务已关闭或路径无效')
+  if (!this.handle || !args.length || !isAbsolute(args[0]) || !isAbsolute(cwd))
+   throw new Error('进程所属任务已关闭或路径无效')
   const size = [0]
   a.initAttributes(null, 2, 0, size)
   if (!size[0] || size[0] > 1048576) throw new Error('Windows 进程属性大小无效')
@@ -121,7 +195,15 @@ export class NativeWindowsJob {
    const job = Buffer.alloc(8)
    job.writeBigUInt64LE(this.handle)
    checked(a.updateAttributes(attributes, 0, 0x2000d, job, 8, null, null))
-   nul = a.createFile('NUL', 0xc0000000, 3, {size: koffi.sizeof(a.security), descriptor: null, inherit: 1}, 3, 0, null) as bigint
+   nul = a.createFile(
+    'NUL',
+    0xc0000000,
+    3,
+    {size: koffi.sizeof(a.security), descriptor: null, inherit: 1},
+    3,
+    0,
+    null
+   ) as bigint
    if (!nul || nul === 0xffffffffffffffffn) throw new Error('Windows 空设备句柄创建失败')
    const handles = Buffer.alloc(8)
    handles.writeBigUInt64LE(nul)
@@ -138,7 +220,20 @@ export class NativeWindowsJob {
       .join('\0') + '\0\0',
      'utf16le'
     )
-   checked(a.createProcess(args[0], command, null, null, 1, 0x00080000 | 0x08000000 | 0x00000400, env, cwd, {startup: {cb: koffi.sizeof(a.startupEx), flags: 0x100, stdin: nul, stdout: nul, stderr: nul}, attributes}, info))
+   checked(
+    a.createProcess(
+     args[0],
+     command,
+     null,
+     null,
+     1,
+     0x00080000 | 0x08000000 | 0x00000400,
+     env,
+     cwd,
+     {startup: {cb: koffi.sizeof(a.startupEx), flags: 0x100, stdin: nul, stdout: nul, stderr: nul}, attributes},
+     info
+    )
+   )
    this.processes.add(info.process!)
    a.close(info.thread!)
    const handle = info.process!,

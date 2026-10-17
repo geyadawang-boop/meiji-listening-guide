@@ -14,25 +14,49 @@ const recordSchema = z.object({
  title: z.string().max(1000),
  state: z.enum(['queued', 'running', 'interrupted', 'cancelled', 'error', 'completed', 'forgotten']),
  stage: z.string().optional(),
- progress: z.object({downloaded: z.number().finite().nonnegative().optional(), total: z.number().finite().nonnegative().optional()}).default({}),
+ progress: z
+  .object({
+   downloaded: z.number().finite().nonnegative().optional(),
+   total: z.number().finite().nonnegative().optional()
+  })
+  .default({}),
  error: z.string().default(''),
  warning: z.string().default(''),
- source: z.object({url: z.string().url(), storage_id: z.string().regex(/^[A-Za-z0-9_-]{3,64}$/), bvid: z.string().optional(), cid: z.number().int().positive().safe().optional(), page: z.number().int().positive().optional()}),
+ source: z.object({
+  url: z.string().url(),
+  storage_id: z.string().regex(/^[A-Za-z0-9_-]{3,64}$/),
+  bvid: z.string().optional(),
+  cid: z.number().int().positive().safe().optional(),
+  page: z.number().int().positive().optional()
+ }),
  options: z.unknown(),
  download_root: z.string(),
  output: z.string().default(''),
  files: z.array(z.string()).default([])
 })
 export type LegacyDownloadRecord = z.infer<typeof recordSchema> & {recordHash: string}
-const mediaExtensions = {video: ['.mp4', '.mkv', '.flv', '.webm', '.m4v', '.mov', '.ts'], audio: ['.m4a', '.mp3', '.aac', '.flac', '.ogg', '.opus', '.wav'], subtitle: ['.srt', '.vtt', '.ass', '.ssa', '.lrc', '.ttml', '.srv3', '.json3']}
-const manifestSchema = z.object({schema_version: z.literal(2), managed_by: z.literal('bilisum'), bvid: z.string(), ownership_id: id, download_root: z.string(), directory: z.string(), media_kind: z.enum(['video', 'audio', 'subtitle']).default('video')})
+const mediaExtensions = {
+ video: ['.mp4', '.mkv', '.flv', '.webm', '.m4v', '.mov', '.ts'],
+ audio: ['.m4a', '.mp3', '.aac', '.flac', '.ogg', '.opus', '.wav'],
+ subtitle: ['.srt', '.vtt', '.ass', '.ssa', '.lrc', '.ttml', '.srv3', '.json3']
+}
+const manifestSchema = z.object({
+ schema_version: z.literal(2),
+ managed_by: z.literal('bilisum'),
+ bvid: z.string(),
+ ownership_id: id,
+ download_root: z.string(),
+ directory: z.string(),
+ media_kind: z.enum(['video', 'audio', 'subtitle']).default('video')
+})
 async function canonical(path: string) {
  return resolve(await realpath(path)).toLowerCase()
 }
 async function checkedDirectory(path: string) {
  const target = resolve(path),
   info = await lstat(target)
- if (!info.isDirectory() || info.isSymbolicLink() || (await canonical(target)) !== target.toLowerCase()) throw new Error('旧下载目录含链接或路径已改变')
+ if (!info.isDirectory() || info.isSymbolicLink() || (await canonical(target)) !== target.toLowerCase())
+  throw new Error('旧下载目录含链接或路径已改变')
  return target
 }
 async function jsonFile(path: string, max = 1024 * 1024) {
@@ -113,7 +137,18 @@ export class LegacyDownloads {
      files: row.files
     })
    } catch {
-    rows.push({id: entry.name, title: '无法读取的旧下载任务', state: 'error', stage: '保留原始记录', progress: {}, error_message: '旧任务记录无法核对，未改写或删除；请检查记录来源和格式', warning: '', source_url: '', output: '', files: []})
+    rows.push({
+     id: entry.name,
+     title: '无法读取的旧下载任务',
+     state: 'error',
+     stage: '保留原始记录',
+     progress: {},
+     error_message: '旧任务记录无法核对，未改写或删除；请检查记录来源和格式',
+     warning: '',
+     source_url: '',
+     output: '',
+     files: []
+    })
    }
   }
   return rows
@@ -123,7 +158,8 @@ export class LegacyDownloads {
  }
  async file(value: string) {
   const row = await this.read(value)
-  if (row.state !== 'completed' || !isAbsolute(row.download_root) || !isAbsolute(row.output)) throw new Error('旧任务尚无可确认成果')
+  if (row.state !== 'completed' || !isAbsolute(row.download_root) || !isAbsolute(row.output))
+   throw new Error('旧任务尚无可确认成果')
   const root = await checkedDirectory(row.download_root),
    directory = await checkedDirectory(row.output)
   if (dirname(directory).toLowerCase() !== root.toLowerCase()) throw new Error('旧成果不属于声明的下载目录')
@@ -131,7 +167,13 @@ export class LegacyDownloads {
    manifest = manifestSchema.parse(marker.value),
    name = basename(directory).toLowerCase(),
    storage = row.source.storage_id.toLowerCase()
-  if (manifest.bvid !== row.source.storage_id || manifest.download_root !== (await canonical(root)) || manifest.directory !== (await canonical(directory)) || !(name === storage || name.endsWith('_' + storage))) throw new Error('旧下载成果所有权标记不匹配')
+  if (
+   manifest.bvid !== row.source.storage_id ||
+   manifest.download_root !== (await canonical(root)) ||
+   manifest.directory !== (await canonical(directory)) ||
+   !(name === storage || name.endsWith('_' + storage))
+  )
+   throw new Error('旧下载成果所有权标记不匹配')
   let primary = false
   for (const entry of await readdir(directory, {withFileTypes: true})) {
    if (entry.isSymbolicLink() || !entry.isFile()) throw new Error('旧成果包含未确认文件或链接')
@@ -141,17 +183,30 @@ export class LegacyDownloads {
   }
   if (!primary) throw new Error('旧成果缺少有效媒体或字幕')
   await this.unchanged(row)
-  if ((await jsonFile(join(directory, '.bilisum-download.json'))).hash !== marker.hash) throw new Error('旧成果所有权标记已改变')
+  if ((await jsonFile(join(directory, '.bilisum-download.json'))).hash !== marker.hash)
+   throw new Error('旧成果所有权标记已改变')
   return directory
  }
  async recipe(value: string) {
   const row = await this.read(value)
-  if (!/^BV[A-Za-z0-9]{10}$/.test(row.source.bvid || '') || !row.source.cid || !row.source.page) throw new Error('此旧任务需先重新读取站点格式，原记录保留')
+  if (!/^BV[A-Za-z0-9]{10}$/.test(row.source.bvid || '') || !row.source.cid || !row.source.page)
+   throw new Error('此旧任务需先重新读取站点格式，原记录保留')
   const selected = biliMediaInput(row.source.url)
-  if (selected.bvid !== row.source.bvid || selected.page !== row.source.page || row.source.storage_id !== row.source.bvid) throw new Error('旧任务网址与分集身份不一致，原记录保留')
+  if (
+   selected.bvid !== row.source.bvid ||
+   selected.page !== row.source.page ||
+   row.source.storage_id !== row.source.bvid
+  )
+   throw new Error('旧任务网址与分集身份不一致，原记录保留')
   const options = mediaOptions(row.options)
   if (options.format_ids) throw new Error('旧下载器的精确格式编号不可直接沿用，请重新读取格式；原记录保留')
-  if (options.cookie_profile || options.privacy || options.use_cookies) throw new Error('旧登录档案不能直接迁移，请在原生下载中重新选择；原记录保留')
-  return {row, identity: `${row.source.bvid}:${row.source.cid}:${row.source.page}`, url: `https://www.bilibili.com/video/${row.source.bvid}/?p=${row.source.page}`, options}
+  if (options.cookie_profile || options.privacy || options.use_cookies)
+   throw new Error('旧登录档案不能直接迁移，请在原生下载中重新选择；原记录保留')
+  return {
+   row,
+   identity: `${row.source.bvid}:${row.source.cid}:${row.source.page}`,
+   url: `https://www.bilibili.com/video/${row.source.bvid}/?p=${row.source.page}`,
+   options
+  }
  }
 }

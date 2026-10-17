@@ -53,7 +53,13 @@ export function parseHls(text: string, base: string, check: (url: string) => str
    const a = attrs(line)
    if (a.METHOD === 'NONE') key = undefined
    else {
-    if (a.METHOD !== 'AES-128' || !a.URI || (a.KEYFORMAT && a.KEYFORMAT !== 'identity') || (a.IV && !/^0x[0-9a-fA-F]{32}$/.test(a.IV))) throw new Error('此 HLS 加密格式尚不支持')
+    if (
+     a.METHOD !== 'AES-128' ||
+     !a.URI ||
+     (a.KEYFORMAT && a.KEYFORMAT !== 'identity') ||
+     (a.IV && !/^0x[0-9a-fA-F]{32}$/.test(a.IV))
+    )
+     throw new Error('此 HLS 加密格式尚不支持')
     key = {url: url(a.URI), iv: a.IV}
    }
   } else if (line.startsWith('#EXT-X-MAP:')) {
@@ -62,13 +68,15 @@ export function parseHls(text: string, base: string, check: (url: string) => str
    const next = url(a.URI)
    if (init && init !== next) throw new Error('HLS 初始化轨道改变，请使用独立片段任务')
    init = next
-  } else if (line.startsWith('#EXT-X-BYTERANGE:') || line.startsWith('#EXT-X-GAP')) throw new Error('此 HLS 字节范围或缺失片段尚不支持')
+  } else if (line.startsWith('#EXT-X-BYTERANGE:') || line.startsWith('#EXT-X-GAP'))
+   throw new Error('此 HLS 字节范围或缺失片段尚不支持')
   else if (line === '#EXT-X-ENDLIST') ended = true
   else if (!line.startsWith('#')) {
    if (pending) {
     const height = Number(pending.RESOLUTION?.split('x')[1] || 0),
      bandwidth = Number(pending.BANDWIDTH || 0)
-    if (!Number.isFinite(height) || !Number.isFinite(bandwidth) || height < 0 || bandwidth < 0) throw new Error('HLS 格式目录无效')
+    if (!Number.isFinite(height) || !Number.isFinite(bandwidth) || height < 0 || bandwidth < 0)
+     throw new Error('HLS 格式目录无效')
     variants.push({url: url(line), height, bandwidth, codec: pending.CODECS || '', audio: pending.AUDIO || ''})
     pending = undefined
    } else {
@@ -79,19 +87,37 @@ export function parseHls(text: string, base: string, check: (url: string) => str
    }
   }
  }
- if (pending || duration !== undefined || (variants.length && segments.length) || variants.length > 200) throw new Error('HLS 清单结构不完整')
- if (!variants.length && (!ended || !segments.length)) throw new Error('仅支持已结束且完整的 HLS 录像，未把直播窗口当作完整视频')
+ if (pending || duration !== undefined || (variants.length && segments.length) || variants.length > 200)
+  throw new Error('HLS 清单结构不完整')
+ if (!variants.length && (!ended || !segments.length))
+  throw new Error('仅支持已结束且完整的 HLS 录像，未把直播窗口当作完整视频')
  return {variants, audio, segments, init}
 }
 /** Downloads every declared VOD segment locally. FFmpeg receives no network URLs or keys. */
-export async function downloadNativeHls(input: {directory: string; key: string; identity: string; url: string; platform: string; options: NativeMediaOptions; fetcher: Fetcher; signal: AbortSignal; headers?: Record<string, string>; progress?: (downloaded: number, total: null) => void}) {
+export async function downloadNativeHls(input: {
+ directory: string
+ key: string
+ identity: string
+ url: string
+ platform: string
+ options: NativeMediaOptions
+ fetcher: Fetcher
+ signal: AbortSignal
+ headers?: Record<string, string>
+ progress?: (downloaded: number, total: null) => void
+}) {
  if (!/^track-\d+$/.test(input.key)) throw new Error('HLS 任务标识无效')
  const check = (url: string) => platformMediaAddress(input.platform, url),
   intermediates: string[] = [],
   keys = new Map<string, Buffer>()
  let downloaded = 0
  const read = async (url: string) => {
-  const response = await input.fetcher(check(url), {signal: input.signal, redirect: 'error', credentials: 'omit', headers: input.headers})
+  const response = await input.fetcher(check(url), {
+   signal: input.signal,
+   redirect: 'error',
+   credentials: 'omit',
+   headers: input.headers
+  })
   if (!response.ok) {
    await response.body?.cancel()
    throw new Error('HLS 清单未取得')
@@ -103,9 +129,17 @@ export async function downloadNativeHls(input: {directory: string; key: string; 
   const manifest = await read(url)
   if (!manifest.variants.length) return [{url, kind: 'combined'}]
   const prefix = {auto: '', h264: 'avc', h265: 'hev', vp9: 'vp', av1: 'av01'}[input.options.video_codec],
-   picked = manifest.variants.filter(v => (!input.options.height || (v.height > 0 && v.height <= input.options.height)) && (!prefix || v.codec.includes(prefix))).sort((a, b) => b.height - a.height || b.bandwidth - a.bandwidth)[0]
+   picked = manifest.variants
+    .filter(
+     v =>
+      (!input.options.height || (v.height > 0 && v.height <= input.options.height)) &&
+      (!prefix || v.codec.includes(prefix))
+    )
+    .sort((a, b) => b.height - a.height || b.bandwidth - a.bandwidth)[0]
   if (!picked) throw new Error('HLS 没有符合画质和编码要求的格式')
-  const audio = manifest.audio.filter(a => a.group === picked.audio).sort((a, b) => Number(b.preferred) - Number(a.preferred))[0]
+  const audio = manifest.audio
+   .filter(a => a.group === picked.audio)
+   .sort((a, b) => Number(b.preferred) - Number(a.preferred))[0]
   const paths = await resolve(picked.url, depth + 1)
   if (audio) {
    if (paths.length !== 1) throw new Error('HLS 音轨嵌套有歧义')
@@ -141,7 +175,11 @@ export async function downloadNativeHls(input: {directory: string; key: string; 
      })
     downloaded += result.size
     intermediates.push(name + '.partial', name + '.resume.json', name + '.resume.json.writing')
-    proofs.push({path: result.path, hash: result.hash, ...('key' in part ? {key: part.key, sequence: part.sequence} : {})})
+    proofs.push({
+     path: result.path,
+     hash: result.hash,
+     ...('key' in part ? {key: part.key, sequence: part.sequence} : {})
+    })
    }
    const name = input.key + '-hls-' + track + '.media',
     artifact = new OwnedMediaArtifact(
@@ -163,7 +201,15 @@ export async function downloadNativeHls(input: {directory: string; key: string; 
        let key = keys.get(part.key.url)
        if (!key) {
         if (keys.size >= 100) throw new Error('HLS 密钥轮换超出预算')
-        key = await boundedMediaResponse(await input.fetcher(part.key.url, {signal: input.signal, redirect: 'error', credentials: 'omit', headers: input.headers}), 16)
+        key = await boundedMediaResponse(
+         await input.fetcher(part.key.url, {
+          signal: input.signal,
+          redirect: 'error',
+          credentials: 'omit',
+          headers: input.headers
+         }),
+         16
+        )
         if (key.length !== 16) throw new Error('HLS 密钥长度无效')
         keys.set(part.key.url, key)
        }

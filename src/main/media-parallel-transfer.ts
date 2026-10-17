@@ -10,8 +10,13 @@ export async function transferMediaRanges(input: Input, concurrency: number) {
  const chunkBytes = input.chunkBytes ?? 0,
   bufferBytes = input.writeBufferBytes ?? 65536
  if (!Number.isSafeInteger(chunkBytes) || chunkBytes < 0 || chunkBytes > 104857600) throw new Error('HTTP 分段大小无效')
- if (!Number.isSafeInteger(bufferBytes) || bufferBytes < 1024 || bufferBytes > 10485760) throw new Error('下载写入缓冲区大小无效')
- const serial = async (intermediates: string[] = [], warning = '') => ({...(await transferMedia(input)), intermediates, warning})
+ if (!Number.isSafeInteger(bufferBytes) || bufferBytes < 1024 || bufferBytes > 10485760)
+  throw new Error('下载写入缓冲区大小无效')
+ const serial = async (intermediates: string[] = [], warning = '') => ({
+  ...(await transferMedia(input)),
+  intermediates,
+  warning
+ })
  if (concurrency === 1 && !chunkBytes) return serial()
  let size = 0,
   etag = ''
@@ -20,11 +25,24 @@ export async function transferMediaRanges(input: Input, concurrency: number) {
   headers.delete('Range')
   headers.delete('If-Range')
   headers.set('Accept-Encoding', 'identity')
-  const head = await input.fetcher(input.url, {method: 'HEAD', headers, signal: AbortSignal.any([input.signal, AbortSignal.timeout(20000)]), redirect: 'error', credentials: 'omit'})
+  const head = await input.fetcher(input.url, {
+   method: 'HEAD',
+   headers,
+   signal: AbortSignal.any([input.signal, AbortSignal.timeout(20000)]),
+   redirect: 'error',
+   credentials: 'omit'
+  })
   if (head.body) await head.body.cancel()
   size = Number(head.headers.get('content-length') || 0)
   etag = head.headers.get('etag') || ''
-  if (!head.ok || !Number.isSafeInteger(size) || size < (chunkBytes ? 2 : concurrency * 65536) || !/^"[^"\r\n]+"$/.test(etag) || head.headers.get('accept-ranges')?.toLowerCase() !== 'bytes') return serial([], '服务器未提供可核验的分段范围，已使用完整串行下载')
+  if (
+   !head.ok ||
+   !Number.isSafeInteger(size) ||
+   size < (chunkBytes ? 2 : concurrency * 65536) ||
+   !/^"[^"\r\n]+"$/.test(etag) ||
+   head.headers.get('accept-ranges')?.toLowerCase() !== 'bytes'
+  )
+   return serial([], '服务器未提供可核验的分段范围，已使用完整串行下载')
  } catch (error) {
   input.signal.throwIfAborted()
   return serial([], '未取得并行范围，已使用串行下载')
@@ -35,8 +53,16 @@ export async function transferMediaRanges(input: Input, concurrency: number) {
  const controller = new AbortController(),
   signal = AbortSignal.any([input.signal, controller.signal]),
   progress = new Array<number>(count).fill(0)
- const ranges = Array.from({length: count}, (_, index) => ({start: chunkBytes ? index * chunkBytes : Math.floor((size * index) / count), end: chunkBytes ? Math.min(size, (index + 1) * chunkBytes) - 1 : Math.floor((size * (index + 1)) / count) - 1, key: input.key + '-chunk-' + index}))
- const intermediates = ranges.flatMap(range => [range.key + '.partial', range.key + '.resume.json', range.key + '.resume.json.writing'])
+ const ranges = Array.from({length: count}, (_, index) => ({
+  start: chunkBytes ? index * chunkBytes : Math.floor((size * index) / count),
+  end: chunkBytes ? Math.min(size, (index + 1) * chunkBytes) - 1 : Math.floor((size * (index + 1)) / count) - 1,
+  key: input.key + '-chunk-' + index
+ }))
+ const intermediates = ranges.flatMap(range => [
+  range.key + '.partial',
+  range.key + '.resume.json',
+  range.key + '.resume.json.writing'
+ ])
  let ignored = false,
   failure: unknown
  const download = async (range: (typeof ranges)[number], index: number) => {
@@ -45,7 +71,8 @@ export async function transferMediaRanges(input: Input, concurrency: number) {
    const headers = new Headers(init.headers),
     prefix = Number(/^bytes=(\d+)-$/.exec(headers.get('Range') || '')?.[1] || 0)
    // HEAD has just confirmed the whole object. A complete, hash-checked chunk can be reused.
-   if (prefix === total) return new Response(null, {status: 416, headers: {ETag: etag, 'Content-Range': `bytes */${total}`}})
+   if (prefix === total)
+    return new Response(null, {status: 416, headers: {ETag: etag, 'Content-Range': `bytes */${total}`}})
    headers.set('Range', `bytes=${range.start + prefix}-${range.end}`)
    headers.set('If-Range', etag)
    const response = await input.fetcher(url, {...init, headers, signal})
@@ -55,7 +82,14 @@ export async function transferMediaRanges(input: Input, concurrency: number) {
     throw new Error('服务器忽略并行范围')
    }
    const match = /^bytes (\d+)-(\d+)\/(\d+)$/.exec(response.headers.get('content-range') || '')
-   if (response.status !== 206 || !match || Number(match[1]) !== range.start + prefix || Number(match[2]) !== range.end || Number(match[3]) !== size || response.headers.get('etag') !== etag) {
+   if (
+    response.status !== 206 ||
+    !match ||
+    Number(match[1]) !== range.start + prefix ||
+    Number(match[2]) !== range.end ||
+    Number(match[3]) !== size ||
+    response.headers.get('etag') !== etag
+   ) {
     await response.body?.cancel()
     throw new Error('并行响应或媒体版本不一致，保留恢复文件')
    }
@@ -106,7 +140,8 @@ export async function transferMediaRanges(input: Input, concurrency: number) {
   throw failure || failed.reason
  }
  input.signal.throwIfAborted()
- if (settled.filter(result => result?.status === 'fulfilled').length !== count) throw new Error('下载分段未全部完成，恢复文件保留')
+ if (settled.filter(result => result?.status === 'fulfilled').length !== count)
+  throw new Error('下载分段未全部完成，恢复文件保留')
  const path = join(input.directory, input.key + '.partial'),
   journal = join(input.directory, input.key + '.resume.json'),
   tmp = journal + '.writing'

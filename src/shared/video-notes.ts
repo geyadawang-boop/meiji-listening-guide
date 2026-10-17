@@ -1,7 +1,12 @@
 export type VideoNotePoint = {cue: number; quote: string; point: string; topic: string; timestamp: string}
 export type VideoNoteResult = {path: string; count: number; markdown: string; points: VideoNotePoint[]}
 export type VideoNoteMode = 'brief' | 'detailed' | 'keypoints' | 'mindmap'
-export const noteTitles: Record<VideoNoteMode, string> = {brief: '简要摘要', detailed: '详细摘要', keypoints: '课程要点', mindmap: '思维导图'}
+export const noteTitles: Record<VideoNoteMode, string> = {
+ brief: '简要摘要',
+ detailed: '详细摘要',
+ keypoints: '课程要点',
+ mindmap: '思维导图'
+}
 export function noteGroups(points: VideoNotePoint[]) {
  const groups = new Map<string, VideoNotePoint[]>()
  for (const point of points) {
@@ -12,14 +17,17 @@ export function noteGroups(points: VideoNotePoint[]) {
  }
  return Array.from(groups, ([title, items]) => ({title, items}))
 }
-const escape = (s: string) => s.replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;'})[c]!)
+const escape = (s: string) =>
+ s.replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;'})[c]!)
 export function notesSvg(title: string, points: VideoNotePoint[]) {
  const groups = noteGroups(points),
   height = Math.max(240, 80 + points.length * 72 + groups.length * 44)
  let y = 44
  const rows: string[] = []
  for (const group of groups) {
-  rows.push(`<path d="M180 100H240V${y + 15}H280" fill="none" stroke="#c8c1ed" stroke-width="2"/><rect x="280" y="${y}" width="640" height="30" rx="8" fill="#eeeafa"/><text x="294" y="${y + 21}" font-size="15" font-weight="600">${escape(group.title)}</text>`)
+  rows.push(
+   `<path d="M180 100H240V${y + 15}H280" fill="none" stroke="#c8c1ed" stroke-width="2"/><rect x="280" y="${y}" width="640" height="30" rx="8" fill="#eeeafa"/><text x="294" y="${y + 21}" font-size="15" font-weight="600">${escape(group.title)}</text>`
+  )
   y += 44
   for (const point of group.items) {
    const text = Array.from(point.point),

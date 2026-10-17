@@ -1,14 +1,48 @@
 import {useEffect, useState} from 'react'
 import {ImAutomation} from './ImAutomation'
-type Connection = {id: string; name: string; platform: string; revision: string; account: string; login_epoch: string; has_session: boolean}
+type Connection = {
+ id: string
+ name: string
+ platform: string
+ revision: string
+ account: string
+ login_epoch: string
+ has_session: boolean
+}
 type Listing = {revision: string; connections: Connection[]; qq_component: {state: string; version: string}}
-type Login = {operation_id: string; connection_id: string; generation: string; state: string; account: string; has_qr: boolean; detail?: {message?: string}}
-type Scope = {connection_id: string; revision: string; platform: string; account: string; login_epoch: string; peer: string}
+type Login = {
+ operation_id: string
+ connection_id: string
+ generation: string
+ state: string
+ account: string
+ has_qr: boolean
+ detail?: {message?: string}
+}
+type Scope = {
+ connection_id: string
+ revision: string
+ platform: string
+ account: string
+ login_epoch: string
+ peer: string
+}
 type Message = {mid: string; text: string; sender: string; ts: number}
 const invoke = <T,>(action: string, args?: unknown) => window.assistant.invoke<T>(action, args)
-const request = <T,>(action: string, value: unknown = {}) => invoke<T>('tools:request', {action: 'im', args: {action, value}})
+const request = <T,>(action: string, value: unknown = {}) =>
+ invoke<T>('tools:request', {action: 'im', args: {action, value}})
 const op = () => crypto.randomUUID().replaceAll('-', '')
-const states: Record<string, string> = {waiting_scan: '等待手机扫码', scanned: '已扫码，等待手机确认', verifying: '正在核验账号', awaiting_bind: '请确认绑定当前账号', online: '账号已绑定', failed: '登录失败', expired: '二维码已过期', cancelled: '已取消', unknown: '登录结果待确认'}
+const states: Record<string, string> = {
+ waiting_scan: '等待手机扫码',
+ scanned: '已扫码，等待手机确认',
+ verifying: '正在核验账号',
+ awaiting_bind: '请确认绑定当前账号',
+ online: '账号已绑定',
+ failed: '登录失败',
+ expired: '二维码已过期',
+ cancelled: '已取消',
+ unknown: '登录结果待确认'
+}
 export function CommunicationIcon() {
  return (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
@@ -41,7 +75,14 @@ export function Communications({visible, close}: {visible: boolean; close: () =>
  const row = data?.connections.find(item => item.id === selected)
  const scope = (chosen = peer): Scope => {
   if (!row?.account || !chosen) throw new Error('请先绑定账号并选择会话')
-  return {connection_id: row.id, revision: row.revision, platform: row.platform, account: row.account, login_epoch: row.login_epoch, peer: chosen}
+  return {
+   connection_id: row.id,
+   revision: row.revision,
+   platform: row.platform,
+   account: row.account,
+   login_epoch: row.login_epoch,
+   peer: chosen
+  }
  }
  async function refresh() {
   setData(await request('status'))
@@ -74,16 +115,37 @@ export function Communications({visible, close}: {visible: boolean; close: () =>
  }, [selected])
  async function showLogin(next: Login) {
   setLogin(next)
-  setQr(next.has_qr ? await request<string>('qr', {operation_id: next.operation_id, connection_id: next.connection_id, generation: next.generation}) : '')
+  setQr(
+   next.has_qr
+    ? await request<string>('qr', {
+       operation_id: next.operation_id,
+       connection_id: next.connection_id,
+       generation: next.generation
+      })
+    : ''
+  )
  }
- const operation = () => ({operation_id: login!.operation_id, connection_id: login!.connection_id, generation: login!.generation})
+ const operation = () => ({
+  operation_id: login!.operation_id,
+  connection_id: login!.connection_id,
+  generation: login!.generation
+ })
  async function read(older = false) {
-  const result = await request<{messages: Message[]; next_cursor: unknown}>('read', {...scope(), limit: 50, ...(older && cursor ? {cursor} : {})})
+  const result = await request<{messages: Message[]; next_cursor: unknown}>('read', {
+   ...scope(),
+   limit: 50,
+   ...(older && cursor ? {cursor} : {})
+  })
   setMessages(older ? old => [...old, ...result.messages] : result.messages)
   setCursor(result.next_cursor)
  }
  return (
-  <section className="ppt-extract-page learning-window" aria-label="通讯助手" hidden={!visible} style={!visible ? {display: 'none'} : undefined}>
+  <section
+   className="ppt-extract-page learning-window"
+   aria-label="通讯助手"
+   hidden={!visible}
+   style={!visible ? {display: 'none'} : undefined}
+  >
    <aside className="learning-menu">
     <h2>通讯助手</h2>
     <p>
@@ -110,7 +172,11 @@ export function Communications({visible, close}: {visible: boolean; close: () =>
     )}
     {busy && <p role="status">正在处理所选操作…</p>}
     <section className="knowledge-card">
-     <p className="hint">不迁移其他软件账号、不自动读取或发送消息。QQ 使用随附组件在后台运行；个人微信本机读取只支持指定登录进程，不能发送。微信 Web / Bot 登录及历史范围依服务实际支持，失败时显示真实状态。</p>
+     <p className="hint">
+      不迁移其他软件账号、不自动读取或发送消息。QQ
+      使用随附组件在后台运行；个人微信本机读取只支持指定登录进程，不能发送。微信 Web / Bot
+      登录及历史范围依服务实际支持，失败时显示真实状态。
+     </p>
      <div className="row">
       <input aria-label="通讯连接名称" placeholder="连接名称" value={name} onChange={e => setName(e.target.value)} />
       <select aria-label="通讯平台" value={platform} onChange={e => setPlatform(e.target.value)}>
@@ -123,7 +189,14 @@ export function Communications({visible, close}: {visible: boolean; close: () =>
        disabled={busy || !name.trim() || !data}
        onClick={() =>
         void run(async () => {
-         const next = await request<Listing>('change', {action: 'create', expected_revision: data!.revision, name, platform, fields: platform === 'qq_napcat' ? {mode: 'managed'} : {}, secrets: {}})
+         const next = await request<Listing>('change', {
+          action: 'create',
+          expected_revision: data!.revision,
+          name,
+          platform,
+          fields: platform === 'qq_napcat' ? {mode: 'managed'} : {},
+          secrets: {}
+         })
          const added = next.connections.find(item => !data!.connections.some(old => old.id === item.id))
          setData(next)
          setSelected(added?.id || '')
@@ -160,14 +233,24 @@ export function Communications({visible, close}: {visible: boolean; close: () =>
      </div>
      {row && (
       <p className="hint">
-       {row.account ? '已确认账号：' + row.account : '尚未确认账号'} · {row.has_session ? '登录会话已保存' : '需要登录或绑定'}
+       {row.account ? '已确认账号：' + row.account : '尚未确认账号'} ·{' '}
+       {row.has_session ? '登录会话已保存' : '需要登录或绑定'}
       </p>
      )}
     </section>
     {row && row.platform !== 'weixin_local' && (
      <section className="knowledge-card">
       <h3>扫码与账号确认</h3>
-      <button disabled={busy} onClick={() => void run(async () => showLogin(await request<Login>('start', {operation_id: op(), connection_id: row.id, expected_revision: row.revision})))}>
+      <button
+       disabled={busy}
+       onClick={() =>
+        void run(async () =>
+         showLogin(
+          await request<Login>('start', {operation_id: op(), connection_id: row.id, expected_revision: row.revision})
+         )
+        )
+       }
+      >
        开始登录
       </button>
       {login && (
@@ -176,12 +259,35 @@ export function Communications({visible, close}: {visible: boolean; close: () =>
          {states[login.state] || login.state} {login.detail?.message || ''}
         </p>
         {qr && <img className="bili-login-qr" src={qr} alt="当前通讯连接二维码" />}
-        {row.platform === 'weixin_ilink' && <input aria-label="手机配对码" placeholder="手机显示的配对码" value={pairCode} onChange={e => setPairCode(e.target.value)} />}
+        {row.platform === 'weixin_ilink' && (
+         <input
+          aria-label="手机配对码"
+          placeholder="手机显示的配对码"
+          value={pairCode}
+          onChange={e => setPairCode(e.target.value)}
+         />
+        )}
         <div className="row">
-         <button disabled={busy} onClick={() => void run(async () => showLogin(await request<Login>('inspect', {...operation(), refresh: true, ...(pairCode ? {verify_code: pairCode} : {})})))}>
+         <button
+          disabled={busy}
+          onClick={() =>
+           void run(async () =>
+            showLogin(
+             await request<Login>('inspect', {
+              ...operation(),
+              refresh: true,
+              ...(pairCode ? {verify_code: pairCode} : {})
+             })
+            )
+           )
+          }
+         >
           检查登录状态
          </button>
-         <button disabled={busy} onClick={() => void run(async () => showLogin(await request<Login>('cancel', operation())))}>
+         <button
+          disabled={busy}
+          onClick={() => void run(async () => showLogin(await request<Login>('cancel', operation())))}
+         >
           取消登录
          </button>
          {login.state === 'awaiting_bind' && (
@@ -207,12 +313,38 @@ export function Communications({visible, close}: {visible: boolean; close: () =>
     {row?.platform === 'weixin_local' && (
      <section className="knowledge-card">
       <h3>绑定本机微信</h3>
-      <p className="hint">请先在官方微信客户端登录；读取范围仅为你选中的进程和会话。点击核验才检查本机读取能力，密钥不写入文件。</p>
-      <button disabled={busy} onClick={() => void run(async () => setProcesses((await request<{processes: {pid: number; created: number; label: string}[]}>('personal-processes')).processes))}>
+      <p className="hint">
+       请先在官方微信客户端登录；读取范围仅为你选中的进程和会话。点击核验才检查本机读取能力，密钥不写入文件。
+      </p>
+      <button
+       disabled={busy}
+       onClick={() =>
+        void run(async () =>
+         setProcesses(
+          (await request<{processes: {pid: number; created: number; label: string}[]}>('personal-processes')).processes
+         )
+        )
+       }
+      >
        查找已登录微信进程
       </button>
       {processes.map(item => (
-       <button key={item.pid} disabled={busy} onClick={() => void run(async () => setProbe(await request('personal-probe', {connection_id: row.id, revision: row.revision, pid: item.pid, created: item.created})))}>
+       <button
+        key={item.pid}
+        disabled={busy}
+        onClick={() =>
+         void run(async () =>
+          setProbe(
+           await request('personal-probe', {
+            connection_id: row.id,
+            revision: row.revision,
+            pid: item.pid,
+            created: item.created
+           })
+          )
+         )
+        }
+       >
         核验 {item.label}
        </button>
       ))}
@@ -222,7 +354,13 @@ export function Communications({visible, close}: {visible: boolean; close: () =>
         disabled={busy}
         onClick={() =>
          void run(async () => {
-          await request('personal-confirm', {connection_id: row.id, revision: row.revision, probe_id: probe.probe_id, account: probe.account, user_confirmed: true})
+          await request('personal-confirm', {
+           connection_id: row.id,
+           revision: row.revision,
+           probe_id: probe.probe_id,
+           account: probe.account,
+           user_confirmed: true
+          })
           setProbe(undefined)
          })
         }
@@ -296,7 +434,12 @@ export function Communications({visible, close}: {visible: boolean; close: () =>
           更早已保存消息
          </button>
         )}
-        <input aria-label="回复草稿要求" placeholder="希望如何回复（可选）" value={instruction} onChange={e => setInstruction(e.target.value)} />
+        <input
+         aria-label="回复草稿要求"
+         placeholder="希望如何回复（可选）"
+         value={instruction}
+         onChange={e => setInstruction(e.target.value)}
+        />
         <button
          disabled={busy || !messages.length}
          onClick={() =>
@@ -330,8 +473,21 @@ export function Communications({visible, close}: {visible: boolean; close: () =>
            disabled={busy || !confirm || !text.trim()}
            onClick={() =>
             void run(async () => {
-             const result = await request<{state: string; operation_id: string}>('send', {...scope(), operation_id: op(), text, user_confirmed: true})
-             setReceipt((result.state === 'sent' ? '服务已确认发送' : result.state === 'unknown' ? '发送结果未知，请在手机核对，不自动重发' : result.state) + ' · 操作编号 ' + result.operation_id)
+             const result = await request<{state: string; operation_id: string}>('send', {
+              ...scope(),
+              operation_id: op(),
+              text,
+              user_confirmed: true
+             })
+             setReceipt(
+              (result.state === 'sent'
+               ? '服务已确认发送'
+               : result.state === 'unknown'
+                 ? '发送结果未知，请在手机核对，不自动重发'
+                 : result.state) +
+               ' · 操作编号 ' +
+               result.operation_id
+             )
              setConfirm(false)
             })
            }

@@ -4,7 +4,15 @@ import {DeepSeekSettings} from './DeepSeekSettings'
 import {useEffect, useState} from 'react'
 import type {CourseFile, Detail, LectureNotes, PastQuestion, Settings} from '../../shared/types'
 import {invoke, Modal, FilePicker} from './UiParts'
-export function NewCourse({close, create, busy}: {close: () => void; create: (name: string, senior: string[], exams: string[]) => Promise<boolean>; busy: boolean}) {
+export function NewCourse({
+ close,
+ create,
+ busy
+}: {
+ close: () => void
+ create: (name: string, senior: string[], exams: string[]) => Promise<boolean>
+ busy: boolean
+}) {
  const [name, setName] = useState(''),
   [senior, setSenior] = useState<string[]>([]),
   [exams, setExams] = useState<string[]>([])
@@ -35,7 +43,21 @@ export function NewCourse({close, create, busy}: {close: () => void; create: (na
   </Modal>
  )
 }
-export function NewLecture({draft, pptDraft, close, create, busy, courseId}: {courseId: string; draft: string; pptDraft: string; close: () => void; create: (title: string, source: string, ppt: string) => Promise<boolean>; busy: boolean}) {
+export function NewLecture({
+ draft,
+ pptDraft,
+ close,
+ create,
+ busy,
+ courseId
+}: {
+ courseId: string
+ draft: string
+ pptDraft: string
+ close: () => void
+ create: (title: string, source: string, ppt: string) => Promise<boolean>
+ busy: boolean
+}) {
  const [title, setTitle] = useState(''),
   [original, setOriginal] = useState(draft ? [draft] : []),
   [ppt, setPpt] = useState<string[]>(pptDraft ? [pptDraft] : [])
@@ -51,9 +73,18 @@ export function NewLecture({draft, pptDraft, close, create, busy, courseId}: {co
      课次标题
      <input autoFocus required value={title} onChange={e => setTitle(e.target.value)} placeholder="第 1 讲" />
     </label>
-    <FilePicker courseId={courseId} transcript label="语音识别原文（必选）" paths={original} set={p => setOriginal(p.slice(-1))} />
+    <FilePicker
+     courseId={courseId}
+     transcript
+     label="语音识别原文（必选）"
+     paths={original}
+     set={p => setOriginal(p.slice(-1))}
+    />
     <FilePicker courseId={courseId} courseware label="PPT/课件" paths={ppt} set={p => setPpt(p.slice(-1))} />
-    <p className="hint">支持智云原文 Word、TXT、Markdown、SRT。导入 PPTX 后，由 Codex 按需读取页面文字与原始图片，结合语音原文校订，无需单独逐页识别。</p>
+    <p className="hint">
+     支持智云原文 Word、TXT、Markdown、SRT。导入 PPTX 后，由 Codex
+     按需读取页面文字与原始图片，结合语音原文校订，无需单独逐页识别。
+    </p>
     <footer>
      <button type="button" onClick={close}>
       取消
@@ -66,7 +97,19 @@ export function NewLecture({draft, pptDraft, close, create, busy, courseId}: {co
   </Modal>
  )
 }
-export function AddTranscript({courseId, draft, close, save, busy}: {courseId: string; draft: string; close: () => void; save: (path: string) => Promise<boolean>; busy: boolean}) {
+export function AddTranscript({
+ courseId,
+ draft,
+ close,
+ save,
+ busy
+}: {
+ courseId: string
+ draft: string
+ close: () => void
+ save: (path: string) => Promise<boolean>
+ busy: boolean
+}) {
  const [paths, setPaths] = useState<string[]>(draft ? [draft] : [])
  return (
   <Modal title="添加语音识别原文" close={close}>
@@ -76,7 +119,13 @@ export function AddTranscript({courseId, draft, close, save, busy}: {courseId: s
      void save(paths[0])
     }}
    >
-    <FilePicker courseId={courseId} transcript label="选择或拖入智云原文" paths={paths} set={p => setPaths(p.slice(-1))} />
+    <FilePicker
+     courseId={courseId}
+     transcript
+     label="选择或拖入智云原文"
+     paths={paths}
+     set={p => setPaths(p.slice(-1))}
+    />
     <p className="hint">替换原文后需要重新校订字幕，旧笔记与练习也需重新生成。</p>
     <footer>
      <button type="button" onClick={close}>
@@ -90,7 +139,19 @@ export function AddTranscript({courseId, draft, close, save, busy}: {courseId: s
   </Modal>
  )
 }
-export function AddCourseware({draft, close, busy, save, courseId}: {courseId: string; draft: string; close: () => void; busy: boolean; save: (path: string) => Promise<boolean>}) {
+export function AddCourseware({
+ draft,
+ close,
+ busy,
+ save,
+ courseId
+}: {
+ courseId: string
+ draft: string
+ close: () => void
+ busy: boolean
+ save: (path: string) => Promise<boolean>
+}) {
  const [paths, setPaths] = useState<string[]>(draft ? [draft] : [])
  return (
   <Modal title="添加 PPT/课件" close={close}>
@@ -100,8 +161,17 @@ export function AddCourseware({draft, close, busy, save, courseId}: {courseId: s
      void save(paths[0])
     }}
    >
-    <FilePicker courseId={courseId} courseware label="选择或拖入 PPT/课件" paths={paths} set={p => setPaths(p.slice(-1))} />
-    <p className="hint">课件保存到 PPT 文件夹并关联当前课次。每个课次保留一份当前课件，新添加会替换关联，旧文件仍保留。Codex 按需读取 PPTX 的页面文字和原始图片，与语音原文一起校订。旧 PPT 请另存为 PPTX；PDF 目前读取文字内容。</p>
+    <FilePicker
+     courseId={courseId}
+     courseware
+     label="选择或拖入 PPT/课件"
+     paths={paths}
+     set={p => setPaths(p.slice(-1))}
+    />
+    <p className="hint">
+     课件保存到 PPT 文件夹并关联当前课次。每个课次保留一份当前课件，新添加会替换关联，旧文件仍保留。Codex 按需读取 PPTX
+     的页面文字和原始图片，与语音原文一起校订。旧 PPT 请另存为 PPTX；PDF 目前读取文字内容。
+    </p>
     <footer>
      <button type="button" onClick={close}>
       取消
@@ -114,7 +184,17 @@ export function AddCourseware({draft, close, busy, save, courseId}: {courseId: s
   </Modal>
  )
 }
-export function Notes({notes, jump, save, disabled}: {notes: LectureNotes; jump: (t: string) => void; save: (n: LectureNotes) => Promise<boolean>; disabled: boolean}) {
+export function Notes({
+ notes,
+ jump,
+ save,
+ disabled
+}: {
+ notes: LectureNotes
+ jump: (t: string) => void
+ save: (n: LectureNotes) => Promise<boolean>
+ disabled: boolean
+}) {
  type Note = LectureNotes['keyPoints'][number] | LectureNotes['notTested'][number]
  const [editing, setEditing] = useState<{
   group: 'keyPoints' | 'notTested' | 'uncertain'
@@ -138,7 +218,9 @@ export function Notes({notes, jump, save, disabled}: {notes: LectureNotes; jump:
      {notes[group]?.map((p, i) => (
       <article key={i} className={`note-card ${p.verified ? '' : 'unverified'}`}>
        <div className="row">
-        <span className={`level ${'level' in p ? p.level : ''}`}>{'level' in p ? p.level : group === 'notTested' ? '不考' : '待判断'}</span>
+        <span className={`level ${'level' in p ? p.level : ''}`}>
+         {'level' in p ? p.level : group === 'notTested' ? '不考' : '待判断'}
+        </span>
         <strong>{p.topic}</strong>
         <button className="timestamp" onClick={() => jump(p.timestamp)}>
          <StudyIcon name="clock" />
@@ -178,12 +260,24 @@ export function Notes({notes, jump, save, disabled}: {notes: LectureNotes; jump:
         >
          <label>
           知识点
-          <input required value={editing.value.topic} onChange={e => setEditing({...editing, value: {...editing.value, topic: e.target.value}})} />
+          <input
+           required
+           value={editing.value.topic}
+           onChange={e => setEditing({...editing, value: {...editing.value, topic: e.target.value}})}
+          />
          </label>
          {'level' in editing.value && (
           <label>
            重点强度
-           <select value={editing.value.level} onChange={e => setEditing({...editing, value: {...editing.value, level: e.target.value as LectureNotes['keyPoints'][number]['level']}})}>
+           <select
+            value={editing.value.level}
+            onChange={e =>
+             setEditing({
+              ...editing,
+              value: {...editing.value, level: e.target.value as LectureNotes['keyPoints'][number]['level']}
+             })
+            }
+           >
             {['必考', '很可能考', '重要', '要求掌握'].map(level => (
              <option key={level}>{level}</option>
             ))}
@@ -193,21 +287,36 @@ export function Notes({notes, jump, save, disabled}: {notes: LectureNotes; jump:
          {'detail' in editing.value && (
           <label>
            具体内容
-           <textarea value={editing.value.detail} onChange={e => setEditing({...editing, value: {...editing.value, detail: e.target.value}})} />
+           <textarea
+            value={editing.value.detail}
+            onChange={e => setEditing({...editing, value: {...editing.value, detail: e.target.value}})}
+           />
           </label>
          )}
          <label>
           老师原话
-          <textarea required value={editing.value.quote} onChange={e => setEditing({...editing, value: {...editing.value, quote: e.target.value}})} />
+          <textarea
+           required
+           value={editing.value.quote}
+           onChange={e => setEditing({...editing, value: {...editing.value, quote: e.target.value}})}
+          />
          </label>
          <label>
           时间戳
-          <input required pattern="[0-9]{2,}:[0-9]{2}:[0-9]{2}" value={editing.value.timestamp} onChange={e => setEditing({...editing, value: {...editing.value, timestamp: e.target.value}})} />
+          <input
+           required
+           pattern="[0-9]{2,}:[0-9]{2}:[0-9]{2}"
+           value={editing.value.timestamp}
+           onChange={e => setEditing({...editing, value: {...editing.value, timestamp: e.target.value}})}
+          />
          </label>
          {'level' in editing.value && (
           <label>
            课件位置（可选）
-           <input value={editing.value.pptRef || ''} onChange={e => setEditing({...editing, value: {...editing.value, pptRef: e.target.value}})} />
+           <input
+            value={editing.value.pptRef || ''}
+            onChange={e => setEditing({...editing, value: {...editing.value, pptRef: e.target.value}})}
+           />
           </label>
          )}
          <button className="primary" disabled={disabled}>
@@ -225,7 +334,19 @@ export function Notes({notes, jump, save, disabled}: {notes: LectureNotes; jump:
   </div>
  )
 }
-export function Materials({detail, busy, close, run, files}: {files: () => void; detail: Detail; busy: boolean; close: () => void; run: (fn: () => Promise<unknown>) => Promise<boolean>}) {
+export function Materials({
+ detail,
+ busy,
+ close,
+ run,
+ files
+}: {
+ files: () => void
+ detail: Detail
+ busy: boolean
+ close: () => void
+ run: (fn: () => Promise<unknown>) => Promise<boolean>
+}) {
  const [selected, setSelected] = useState<string[]>([]),
   [edit, setEdit] = useState<PastQuestion | null>(null)
  const add = (kind: CourseFile['kind']) =>
@@ -233,7 +354,8 @@ export function Materials({detail, busy, close, run, files}: {files: () => void;
    const paths = await invoke<string[]>('pick', {kind: 'document'})
    if (paths.length) await invoke('files:add', {courseId: detail.course.id, kind, paths})
   })
- const saveQuestions = (questions: PastQuestion[]) => run(() => invoke('questions:save', {courseId: detail.course.id, questions}))
+ const saveQuestions = (questions: PastQuestion[]) =>
+  run(() => invoke('questions:save', {courseId: detail.course.id, questions}))
  return (
   <Modal title="课前资料与历年题库" close={close}>
    <div className="toolbar">
@@ -250,15 +372,22 @@ export function Materials({detail, busy, close, run, files}: {files: () => void;
      <div>
       <strong>{f.filename}</strong>
       <small>
-       {f.kind === 'senior_notes' ? '学长学姐笔记' : '历年卷'} · {f.text.length} 字 · {f.chunks.length} 块{f.needs_ocr ? ' · 需 OCR' : ''}
+       {f.kind === 'senior_notes' ? '学长学姐笔记' : '历年卷'} · {f.text.length} 字 · {f.chunks.length} 块
+       {f.needs_ocr ? ' · 需 OCR' : ''}
       </small>
      </div>
      {f.kind === 'past_exam' && (
-      <button disabled={busy || !!f.needs_ocr} onClick={() => void run(() => invoke('questions:split', {courseId: detail.course.id, id: f.id}))}>
+      <button
+       disabled={busy || !!f.needs_ocr}
+       onClick={() => void run(() => invoke('questions:split', {courseId: detail.course.id, id: f.id}))}
+      >
        拆成单题
       </button>
      )}
-     <button disabled={busy} onClick={() => void run(() => invoke('files:remove', {courseId: detail.course.id, id: f.id}))}>
+     <button
+      disabled={busy}
+      onClick={() => void run(() => invoke('files:remove', {courseId: detail.course.id, id: f.id}))}
+     >
       删除资料
      </button>
     </article>
@@ -281,19 +410,33 @@ export function Materials({detail, busy, close, run, files}: {files: () => void;
          .join('\n') || undefined,
        knowledgePoints: [...new Set(chosen.flatMap(q => q.knowledgePoints))]
       }
-      void saveQuestions(detail.questions.filter(q => !selected.includes(q.id) || q.id === first.id).map(q => (q.id === first.id ? merged : q))).then(() => setSelected([]))
+      void saveQuestions(
+       detail.questions
+        .filter(q => !selected.includes(q.id) || q.id === first.id)
+        .map(q => (q.id === first.id ? merged : q))
+      ).then(() => setSelected([]))
      }}
     >
      合并选中题目
     </button>
-    <button disabled={busy || !selected.length} onClick={() => void saveQuestions(detail.questions.filter(q => !selected.includes(q.id))).then(() => setSelected([]))}>
+    <button
+     disabled={busy || !selected.length}
+     onClick={() =>
+      void saveQuestions(detail.questions.filter(q => !selected.includes(q.id))).then(() => setSelected([]))
+     }
+    >
      删除选中
     </button>
    </div>
    {detail.questions.map(q => (
     <article key={q.id} className="question-card">
      <div className="row">
-      <input type="checkbox" aria-label="选中题目" checked={selected.includes(q.id)} onChange={e => setSelected(e.target.checked ? [...selected, q.id] : selected.filter(id => id !== q.id))} />
+      <input
+       type="checkbox"
+       aria-label="选中题目"
+       checked={selected.includes(q.id)}
+       onChange={e => setSelected(e.target.checked ? [...selected, q.id] : selected.filter(id => id !== q.id))}
+      />
       <strong>{q.type}</strong>
       <small>
        {q.year} · {q.sourceFile}
@@ -330,7 +473,10 @@ export function Materials({detail, busy, close, run, files}: {files: () => void;
        </label>
        <label>
         知识点（用逗号分隔）
-        <input value={edit.knowledgePoints.join(',')} onChange={e => setEdit({...edit, knowledgePoints: e.target.value.split(/[,，]/).filter(Boolean)})} />
+        <input
+         value={edit.knowledgePoints.join(',')}
+         onChange={e => setEdit({...edit, knowledgePoints: e.target.value.split(/[,，]/).filter(Boolean)})}
+        />
        </label>
        <button className="primary" disabled={busy}>
         保存
@@ -401,11 +547,28 @@ export function SettingsPanel({
       update={update}
       busy={busy}
       close={close}
-      save={() => void save({...value, connection: 'deepseek', activeProfile: (value.profiles.find(p => p.id === value.activeProfile && p.provider === 'deepseek') || value.profiles.find(p => p.provider === 'deepseek'))?.id || ''}).then(ok => setSaved(ok))}
+      save={() =>
+       void save({
+        ...value,
+        connection: 'deepseek',
+        activeProfile:
+         (
+          value.profiles.find(p => p.id === value.activeProfile && p.provider === 'deepseek') ||
+          value.profiles.find(p => p.provider === 'deepseek')
+         )?.id || ''
+       }).then(ok => setSaved(ok))
+      }
       navigation={navigation}
      />
     ) : (
-     <CodexSettings value={value} update={update} busy={busy} close={close} save={() => void save({...value, connection: 'codex'}).then(ok => setSaved(ok))} navigation={navigation} />
+     <CodexSettings
+      value={value}
+      update={update}
+      busy={busy}
+      close={close}
+      save={() => void save({...value, connection: 'codex'}).then(ok => setSaved(ok))}
+      navigation={navigation}
+     />
     )}{' '}
     {error && <p className="alert">{error}</p>}
     {saved && <p role="status">已保存</p>}
@@ -429,7 +592,13 @@ export function SettingsPanel({
     <>
      <label>
       Tavily 搜索 API Key
-      <input type="password" autoComplete="off" value={value.searchKey || ''} placeholder={value.hasSearchKey ? '已加密保存；留空保持原密钥' : '未配置时显示拓展题差额'} onChange={e => update({searchKey: e.target.value || undefined})} />
+      <input
+       type="password"
+       autoComplete="off"
+       value={value.searchKey || ''}
+       placeholder={value.hasSearchKey ? '已加密保存；留空保持原密钥' : '未配置时显示拓展题差额'}
+       onChange={e => update({searchKey: e.target.value || undefined})}
+      />
      </label>
      <label>
       主题
@@ -447,11 +616,26 @@ export function SettingsPanel({
        .filter(p => p !== 'subtitles')
        .map(p => (
         <option key={p} value={p}>
-         {({subtitles: '旧字幕提示词', correction: '原文与 PPT 校订', notes: '教师重点', 'past-exam': '历年卷拆题', match: '真题匹配', search: '网上题抽取', answer: '参考解析', chat: '课程追问'} as Record<string, string>)[p] || p}
+         {(
+          {
+           subtitles: '旧字幕提示词',
+           correction: '原文与 PPT 校订',
+           notes: '教师重点',
+           'past-exam': '历年卷拆题',
+           match: '真题匹配',
+           search: '网上题抽取',
+           answer: '参考解析',
+           chat: '课程追问'
+          } as Record<string, string>
+         )[p] || p}
         </option>
        ))}
      </select>
-     <textarea className="prompt-editor" value={value.prompts[prompt]} onChange={e => update({prompts: {...value.prompts, [prompt]: e.target.value}})} />
+     <textarea
+      className="prompt-editor"
+      value={value.prompts[prompt]}
+      onChange={e => update({prompts: {...value.prompts, [prompt]: e.target.value}})}
+     />
     </>
    )}
    <footer>

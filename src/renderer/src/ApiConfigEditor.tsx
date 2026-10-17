@@ -58,7 +58,17 @@ export function ApiConfigEditor({
  function add(provider = 'custom') {
   const id = crypto.randomUUID()
   update({
-   profiles: [...value.profiles, {id, provider, name: provider === 'deepseek' ? 'DeepSeek' : '新配置', baseUrl: provider === 'deepseek' ? 'https://api.deepseek.com' : '', model: provider === 'deepseek' ? 'deepseek-chat' : '', models: provider === 'deepseek' ? ['deepseek-chat', 'deepseek-reasoner'] : []}],
+   profiles: [
+    ...value.profiles,
+    {
+     id,
+     provider,
+     name: provider === 'deepseek' ? 'DeepSeek' : '新配置',
+     baseUrl: provider === 'deepseek' ? 'https://api.deepseek.com' : '',
+     model: provider === 'deepseek' ? 'deepseek-chat' : '',
+     models: provider === 'deepseek' ? ['deepseek-chat', 'deepseek-reasoner'] : []
+    }
+   ],
    activeProfile: id
   })
   setSelected(id)
@@ -110,12 +120,19 @@ export function ApiConfigEditor({
     const r = row as Record<string, unknown>
     if (!r || typeof r !== 'object') throw new Error('API 配置内容不正确')
     const apiFormat = r.apiFormat || r.api_format || 'chat_completions'
-    if (apiFormat !== 'chat_completions' && apiFormat !== 'responses') throw new Error('支持 Chat Completions 或 Responses 接口')
+    if (apiFormat !== 'chat_completions' && apiFormat !== 'responses')
+     throw new Error('支持 Chat Completions 或 Responses 接口')
     const name = r.name || '导入配置',
      baseUrl = r.baseUrl || r.base_url,
      model = r.model || '',
      apiKey = r.apiKey || r.api_key
-    if (typeof name !== 'string' || typeof baseUrl !== 'string' || typeof model !== 'string' || (apiKey !== undefined && typeof apiKey !== 'string')) throw new Error('配置需包含名称、baseUrl/base_url、model 和 apiKey/api_key')
+    if (
+     typeof name !== 'string' ||
+     typeof baseUrl !== 'string' ||
+     typeof model !== 'string' ||
+     (apiKey !== undefined && typeof apiKey !== 'string')
+    )
+     throw new Error('配置需包含名称、baseUrl/base_url、model 和 apiKey/api_key')
     return {id: crypto.randomUUID(), name, baseUrl, model, apiFormat, apiKey: apiKey as string | undefined}
    })
    if (!profiles.length) throw new Error('文件中没有 API 配置')
@@ -125,11 +142,18 @@ export function ApiConfigEditor({
   })
  }
  const provider = p?.provider || (p?.baseUrl.includes('deepseek.com') ? 'deepseek' : 'custom')
- const versions = value.profiles.filter(v => (v.provider || (v.baseUrl.includes('deepseek.com') ? 'deepseek' : 'custom')) === provider)
+ const versions = value.profiles.filter(
+  v => (v.provider || (v.baseUrl.includes('deepseek.com') ? 'deepseek' : 'custom')) === provider
+ )
  const parameters = p?.parameters?.[p.model] || {}
  function parameter(key: 'temperature' | 'topP' | 'maxTokens' | 'reasoningEffort', entry: string) {
   if (!p) return
-  patch({parameters: {...p.parameters, [p.model]: {...parameters, [key]: entry === '' ? undefined : key === 'reasoningEffort' ? entry : Number(entry)}}})
+  patch({
+   parameters: {
+    ...p.parameters,
+    [p.model]: {...parameters, [key]: entry === '' ? undefined : key === 'reasoningEffort' ? entry : Number(entry)}
+   }
+  })
  }
  const eye = (
   <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" strokeWidth="1.7">
@@ -162,12 +186,23 @@ export function ApiConfigEditor({
     <strong className="library-brand">听课助手</strong>
     <h2>模型库</h2>
     <div className="library-search">
-     <input aria-label="搜索模型配置" placeholder="搜索模型配置…" value={search} onChange={e => setSearch(e.target.value)} />
+     <input
+      aria-label="搜索模型配置"
+      placeholder="搜索模型配置…"
+      value={search}
+      onChange={e => setSearch(e.target.value)}
+     />
      <button disabled={busy} aria-label="添加 API 配置" onClick={() => add()}>
       ＋
      </button>
     </div>
-    <button type="button" className="library-group" aria-expanded={!collapsed} aria-controls="general-model-providers" onClick={toggleGroup}>
+    <button
+     type="button"
+     className="library-group"
+     aria-expanded={!collapsed}
+     aria-controls="general-model-providers"
+     onClick={toggleGroup}
+    >
      <span className="library-group-title">
       <DshChevronDownIcon className={collapsed ? 'collapsed' : ''} />
       通用大模型
@@ -176,11 +211,23 @@ export function ApiConfigEditor({
     </button>
     <div id="general-model-providers" hidden={collapsed && !search.trim()}>
      {['custom', 'deepseek'].map(kind => {
-      const rows = value.profiles.filter(v => (v.provider || (v.baseUrl.includes('deepseek.com') ? 'deepseek' : 'custom')) === kind),
+      const rows = value.profiles.filter(
+        v => (v.provider || (v.baseUrl.includes('deepseek.com') ? 'deepseek' : 'custom')) === kind
+       ),
        title = kind === 'deepseek' ? 'DeepSeek' : '自定义模型提供商'
-      if (search && !title.toLowerCase().includes(search.toLowerCase()) && !rows.some(v => v.name.toLowerCase().includes(search.toLowerCase()))) return null
+      if (
+       search &&
+       !title.toLowerCase().includes(search.toLowerCase()) &&
+       !rows.some(v => v.name.toLowerCase().includes(search.toLowerCase()))
+      )
+       return null
       return (
-       <button className={'provider-tile ' + (provider === kind && p ? 'selected' : '')} key={kind} disabled={busy} onClick={() => (rows[0] ? select(rows[0].id) : add(kind))}>
+       <button
+        className={'provider-tile ' + (provider === kind && p ? 'selected' : '')}
+        key={kind}
+        disabled={busy}
+        onClick={() => (rows[0] ? select(rows[0].id) : add(kind))}
+       >
         {kind === 'deepseek' ? (
          <img src={deepseekIcon} />
         ) : (
@@ -296,15 +343,28 @@ export function ApiConfigEditor({
        </div>
        <label>
         接口格式
-        <select aria-label="接口格式" disabled={busy} value={p.apiFormat || 'chat_completions'} onChange={e => patch({apiFormat: e.target.value as Profile['apiFormat']})}>
+        <select
+         aria-label="接口格式"
+         disabled={busy}
+         value={p.apiFormat || 'chat_completions'}
+         onChange={e => patch({apiFormat: e.target.value as Profile['apiFormat']})}
+        >
          <option value="chat_completions">Chat Completions</option>
          <option value="responses">Responses</option>
         </select>
        </label>
-       <p className="hint">PPT/PPTX 原文件上传自动使用同一服务地址的 Responses 接口；普通对话按此处配置。服务商需支持 PPT 文件输入。</p>
+       <p className="hint">
+        PPT/PPTX 原文件上传自动使用同一服务地址的 Responses 接口；普通对话按此处配置。服务商需支持 PPT 文件输入。
+       </p>
        <label>
         API 地址
-        <input aria-label="Base URL（包含 /v1 等前缀）" disabled={busy} value={p.baseUrl} placeholder="https://服务地址/v1" onChange={e => patch({baseUrl: e.target.value})} />
+        <input
+         aria-label="Base URL（包含 /v1 等前缀）"
+         disabled={busy}
+         value={p.baseUrl}
+         placeholder="https://服务地址/v1"
+         onChange={e => patch({baseUrl: e.target.value})}
+        />
        </label>
        <label>
         API Key
@@ -317,10 +377,16 @@ export function ApiConfigEditor({
           value={p.apiKey || revealed || (!keyFocused && p.hasKey ? '•'.repeat(p.keyLength || 8) : '')}
           onFocus={() => setKeyFocused(true)}
           onBlur={() => setKeyFocused(false)}
-          placeholder={p.hasKey ? '已保存，留空保留' : provider === 'deepseek' ? '填写 DeepSeek API Key' : '填写 API Key'}
+          placeholder={
+           p.hasKey ? '已保存，留空保留' : provider === 'deepseek' ? '填写 DeepSeek API Key' : '填写 API Key'
+          }
           onChange={e => patch({apiKey: e.target.value || undefined})}
          />
-         <button disabled={busy || (!p.hasKey && !p.apiKey)} aria-label={revealed !== null ? '隐藏 API Key' : '显示 API Key'} onClick={() => void reveal()}>
+         <button
+          disabled={busy || (!p.hasKey && !p.apiKey)}
+          aria-label={revealed !== null ? '隐藏 API Key' : '显示 API Key'}
+          onClick={() => void reveal()}
+         >
           {eye}
          </button>
         </div>
@@ -354,7 +420,13 @@ export function ApiConfigEditor({
        </label>
        {manual && (
         <div className="manual-model">
-         <input aria-label="模型名" disabled={busy} value={manualName} placeholder="填写服务商提供的完整模型 ID" onChange={e => setManualName(e.target.value)} />
+         <input
+          aria-label="模型名"
+          disabled={busy}
+          value={manualName}
+          placeholder="填写服务商提供的完整模型 ID"
+          onChange={e => setManualName(e.target.value)}
+         />
          <button
           disabled={busy || !manualName.trim()}
           onClick={() => {
@@ -377,11 +449,24 @@ export function ApiConfigEditor({
        <div className="parameter-grid">
         <label>
          单次最大输出
-         <input aria-label="单次最大输出" disabled={busy} type="number" min="1" value={parameters.maxTokens ?? ''} placeholder="自动" onChange={e => parameter('maxTokens', e.target.value)} />
+         <input
+          aria-label="单次最大输出"
+          disabled={busy}
+          type="number"
+          min="1"
+          value={parameters.maxTokens ?? ''}
+          placeholder="自动"
+          onChange={e => parameter('maxTokens', e.target.value)}
+         />
         </label>
         <label>
          推理强度
-         <select disabled={busy} aria-label="推理强度" value={parameters.reasoningEffort || ''} onChange={e => parameter('reasoningEffort', e.target.value)}>
+         <select
+          disabled={busy}
+          aria-label="推理强度"
+          value={parameters.reasoningEffort || ''}
+          onChange={e => parameter('reasoningEffort', e.target.value)}
+         >
           {reasoningOptions.map(o => (
            <option key={o.value} value={o.value}>
             {o.label}
@@ -391,11 +476,31 @@ export function ApiConfigEditor({
         </label>
         <label>
          温度 <small>0–2</small>
-         <input disabled={busy} aria-label="温度" type="number" min="0" max="2" step="0.1" value={parameters.temperature ?? ''} placeholder="上游默认" onChange={e => parameter('temperature', e.target.value)} />
+         <input
+          disabled={busy}
+          aria-label="温度"
+          type="number"
+          min="0"
+          max="2"
+          step="0.1"
+          value={parameters.temperature ?? ''}
+          placeholder="上游默认"
+          onChange={e => parameter('temperature', e.target.value)}
+         />
         </label>
         <label>
          Top P <small>0–1</small>
-         <input disabled={busy} aria-label="Top P" type="number" min="0" max="1" step="0.1" value={parameters.topP ?? ''} placeholder="上游默认" onChange={e => parameter('topP', e.target.value)} />
+         <input
+          disabled={busy}
+          aria-label="Top P"
+          type="number"
+          min="0"
+          max="1"
+          step="0.1"
+          value={parameters.topP ?? ''}
+          placeholder="上游默认"
+          onChange={e => parameter('topP', e.target.value)}
+         />
         </label>
        </div>
       </section>

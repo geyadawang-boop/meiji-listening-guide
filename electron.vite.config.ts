@@ -19,6 +19,12 @@ export default defineConfig({
    }
   }
  },
- preload: {plugins: [externalizeDepsPlugin()], build: {lib: {entry: resolve('src/preload/preload.ts')}, rollupOptions: {output: {format: 'cjs', entryFileNames: '[name].cjs'}}}},
+ preload: {
+  plugins: [externalizeDepsPlugin()],
+  build: {
+   lib: {entry: resolve('src/preload/preload.ts')},
+   rollupOptions: {output: {format: 'cjs', entryFileNames: '[name].cjs'}}
+  }
+ },
  renderer: {plugins: [react()]}
 })

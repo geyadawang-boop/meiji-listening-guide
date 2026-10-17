@@ -48,7 +48,8 @@ export function trimBlackSides(image: Electron.NativeImage): Crop {
   }
   return n / height > 0.999
  }
- if (!width || !height || Array.from({length: width}, (_, x) => x).every(black)) return {left: 0, right: 1, top: 0, bottom: 1}
+ if (!width || !height || Array.from({length: width}, (_, x) => x).every(black))
+  return {left: 0, right: 1, top: 0, bottom: 1}
  // Dark slide backgrounds cannot be distinguished from bars by the content
  // bounding box. Preserve the canvas whenever the interior is mostly dark.
  let dark = 0,
@@ -68,13 +69,25 @@ export function trimBlackSides(image: Electron.NativeImage): Crop {
  // Only trim continuous bars touching an edge. Never seek dark areas inside a slide.
  return {left: left / width, right: (right + 1) / width, top: 0, bottom: 1}
 }
-const cropSchema = z.object({left: z.number().min(0).max(0.95), right: z.number().min(0.05).max(1), top: z.number().min(0).max(0.95), bottom: z.number().min(0.05).max(1)}).refine(c => c.right - c.left > 0.05 && c.bottom - c.top > 0.05, '裁剪区域过小')
+const cropSchema = z
+ .object({
+  left: z.number().min(0).max(0.95),
+  right: z.number().min(0.05).max(1),
+  top: z.number().min(0).max(0.95),
+  bottom: z.number().min(0.05).max(1)
+ })
+ .refine(c => c.right - c.left > 0.05 && c.bottom - c.top > 0.05, '裁剪区域过小')
 export function croppedImage(image: Electron.NativeImage, crop: Crop) {
  const c = cropSchema.parse(crop),
   {width, height} = image.getSize(),
   x = Math.round(width * c.left),
   y = Math.round(height * c.top)
- return image.crop({x, y, width: Math.max(1, Math.min(width - x, Math.round(width * c.right) - x)), height: Math.max(1, Math.min(height - y, Math.round(height * c.bottom) - y))})
+ return image.crop({
+  x,
+  y,
+  width: Math.max(1, Math.min(width - x, Math.round(width * c.right) - x)),
+  height: Math.max(1, Math.min(height - y, Math.round(height * c.bottom) - y))
+ })
 }
 function preview(image: Electron.NativeImage, maxSide = 900, quality = 82) {
  const s = image.getSize()
@@ -93,7 +106,9 @@ export async function readImageDeck(path: string, signal?: AbortSignal): Promise
   presentation = await zip.file('ppt/presentation.xml')?.async('string'),
   rels = await zip.file('ppt/_rels/presentation.xml.rels')?.async('string')
  if (!presentation || !rels) throw new Error('无法读取 PPTX 页面目录')
- const ids = Array.from(presentation.matchAll(/<p:sldId\b[^>]*\/?\s*>/g), m => attr(m[0], 'r:id')).filter(Boolean) as string[]
+ const ids = Array.from(presentation.matchAll(/<p:sldId\b[^>]*\/?\s*>/g), m => attr(m[0], 'r:id')).filter(
+  Boolean
+ ) as string[]
  if (!ids.length || ids.length > 500) throw new Error('请选择包含 1–500 页的图片型 PPTX')
  const pages: Page[] = []
  let compressedBytes = 0
@@ -106,10 +121,13 @@ export async function readImageDeck(path: string, signal?: AbortSignal): Promise
   if (!xml) throw new Error('课件页面缺失')
   const pictures = Array.from(xml.matchAll(/<p:pic\b[\s\S]*?<\/p:pic>/g), m => m[0])
   if (!pictures.length && !/<a:t\b|<p:graphicFrame\b|<p:sp\b/.test(xml)) continue
-  if (pictures.length !== 1 || /<a:t\b|<p:graphicFrame\b|<p:sp\b/.test(xml)) throw new Error(`第 ${index + 1} 页包含可编辑对象或多张图片，暂不能完整处理；请先将每页转换为一张图片后再导入`)
+  if (pictures.length !== 1 || /<a:t\b|<p:graphicFrame\b|<p:sp\b/.test(xml))
+   throw new Error(`第 ${index + 1} 页包含可编辑对象或多张图片，暂不能完整处理；请先将每页转换为一张图片后再导入`)
   const pic = pictures[0],
    embed = attr(pic, 'r:embed'),
-   slideRels = await zip.file(posix.join(posix.dirname(name), '_rels', posix.basename(name) + '.rels'))?.async('string'),
+   slideRels = await zip
+    .file(posix.join(posix.dirname(name), '_rels', posix.basename(name) + '.rels'))
+    ?.async('string'),
    media = embed && slideRels && target(slideRels, embed)
   if (!media) throw new Error(`第 ${index + 1} 页没有可读取的内嵌图片`)
   const mediaName = partTarget(posix.dirname(name), media)
@@ -129,10 +147,23 @@ export async function readImageDeck(path: string, signal?: AbortSignal): Promise
   if (dimensions.width * dimensions.height > 25000000) throw new Error('单页图片分辨率过大，请降低分辨率')
   const rect = /<a:srcRect\b[^>]*\/?\s*>/.exec(pic)?.[0]
   if (rect) {
-   image = croppedImage(image, {left: Number(attr(rect, 'l') || 0) / 100000, top: Number(attr(rect, 't') || 0) / 100000, right: 1 - Number(attr(rect, 'r') || 0) / 100000, bottom: 1 - Number(attr(rect, 'b') || 0) / 100000})
+   image = croppedImage(image, {
+    left: Number(attr(rect, 'l') || 0) / 100000,
+    top: Number(attr(rect, 't') || 0) / 100000,
+    right: 1 - Number(attr(rect, 'r') || 0) / 100000,
+    bottom: 1 - Number(attr(rect, 'b') || 0) / 100000
+   })
   }
   const transform = /<a:xfrm\b[^>]*>/.exec(pic)?.[0]
-  if (transform && (Number(attr(transform, 'rot') || 0) !== 0 || attr(transform, 'flipH') === '1' || attr(transform, 'flipV') === '1' || attr(transform, 'flipH') === 'true' || attr(transform, 'flipV') === 'true')) throw new Error(`第 ${index + 1} 页图片带旋转或翻转，请先转换为完整截图`)
+  if (
+   transform &&
+   (Number(attr(transform, 'rot') || 0) !== 0 ||
+    attr(transform, 'flipH') === '1' ||
+    attr(transform, 'flipV') === '1' ||
+    attr(transform, 'flipH') === 'true' ||
+    attr(transform, 'flipV') === 'true')
+  )
+   throw new Error(`第 ${index + 1} 页图片带旋转或翻转，请先转换为完整截图`)
   const png = image.toPNG(),
    stored = rect ? png : data
   compressedBytes += stored.length
@@ -151,16 +182,38 @@ export async function readImageDeck(path: string, signal?: AbortSignal): Promise
  if (!pages.some(p => !p.unavailable)) throw new Error('课件中没有可读取的图片页；原课件图片缺失或损坏')
  return pages
 }
-const analysisSchema = z.array(z.object({page: z.number().int().positive(), keep: z.boolean(), reason: z.string().max(300), contentScore: z.number().min(0).max(100), duplicateOf: z.number().int().positive().nullable()}))
+const analysisSchema = z.array(
+ z.object({
+  page: z.number().int().positive(),
+  keep: z.boolean(),
+  reason: z.string().max(300),
+  contentScore: z.number().min(0).max(100),
+  duplicateOf: z.number().int().positive().nullable()
+ })
+)
 export class PptExtractor {
- private drafts = new Map<string, {sourceName: string; sourcePath: string; sourceHash: string; sourceDeleted?: boolean; pages: Page[]; review: PptExtractReview}>()
+ private drafts = new Map<
+  string,
+  {
+   sourceName: string
+   sourcePath: string
+   sourceHash: string
+   sourceDeleted?: boolean
+   pages: Page[]
+   review: PptExtractReview
+  }
+ >()
  constructor(
   private codex: Pick<CodexClient, 'chat'>,
   private progress: (message: string) => void
  ) {}
  async restore(path: string, review: PptExtractReview, signal: AbortSignal) {
   const pages = await readImageDeck(path, signal)
-  if (review.pages.length !== pages.length || review.pages.some((p, i) => p.page !== pages[i].page || typeof p.keep !== 'boolean')) throw new Error('已保存的分析与原课件不一致')
+  if (
+   review.pages.length !== pages.length ||
+   review.pages.some((p, i) => p.page !== pages[i].page || typeof p.keep !== 'boolean')
+  )
+   throw new Error('已保存的分析与原课件不一致')
   this.drafts.clear()
   this.drafts.set(review.id, {
    sourceName: basename(path),
@@ -188,7 +241,14 @@ export class PptExtractor {
     continue
    }
    const same = seen.get(p.hash)
-   if (same) decisions.push({page: p.page, keep: true, reason: `与第 ${same} 页图片完全相同`, contentScore: 0, duplicateOf: same})
+   if (same)
+    decisions.push({
+     page: p.page,
+     keep: true,
+     reason: `与第 ${same} 页图片完全相同`,
+     contentScore: 0,
+     duplicateOf: same
+    })
    else {
     seen.set(p.hash, p.page)
     unique.push(p)
@@ -204,7 +264,8 @@ export class PptExtractor {
    this.progress('整份 PPT 图片较大，正在压缩发送预览；仍在同一个对话中处理')
    images = unique.map(p => ({label: `课件第 ${p.page} 页`, url: preview(croppedImage(p.image, p.crop), 640, 75)}))
   }
-  if (bytes() > payloadLimit) throw new Error('整份 PPT 的图片请求超过软件的 32 MB 发送保护值。请降低原图分辨率后重试；没有自动分批或创建额外对话')
+  if (bytes() > payloadLimit)
+   throw new Error('整份 PPT 的图片请求超过软件的 32 MB 发送保护值。请降低原图分辨率后重试；没有自动分批或创建额外对话')
   signal.throwIfAborted()
   this.progress(`正在一次分析整份 PPT：${pages.length} 页，${unique.length} 张不同图片，同一个新对话`)
   const instructions =
@@ -230,7 +291,16 @@ export class PptExtractor {
      .trim()
    )
   )
-  if (result.length !== unique.length || new Set(result.map(d => d.page)).size !== unique.length || result.some(d => !unique.some(p => p.page === d.page) || d.duplicateOf === d.page || (d.duplicateOf !== null && !unique.some(p => p.page === d.duplicateOf))))
+  if (
+   result.length !== unique.length ||
+   new Set(result.map(d => d.page)).size !== unique.length ||
+   result.some(
+    d =>
+     !unique.some(p => p.page === d.page) ||
+     d.duplicateOf === d.page ||
+     (d.duplicateOf !== null && !unique.some(p => p.page === d.duplicateOf))
+   )
+  )
    throw new Error('模型返回的页面编号不完整，请重新分析；没有自动分批或重开对话')
   decisions.push(...result)
   signal.throwIfAborted()
@@ -250,12 +320,15 @@ export class PptExtractor {
     while (root.get(n) !== n) n = root.get(n)!
     return n
    }
-  for (const d of decisions) if (d.duplicateOf && decisions.find(x => x.page === d.duplicateOf)?.keep && d.keep) root.set(find(d.page), find(d.duplicateOf))
+  for (const d of decisions)
+   if (d.duplicateOf && decisions.find(x => x.page === d.duplicateOf)?.keep && d.keep)
+    root.set(find(d.page), find(d.duplicateOf))
   const winners = new Map<number, number>()
   for (const d of decisions.filter(d => d.keep)) {
    const key = find(d.page),
     old = decisions.find(x => x.page === winners.get(key))
-   if (!old || d.contentScore > old.contentScore || (d.contentScore === old.contentScore && d.page < old.page)) winners.set(key, d.page)
+   if (!old || d.contentScore > old.contentScore || (d.contentScore === old.contentScore && d.page < old.page))
+    winners.set(key, d.page)
   }
   const review: PptExtractReview = {
    id: randomUUID(),
@@ -264,7 +337,15 @@ export class PptExtractor {
     const d = decisions.find(x => x.page === p.page)!,
      winner = winners.get(find(p.page)),
      keep = d.keep && winner === p.page
-    return {page: p.page, preview: p.unavailable ? '' : preview(p.image), ...p.image.getSize(), crop: p.crop, keep, reason: d.keep && !keep ? `与第 ${winner} 页重复，保留内容更完整的版本` : d.reason, duplicateOf: d.keep && !keep ? winner : undefined}
+    return {
+     page: p.page,
+     preview: p.unavailable ? '' : preview(p.image),
+     ...p.image.getSize(),
+     crop: p.crop,
+     keep,
+     reason: d.keep && !keep ? `与第 ${winner} 页重复，保留内容更完整的版本` : d.reason,
+     duplicateOf: d.keep && !keep ? winner : undefined
+    }
    })
   }
   this.drafts.clear()
@@ -279,8 +360,14 @@ export class PptExtractor {
  async export(id: string, choices: Array<{page: number; keep: boolean; crop: Crop}>, signal?: AbortSignal) {
   const draft = this.drafts.get(id)
   if (!draft) throw new Error('处理预览已失效，请重新导入 PPT')
-  if (choices.length !== draft.pages.length || new Set(choices.map(c => c.page)).size !== choices.length || choices.some(c => !draft.pages.some(p => p.page === c.page))) throw new Error('页面选择不完整')
-  if (choices.some(c => c.keep && draft.pages.find(p => p.page === c.page)?.unavailable)) throw new Error('缺失或损坏的图片页无法导出，请取消保留这些页')
+  if (
+   choices.length !== draft.pages.length ||
+   new Set(choices.map(c => c.page)).size !== choices.length ||
+   choices.some(c => !draft.pages.some(p => p.page === c.page))
+  )
+   throw new Error('页面选择不完整')
+  if (choices.some(c => c.keep && draft.pages.find(p => p.page === c.page)?.unavailable))
+   throw new Error('缺失或损坏的图片页无法导出，请取消保留这些页')
   const selected = choices
    .filter(c => c.keep)
    .map(c => ({page: c.page, image: () => croppedImage(draft.pages.find(p => p.page === c.page)!.image, c.crop)}))
@@ -291,13 +378,26 @@ export class PptExtractor {
    selected.map(p => p.image),
    signal
   )
-  const files = [{name: draft.sourceName.replace(/\.pptx$/i, '') + '-截取.pdf', buffer, pages: selected.map(p => p.page)}]
-  return {buffer, files, extension: 'pdf', kept: selected.length, removed: choices.length - selected.length, sourceName: draft.sourceName, sourcePath: draft.sourcePath, sourceHash: draft.sourceHash, sourceDeleted: !!draft.sourceDeleted}
+  const files = [
+   {name: draft.sourceName.replace(/\.pptx$/i, '') + '-截取.pdf', buffer, pages: selected.map(p => p.page)}
+  ]
+  return {
+   buffer,
+   files,
+   extension: 'pdf',
+   kept: selected.length,
+   removed: choices.length - selected.length,
+   sourceName: draft.sourceName,
+   sourcePath: draft.sourcePath,
+   sourceHash: draft.sourceHash,
+   sourceDeleted: !!draft.sourceDeleted
+  }
  }
 }
 export async function imagePptx(images: Array<Electron.NativeImage | (() => Electron.NativeImage)>): Promise<Buffer> {
  if (!images.length) throw new Error('没有可导出的页面')
- const load = (image: Electron.NativeImage | (() => Electron.NativeImage)) => (typeof image === 'function' ? image() : image)
+ const load = (image: Electron.NativeImage | (() => Electron.NativeImage)) =>
+  typeof image === 'function' ? image() : image
  const size = load(images[0]).getSize(),
   cx = 9144000,
   cy = Math.round((cx * size.height) / size.width),
@@ -311,23 +411,42 @@ export async function imagePptx(images: Array<Electron.NativeImage | (() => Elec
   '<Override PartName="/ppt/slideLayouts/slideLayout1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml"/>',
   '<Override PartName="/ppt/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/>'
  ]
- const rels = (items: string) => `<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${items}</Relationships>`
- const rel = (id: string, type: string, target: string) => `<Relationship Id="${id}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/${type}" Target="${target}"/>`
- const namespaces = 'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"'
- const group = '<p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>'
+ const rels = (items: string) =>
+  `<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${items}</Relationships>`
+ const rel = (id: string, type: string, target: string) =>
+  `<Relationship Id="${id}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/${type}" Target="${target}"/>`
+ const namespaces =
+  'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"'
+ const group =
+  '<p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>'
  zip.file('_rels/.rels', rels(rel('rId1', 'officeDocument', 'ppt/presentation.xml')))
  zip.file(
   'ppt/presentation.xml',
   `<p:presentation ${namespaces}><p:sldMasterIdLst><p:sldMasterId id="2147483648" r:id="rIdMaster"/></p:sldMasterIdLst><p:sldIdLst>${images.map((_, i) => `<p:sldId id="${256 + i}" r:id="rId${i + 1}"/>`).join('')}</p:sldIdLst><p:sldSz cx="${cx}" cy="${cy}"/><p:notesSz cx="6858000" cy="9144000"/></p:presentation>`
  )
- zip.file('ppt/_rels/presentation.xml.rels', rels(rel('rIdMaster', 'slideMaster', 'slideMasters/slideMaster1.xml') + images.map((_, i) => rel('rId' + (i + 1), 'slide', 'slides/slide' + (i + 1) + '.xml')).join('')))
+ zip.file(
+  'ppt/_rels/presentation.xml.rels',
+  rels(
+   rel('rIdMaster', 'slideMaster', 'slideMasters/slideMaster1.xml') +
+    images.map((_, i) => rel('rId' + (i + 1), 'slide', 'slides/slide' + (i + 1) + '.xml')).join('')
+  )
+ )
  zip.file(
   'ppt/slideMasters/slideMaster1.xml',
   `<p:sldMaster ${namespaces}><p:cSld><p:spTree>${group}</p:spTree></p:cSld><p:clrMap accent1="accent1" accent2="accent2" accent3="accent3" accent4="accent4" accent5="accent5" accent6="accent6" bg1="lt1" bg2="lt2" folHlink="folHlink" hlink="hlink" tx1="dk1" tx2="dk2"/><p:sldLayoutIdLst><p:sldLayoutId id="2147483649" r:id="rId1"/></p:sldLayoutIdLst><p:txStyles><p:titleStyle/><p:bodyStyle/><p:otherStyle/></p:txStyles></p:sldMaster>`
  )
- zip.file('ppt/slideMasters/_rels/slideMaster1.xml.rels', rels(rel('rId1', 'slideLayout', '../slideLayouts/slideLayout1.xml') + rel('rId2', 'theme', '../theme/theme1.xml')))
- zip.file('ppt/slideLayouts/slideLayout1.xml', `<p:sldLayout ${namespaces} type="blank" preserve="1"><p:cSld name="Blank"><p:spTree>${group}</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sldLayout>`)
- zip.file('ppt/slideLayouts/_rels/slideLayout1.xml.rels', rels(rel('rId1', 'slideMaster', '../slideMasters/slideMaster1.xml')))
+ zip.file(
+  'ppt/slideMasters/_rels/slideMaster1.xml.rels',
+  rels(rel('rId1', 'slideLayout', '../slideLayouts/slideLayout1.xml') + rel('rId2', 'theme', '../theme/theme1.xml'))
+ )
+ zip.file(
+  'ppt/slideLayouts/slideLayout1.xml',
+  `<p:sldLayout ${namespaces} type="blank" preserve="1"><p:cSld name="Blank"><p:spTree>${group}</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sldLayout>`
+ )
+ zip.file(
+  'ppt/slideLayouts/_rels/slideLayout1.xml.rels',
+  rels(rel('rId1', 'slideMaster', '../slideMasters/slideMaster1.xml'))
+ )
  zip.file(
   'ppt/theme/theme1.xml',
   `<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="PPT"><a:themeElements><a:clrScheme name="PPT">${[
@@ -353,15 +472,24 @@ export async function imagePptx(images: Array<Electron.NativeImage | (() => Elec
   const image = load(entry)
   const n = i + 1,
    s = image.getSize()
-  if (Math.abs(s.width / s.height - size.width / size.height) / (size.width / size.height) > 0.03) throw new Error('保留页的裁剪比例不同。请调整裁剪范围至同一比例，或分批导出；避免拉伸图片或再次切掉内容')
-  types.push(`<Override PartName="/ppt/slides/slide${n}.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>`)
+  if (Math.abs(s.width / s.height - size.width / size.height) / (size.width / size.height) > 0.03)
+   throw new Error('保留页的裁剪比例不同。请调整裁剪范围至同一比例，或分批导出；避免拉伸图片或再次切掉内容')
+  types.push(
+   `<Override PartName="/ppt/slides/slide${n}.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>`
+  )
   zip.file(`ppt/media/image${n}.png`, image.toPNG())
-  zip.file(`ppt/slides/_rels/slide${n}.xml.rels`, rels(rel('rId1', 'slideLayout', '../slideLayouts/slideLayout1.xml') + rel('rId2', 'image', `../media/image${n}.png`)))
+  zip.file(
+   `ppt/slides/_rels/slide${n}.xml.rels`,
+   rels(rel('rId1', 'slideLayout', '../slideLayouts/slideLayout1.xml') + rel('rId2', 'image', `../media/image${n}.png`))
+  )
   zip.file(
    `ppt/slides/slide${n}.xml`,
    `<p:sld ${namespaces}><p:cSld><p:spTree>${group}<p:pic><p:nvPicPr><p:cNvPr id="2" name="PPT ${n}"/><p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="rId2"/><a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic></p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`
   )
  }
- zip.file('[Content_Types].xml', `<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">${types.join('')}</Types>`)
+ zip.file(
+  '[Content_Types].xml',
+  `<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">${types.join('')}</Types>`
+ )
  return zip.generateAsync({type: 'nodebuffer', compression: 'DEFLATE'})
 }

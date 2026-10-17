@@ -4,9 +4,26 @@ import {MemorySuggestions} from './MemorySuggestions'
 const request = <T,>(action: string, args: unknown = {}) => window.assistant.invoke<T>('tools:request', {action, args})
 const op = () => crypto.randomUUID().replaceAll('-', '')
 type Session = {conversation_id: string; title: string; revision: number; pinned: boolean}
-type Task = {task_id: string; question: string; status: string; note: string; error_code?: string; sources: {source_id: string; title: string; text: string; read: boolean}[]}
+type Task = {
+ task_id: string
+ question: string
+ status: string
+ note: string
+ error_code?: string
+ sources: {source_id: string; title: string; text: string; read: boolean}[]
+}
 type Detail = Session & {research_tasks?: Task[]}
-type Memory = {memory_id: string; revision: number; kind: string; title: string; body: string; source_task: string | null; paused: boolean; expires_at: number | null; availability: string}
+type Memory = {
+ memory_id: string
+ revision: number
+ kind: string
+ title: string
+ body: string
+ source_task: string | null
+ paused: boolean
+ expires_at: number | null
+ availability: string
+}
 type Memories = {records: Memory[]; capacity: {used: number; limit: number}}
 export function LearningRecords() {
  const [sessions, setSessions] = useState<Session[]>([]),
@@ -69,9 +86,17 @@ export function LearningRecords() {
   <>
    <section className="knowledge-card">
     <h3>知识会话</h3>
-    <p className="hint">研究结果和已读来源保存在副本知识库。打开历史不会重新请求模型；后续问题采用保存的上下文，重新核验引用资料，不把历史回答当原文。</p>
+    <p className="hint">
+     研究结果和已读来源保存在副本知识库。打开历史不会重新请求模型；后续问题采用保存的上下文，重新核验引用资料，不把历史回答当原文。
+    </p>
     <div className="row">
-     <input aria-label="知识会话名称" placeholder="例如：龋病病因复习" maxLength={80} value={title} onChange={e => setTitle(e.target.value)} />
+     <input
+      aria-label="知识会话名称"
+      placeholder="例如：龋病病因复习"
+      maxLength={80}
+      value={title}
+      onChange={e => setTitle(e.target.value)}
+     />
      <button
       disabled={busy || !title.trim()}
       onClick={() =>
@@ -119,8 +144,16 @@ export function LearningRecords() {
         disabled={busy || !title.trim()}
         onClick={() =>
          void run(async () => {
-          const organization = await request<{revision: number; pinned: boolean}>('conversation-organization', {id: detail.conversation_id})
-          await request('conversation-organize', {id: detail.conversation_id, op: op(), revision: organization.revision, title, pinned: organization.pinned})
+          const organization = await request<{revision: number; pinned: boolean}>('conversation-organization', {
+           id: detail.conversation_id
+          })
+          await request('conversation-organize', {
+           id: detail.conversation_id,
+           op: op(),
+           revision: organization.revision,
+           title,
+           pinned: organization.pinned
+          })
           setDetail(await request<Detail>('conversation-read', {id: detail.conversation_id}))
           await listing()
          })
@@ -132,8 +165,16 @@ export function LearningRecords() {
         disabled={busy}
         onClick={() =>
          void run(async () => {
-          const organization = await request<{revision: number; pinned: boolean}>('conversation-organization', {id: detail.conversation_id})
-          await request('conversation-organize', {id: detail.conversation_id, op: op(), revision: organization.revision, title: detail.title, pinned: !organization.pinned})
+          const organization = await request<{revision: number; pinned: boolean}>('conversation-organization', {
+           id: detail.conversation_id
+          })
+          await request('conversation-organize', {
+           id: detail.conversation_id,
+           op: op(),
+           revision: organization.revision,
+           title: detail.title,
+           pinned: !organization.pinned
+          })
           await listing()
          })
         }
@@ -141,14 +182,28 @@ export function LearningRecords() {
         切换置顶
        </button>
       </div>
-      <textarea aria-label="知识会话问题" maxLength={1500} value={question} onChange={e => setQuestion(e.target.value)} placeholder="依据知识库继续提问…" />
+      <textarea
+       aria-label="知识会话问题"
+       maxLength={1500}
+       value={question}
+       onChange={e => setQuestion(e.target.value)}
+       placeholder="依据知识库继续提问…"
+      />
       <button
        className="primary"
        disabled={busy || !question.trim() || !!detail.research_tasks?.some(task => task.status === 'running')}
        onClick={() =>
         void run(async () => {
          const overview = await request<{extensions: {revision: number}; mcp: {revision: number}}>('overview')
-         await request('agent-create', {op: op(), question, channels: ['library', 'memory', 'conversations'], skills: {revision: overview.extensions.revision, ids: []}, mcp: {revision: overview.mcp.revision, items: []}, materials: [], conversation: {id: detail.conversation_id, revision: detail.revision}})
+         await request('agent-create', {
+          op: op(),
+          question,
+          channels: ['library', 'memory', 'conversations'],
+          skills: {revision: overview.extensions.revision, ids: []},
+          mcp: {revision: overview.mcp.revision, items: []},
+          materials: [],
+          conversation: {id: detail.conversation_id, revision: detail.revision}
+         })
          setQuestion('')
          setDetail(await request<Detail>('conversation-read', {id: detail.conversation_id}))
          await listing()
@@ -161,7 +216,8 @@ export function LearningRecords() {
        <article key={task.task_id}>
         <h4>{task.question}</h4>
         <p>
-         {task.status === 'running' ? '正在核验与回答' : task.status === 'completed' ? '已保存' : '未完成'} {task.error_code || ''}
+         {task.status === 'running' ? '正在核验与回答' : task.status === 'completed' ? '已保存' : '未完成'}{' '}
+         {task.error_code || ''}
         </p>
         {task.status === 'running' && (
          <button
@@ -214,14 +270,21 @@ export function LearningRecords() {
     <h3>
      学习记忆 · {memories?.capacity.used || 0}/{memories?.capacity.limit || 100}
     </h3>
-    <p className="hint">由你明确填写和保存，模型建议不自动写入。记忆仅辅助后续检索，不能当作教材事实。停用保留内容；忘记会清除内容。</p>
+    <p className="hint">
+     由你明确填写和保存，模型建议不自动写入。记忆仅辅助后续检索，不能当作教材事实。停用保留内容；忘记会清除内容。
+    </p>
     <div className="row">
      <select aria-label="学习记忆类型" value={kind} onChange={e => setKind(e.target.value)}>
       <option value="preference">学习偏好</option>
       <option value="progress">学习进度</option>
       <option value="correction">待核实纠错</option>
      </select>
-     <input aria-label="学习记忆标题" maxLength={80} value={memoryTitle} onChange={e => setMemoryTitle(e.target.value)} />
+     <input
+      aria-label="学习记忆标题"
+      maxLength={80}
+      value={memoryTitle}
+      onChange={e => setMemoryTitle(e.target.value)}
+     />
     </div>
     <textarea aria-label="学习记忆正文" maxLength={1000} value={body} onChange={e => setBody(e.target.value)} />
     <label className="media-check">
@@ -233,7 +296,19 @@ export function LearningRecords() {
       disabled={busy || !memoryTitle.trim() || !body.trim()}
       onClick={() =>
        void run(async () => {
-        await request('memory-change', {value: {op_id: op(), memory_id: editing?.memory_id || null, revision: editing?.revision || 0, kind, title: memoryTitle, body, source_task: editing?.source_task || null, paused, expires_at: editing?.expires_at || null}})
+        await request('memory-change', {
+         value: {
+          op_id: op(),
+          memory_id: editing?.memory_id || null,
+          revision: editing?.revision || 0,
+          kind,
+          title: memoryTitle,
+          body,
+          source_task: editing?.source_task || null,
+          paused,
+          expires_at: editing?.expires_at || null
+         }
+        })
         edit()
         setMemories(await request<Memories>('memories'))
         setNotice('学习记忆已保存')
@@ -258,7 +333,10 @@ export function LearningRecords() {
         disabled={busy}
         onClick={() =>
          void run(async () => {
-          await request('memory-change', {deleting: true, value: {op_id: op(), memory_id: memory.memory_id, revision: memory.revision}})
+          await request('memory-change', {
+           deleting: true,
+           value: {op_id: op(), memory_id: memory.memory_id, revision: memory.revision}
+          })
           if (editing?.memory_id === memory.memory_id) edit()
           setMemories(await request<Memories>('memories'))
          })

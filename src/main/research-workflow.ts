@@ -13,7 +13,14 @@ export type NativeResearchFlow = {
  fence: number
  outcome_unknown: boolean
  bindings: ResearchBinding[]
- steps: {name: string; status: string; answer: string; answer_sha256: string | null; task_id: string | null; create_op: string}[]
+ steps: {
+  name: string
+  status: string
+  answer: string
+  answer_sha256: string | null
+  task_id: string | null
+  create_op: string
+ }[]
  error_code: string
  created_at: string
  updated_at: string
@@ -30,7 +37,9 @@ export class NativeResearchWorkflows {
  private initialize() {
   if (this.initialized) return
   this.initialized = true
-  for (const flow of this.store.list<NativeResearchFlow>('workflow')) if (flow.status === 'running') this.save({...flow, status: 'paused', outcome_unknown: true, error_code: '上次工作流中断，需核对模型请求后再继续'})
+  for (const flow of this.store.list<NativeResearchFlow>('workflow'))
+   if (flow.status === 'running')
+    this.save({...flow, status: 'paused', outcome_unknown: true, error_code: '上次工作流中断，需核对模型请求后再继续'})
  }
  private save(flow: NativeResearchFlow) {
   const next = {...flow, revision: flow.revision + 1, updated_at: new Date().toISOString()}
@@ -47,7 +56,9 @@ export class NativeResearchWorkflows {
   return this.store.read<NativeResearchFlow>('workflow', id)
  }
  create(input: unknown) {
-  const request = z.object({op, question: z.string().trim().min(1).max(800), materials: z.array(z.unknown()).min(1).max(6)}).parse(input)
+  const request = z
+   .object({op, question: z.string().trim().min(1).max(800), materials: z.array(z.unknown()).min(1).max(6)})
+   .parse(input)
   const result = this.store.operation(request.op, request, () => {
    const materials = request.materials.map(binding => this.sources.read(binding))
    this.sources.verify(materials)
@@ -60,7 +71,14 @@ export class NativeResearchWorkflows {
      fence: 0,
      outcome_unknown: false,
      bindings: materials.map(source => source.binding),
-     steps: ['材料整理', '综合回答'].map(name => ({name, status: 'pending', answer: '', answer_sha256: null, task_id: null, create_op: randomUUID().replaceAll('-', '')})),
+     steps: ['材料整理', '综合回答'].map(name => ({
+      name,
+      status: 'pending',
+      answer: '',
+      answer_sha256: null,
+      task_id: null,
+      create_op: randomUUID().replaceAll('-', '')
+     })),
      error_code: '',
      created_at: now,
      updated_at: now
@@ -71,7 +89,16 @@ export class NativeResearchWorkflows {
   return this.read(result.id)
  }
  action(input: unknown) {
-  const value = z.object({id: op, op, revision: z.number().int().nonnegative(), fence: z.number().int().nonnegative(), retry_unknown: z.boolean(), kind: z.enum(['stop', 'resume'])}).parse(input)
+  const value = z
+   .object({
+    id: op,
+    op,
+    revision: z.number().int().nonnegative(),
+    fence: z.number().int().nonnegative(),
+    retry_unknown: z.boolean(),
+    kind: z.enum(['stop', 'resume'])
+   })
+   .parse(input)
   const result = this.store.operation(value.op, value, () => {
    const flow = this.read(value.id)
    if (flow.revision !== value.revision || flow.fence !== value.fence) throw new Error('工作流版本已改变，请刷新')
@@ -79,7 +106,9 @@ export class NativeResearchWorkflows {
     if (flow.status !== 'running') throw new Error('工作流未运行')
     this.active.get(flow.workflow_id)?.controller.abort()
     for (const step of flow.steps) if (step.task_id && step.status === 'running') this.engine.stop(step.task_id)
-    return {id: this.save({...flow, status: 'stopped', fence: flow.fence + 1, error_code: '用户停止工作流'}).workflow_id}
+    return {
+     id: this.save({...flow, status: 'stopped', fence: flow.fence + 1, error_code: '用户停止工作流'}).workflow_id
+    }
    }
    if (flow.status === 'completed' || flow.status === 'running') throw new Error('当前工作流不能继续')
    if (flow.outcome_unknown && !value.retry_unknown) throw new Error('存在未确认模型请求，需要明确确认后再继续')
@@ -136,17 +165,33 @@ export class NativeResearchWorkflows {
      task = this.engine.read(step.task_id)
      if (task.status !== 'completed') task = this.engine.resume(task.task_id, task.revision, retryUnknown)
     } else {
-     const question = index === 0 ? `请为以下问题整理原文证据，区分资料中的共识和缺失：${flow.question}` : `请依据所选原文回答：${flow.question}\n前一步草稿仅为整理线索，不是额外来源，不得替代原文核对：\n${flow.steps[0].answer.slice(0, 10000)}`
-     task = this.engine.create({op: step.create_op, question: question.slice(0, 1500), channels: ['library'], materials: flow.bindings})
+     const question =
+      index === 0
+       ? `请为以下问题整理原文证据，区分资料中的共识和缺失：${flow.question}`
+       : `请依据所选原文回答：${flow.question}\n前一步草稿仅为整理线索，不是额外来源，不得替代原文核对：\n${flow.steps[0].answer.slice(0, 10000)}`
+     task = this.engine.create({
+      op: step.create_op,
+      question: question.slice(0, 1500),
+      channels: ['library'],
+      materials: flow.bindings
+     })
     }
-    flow = {...flow, steps: flow.steps.map((item, i) => (i === index ? {...item, status: 'running', task_id: task.task_id} : item))}
+    flow = {
+     ...flow,
+     steps: flow.steps.map((item, i) => (i === index ? {...item, status: 'running', task_id: task.task_id} : item))
+    }
     this.save(flow)
     const result = task.status === 'completed' ? task : await this.wait(task.task_id, signal)
     if (result.status !== 'completed') throw new Error(result.error_code || '工作流步骤未完成')
     this.engine.verifyResult(result.task_id)
     flow = this.read(id)
     if (flow.status !== 'running' || flow.fence !== fence) throw new Error('工作流已停止，步骤未发布')
-    this.save({...flow, steps: flow.steps.map((item, i) => (i === index ? {...item, status: 'completed', answer: result.note, answer_sha256: hash(result.note)} : item))})
+    this.save({
+     ...flow,
+     steps: flow.steps.map((item, i) =>
+      i === index ? {...item, status: 'completed', answer: result.note, answer_sha256: hash(result.note)} : item
+     )
+    })
    }
    const flow = this.read(id)
    if (flow.status !== 'running' || flow.fence !== fence) throw new Error('工作流已改变')
@@ -154,12 +199,22 @@ export class NativeResearchWorkflows {
    this.save({...flow, status: 'completed', outcome_unknown: false})
   } catch (error) {
    const current = this.read(id)
-   if (current.status === 'running' && current.fence === fence) this.save({...current, status: signal.aborted ? 'stopped' : 'failed', outcome_unknown: current.steps.some(step => step.task_id && this.engine.read(step.task_id).outcome_unknown), error_code: error instanceof Error ? error.message : '工作流未完成'})
+   if (current.status === 'running' && current.fence === fence)
+    this.save({
+     ...current,
+     status: signal.aborted ? 'stopped' : 'failed',
+     outcome_unknown: current.steps.some(step => step.task_id && this.engine.read(step.task_id).outcome_unknown),
+     error_code: error instanceof Error ? error.message : '工作流未完成'
+    })
   }
  }
  verify(id: string) {
   const flow = this.read(id)
-  if (flow.status !== 'completed' || flow.steps.some(step => step.status !== 'completed' || step.answer_sha256 !== hash(step.answer))) throw new Error('工作流尚未完整核验')
+  if (
+   flow.status !== 'completed' ||
+   flow.steps.some(step => step.status !== 'completed' || step.answer_sha256 !== hash(step.answer))
+  )
+   throw new Error('工作流尚未完整核验')
   for (const step of flow.steps) this.engine.verifyResult(step.task_id!)
   return flow
  }

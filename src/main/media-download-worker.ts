@@ -9,9 +9,16 @@ if (!port || !resources || !root) throw new Error('下载工作进程参数无�
 const ownerReady = acquireDownloadQueue(root)
 void ownerReady.catch(() => {})
 let sequence = 0
-const pending = new Map<number, {resolve: (data: unknown) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout>}>()
+const pending = new Map<
+ number,
+ {resolve: (data: unknown) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout>}
+>()
 const api = {
- readMedia(path: '/x/web-interface/view' | '/x/player/wbi/playurl' | '/x/player/v2', params: Record<string, string>, signal: AbortSignal): Promise<unknown> {
+ readMedia(
+  path: '/x/web-interface/view' | '/x/player/wbi/playurl' | '/x/player/v2',
+  params: Record<string, string>,
+  signal: AbortSignal
+ ): Promise<unknown> {
   return new Promise((resolve, reject) => {
    const key = ++sequence,
     timer = setTimeout(() => finish(new Error('站点读取超时')), 45000)
@@ -34,14 +41,29 @@ port.on('message', event => {
  void (async () => {
   const raw = event.data as {kind?: unknown}
   if (raw.kind === 'bili-result') {
-   const reply = z.object({kind: z.literal('bili-result'), key: z.number().int().positive(), ok: z.boolean(), data: z.unknown().optional(), error: z.string().optional()}).parse(raw)
+   const reply = z
+    .object({
+     kind: z.literal('bili-result'),
+     key: z.number().int().positive(),
+     ok: z.boolean(),
+     data: z.unknown().optional(),
+     error: z.string().optional()
+    })
+    .parse(raw)
    const request = pending.get(reply.key)
    if (request) reply.ok ? request.resolve(reply.data) : request.reject(new Error(reply.error || '站点读取失败'))
    return
   }
   let id: number | undefined
   try {
-   const request = z.object({protocol: z.literal(BACKEND_PROTOCOL), id: z.number().int().positive(), action: z.string(), args: z.unknown()}).parse(raw)
+   const request = z
+    .object({
+     protocol: z.literal(BACKEND_PROTOCOL),
+     id: z.number().int().positive(),
+     action: z.string(),
+     args: z.unknown()
+    })
+    .parse(raw)
    id = request.id
    const owner = await ownerReady
    if (request.action === 'shutdown') {
@@ -53,7 +75,13 @@ port.on('message', event => {
    const result = await service.execute(request.action, request.args)
    port.postMessage({protocol: BACKEND_PROTOCOL, kind: 'result', id, ok: true, result})
   } catch (error) {
-   port.postMessage({protocol: BACKEND_PROTOCOL, kind: 'result', id, ok: false, error: error instanceof Error ? error.message : '下载请求失败'})
+   port.postMessage({
+    protocol: BACKEND_PROTOCOL,
+    kind: 'result',
+    id,
+    ok: false,
+    error: error instanceof Error ? error.message : '下载请求失败'
+   })
   }
  })().catch(() => {
   process.exitCode = 1

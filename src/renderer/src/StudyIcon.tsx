@@ -1,5 +1,21 @@
 import type {ReactNode} from 'react'
-export function StudyIcon({name}: {name: 'subtitles' | 'notes' | 'practice' | 'edit' | 'download' | 'upload' | 'sparkle' | 'clock' | 'trash' | 'check' | 'reset' | 'eye'}) {
+export function StudyIcon({
+ name
+}: {
+ name:
+  | 'subtitles'
+  | 'notes'
+  | 'practice'
+  | 'edit'
+  | 'download'
+  | 'upload'
+  | 'sparkle'
+  | 'clock'
+  | 'trash'
+  | 'check'
+  | 'reset'
+  | 'eye'
+}) {
  const paths: Record<string, ReactNode> = {
   subtitles: (
    <>
@@ -64,7 +80,16 @@ export function StudyIcon({name}: {name: 'subtitles' | 'notes' | 'practice' | 'e
   )
  }
  return (
-  <svg className="study-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+   className="study-icon"
+   aria-hidden="true"
+   viewBox="0 0 24 24"
+   fill="none"
+   stroke="currentColor"
+   strokeWidth="1.7"
+   strokeLinecap="round"
+   strokeLinejoin="round"
+  >
    {paths[name]}
   </svg>
  )

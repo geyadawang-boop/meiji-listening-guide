@@ -16,13 +16,21 @@ async function walk(folder: string) {
   if (item.isDirectory()) await walk(path)
   else {
    const name = relative(root, path).replaceAll('\\', '/')
-   if (/\.(?:py|pyc|cjs|ps1|db|sqlite|pdf|pptx?|srt|mp4|log)$/i.test(name)) throw new Error('源码白名单目录出现历史实现或个人资料：' + name)
+   if (/\.(?:py|pyc|cjs|ps1|db|sqlite|pdf|pptx?|srt|mp4|log)$/i.test(name))
+    throw new Error('源码白名单目录出现历史实现或个人资料：' + name)
    files.push(name)
   }
  }
 }
 for (const folder of ['src', 'prompts']) await walk(join(root, folder))
-for (const item of await readdir(join(root, 'scripts'), {withFileTypes: true})) if (item.isFile() && item.name.endsWith('.mts') && !item.name.startsWith('github-') && !item.name.startsWith('retire-')) files.push('scripts/' + item.name)
+for (const item of await readdir(join(root, 'scripts'), {withFileTypes: true}))
+ if (
+  item.isFile() &&
+  item.name.endsWith('.mts') &&
+  !item.name.startsWith('github-') &&
+  !item.name.startsWith('retire-')
+ )
+  files.push('scripts/' + item.name)
 for (const name of [
  'package.json',
  'pnpm-lock.yaml',
@@ -50,9 +58,25 @@ for (const path of files) zip.file(path, createReadStream(join(root, path)))
 const output = join(root, 'release/source')
 await mkdir(output, {recursive: true})
 const archive = join(output, `Meiji-Listening-Guide-${pkg.version}-source.zip`)
-await pipeline(zip.generateNodeStream({type: 'nodebuffer', streamFiles: true, compression: 'DEFLATE', compressionOptions: {level: 6}}), createWriteStream(archive))
+await pipeline(
+ zip.generateNodeStream({
+  type: 'nodebuffer',
+  streamFiles: true,
+  compression: 'DEFLATE',
+  compressionOptions: {level: 6}
+ }),
+ createWriteStream(archive)
+)
 const hash = createHash('sha256')
 for await (const bytes of createReadStream(archive)) hash.update(bytes)
-const receipt = {version: pkg.version, path: archive, size: (await stat(archive)).size, sha256: hash.digest('hex'), files: files.length, userDataIncluded: false, legacyCodeIncluded: false}
+const receipt = {
+ version: pkg.version,
+ path: archive,
+ size: (await stat(archive)).size,
+ sha256: hash.digest('hex'),
+ files: files.length,
+ userDataIncluded: false,
+ legacyCodeIncluded: false
+}
 await import('node:fs/promises').then(fs => fs.writeFile(archive + '.json', JSON.stringify(receipt, null, 2)))
 console.log(JSON.stringify(receipt))

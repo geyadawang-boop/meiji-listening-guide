@@ -15,7 +15,19 @@ export class SettingsStore {
  constructor(root: string) {
   mkdirSync(root, {recursive: true})
   this.path = join(root, 'settings.json')
-  this.value = existsSync(this.path) ? JSON.parse(readFileSync(this.path, 'utf8')) : {profiles: [], activeProfile: '', theme: 'light', browserWidth: 420, browserOpen: true, maxMinutes: 60, maxGB: 1.5, compress: false, prompts: {}}
+  this.value = existsSync(this.path)
+   ? JSON.parse(readFileSync(this.path, 'utf8'))
+   : {
+      profiles: [],
+      activeProfile: '',
+      theme: 'light',
+      browserWidth: 420,
+      browserOpen: true,
+      maxMinutes: 60,
+      maxGB: 1.5,
+      compress: false,
+      prompts: {}
+     }
   if (this.value.videoPolicyVersion !== 2) {
    if (this.value.maxMinutes === 45 || this.value.maxMinutes >= 60) {
     this.value.maxMinutes = 60
@@ -25,12 +37,24 @@ export class SettingsStore {
    this.flush()
   }
   for (const name of ['correction', 'notes', 'past-exam', 'match', 'search', 'answer', 'chat']) {
-   if (this.value.prompts[name] === undefined) this.value.prompts[name] = readFileSync(join(app.isPackaged ? process.resourcesPath : app.getAppPath(), 'prompts', name + '.txt'), 'utf8')
+   if (this.value.prompts[name] === undefined)
+    this.value.prompts[name] = readFileSync(
+     join(app.isPackaged ? process.resourcesPath : app.getAppPath(), 'prompts', name + '.txt'),
+     'utf8'
+    )
   }
  }
  public get(): Settings {
   const {encryptedSearchKey, profiles, videoPolicyVersion, ...rest} = this.value
-  return {...rest, hasSearchKey: !!encryptedSearchKey, profiles: profiles.map(({encryptedKey, apiKey, ...p}) => ({...p, hasKey: !!encryptedKey, keyLength: encryptedKey ? this.decrypt(encryptedKey).length : 0}))}
+  return {
+   ...rest,
+   hasSearchKey: !!encryptedSearchKey,
+   profiles: profiles.map(({encryptedKey, apiKey, ...p}) => ({
+    ...p,
+    hasKey: !!encryptedKey,
+    keyLength: encryptedKey ? this.decrypt(encryptedKey).length : 0
+   }))
+  }
  }
  public codexSelection(): Settings['codex'] {
   return this.value.codex ? {...this.value.codex} : undefined
@@ -43,7 +67,8 @@ export class SettingsStore {
   return value ? safeStorage.decryptString(Buffer.from(value, 'base64')) : ''
  }
  public save(settings: Settings): Settings {
-  if (!(settings.maxMinutes >= 1 && settings.maxMinutes <= 60) || !(settings.maxGB > 0 && settings.maxGB <= 10)) throw new Error('视频限制设置不合法')
+  if (!(settings.maxMinutes >= 1 && settings.maxMinutes <= 60) || !(settings.maxGB > 0 && settings.maxGB <= 10))
+   throw new Error('视频限制设置不合法')
   const profiles = settings.profiles.map(p => {
    const name = p.name?.trim(),
     model = p.model?.trim(),
@@ -56,10 +81,12 @@ export class SettingsStore {
    } catch {
     throw new Error('API 地址格式不正确，请填写完整地址，例如 https://服务地址/v1')
    }
-   if (!['https:', 'http:'].includes(parsed.protocol) || parsed.username || parsed.password) throw new Error('API 地址必须是 HTTP(S)，不能包含密码')
+   if (!['https:', 'http:'].includes(parsed.protocol) || parsed.username || parsed.password)
+    throw new Error('API 地址必须是 HTTP(S)，不能包含密码')
    for (const param of Object.values(p.parameters || {})) {
     if (
-     (param.temperature !== undefined && (!Number.isFinite(param.temperature) || param.temperature < 0 || param.temperature > 2)) ||
+     (param.temperature !== undefined &&
+      (!Number.isFinite(param.temperature) || param.temperature < 0 || param.temperature > 2)) ||
      (param.topP !== undefined && (!Number.isFinite(param.topP) || param.topP < 0 || param.topP > 1)) ||
      (param.maxTokens !== undefined && (!Number.isInteger(param.maxTokens) || param.maxTokens < 1))
     )
@@ -67,7 +94,8 @@ export class SettingsStore {
    }
    const id = p.id || randomUUID(),
     old = this.value.profiles.find(v => v.id === id)
-   if (p.apiFormat !== undefined && !['chat_completions', 'responses'].includes(p.apiFormat)) throw new Error('不支持此 API 接口格式')
+   if (p.apiFormat !== undefined && !['chat_completions', 'responses'].includes(p.apiFormat))
+    throw new Error('不支持此 API 接口格式')
    return {
     id,
     name,
@@ -80,9 +108,16 @@ export class SettingsStore {
     encryptedKey: p.apiKey?.trim() ? this.encrypt(p.apiKey.trim()) : old?.encryptedKey
    }
   })
-  const encryptedSearchKey = settings.searchKey === undefined ? this.value.encryptedSearchKey : settings.searchKey ? this.encrypt(settings.searchKey) : undefined
-  if (settings.codex && (typeof settings.codex.model !== 'string' || typeof settings.codex.effort !== 'string')) throw new Error('Codex 模型设置不正确')
-  if (settings.connection !== undefined && !['codex', 'deepseek'].includes(settings.connection)) throw new Error('模型连接方式不正确')
+  const encryptedSearchKey =
+   settings.searchKey === undefined
+    ? this.value.encryptedSearchKey
+    : settings.searchKey
+      ? this.encrypt(settings.searchKey)
+      : undefined
+  if (settings.codex && (typeof settings.codex.model !== 'string' || typeof settings.codex.effort !== 'string'))
+   throw new Error('Codex 模型设置不正确')
+  if (settings.connection !== undefined && !['codex', 'deepseek'].includes(settings.connection))
+   throw new Error('模型连接方式不正确')
   if (settings.connection === 'deepseek') {
    const selected = profiles.find(p => p.id === settings.activeProfile)
    if (!selected || selected.provider !== 'deepseek') throw new Error('请选择 DeepSeek 配置')
@@ -125,7 +160,8 @@ export class SettingsStore {
   } catch {
    throw new Error('请填写完整的 API 地址')
   }
-  if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password) throw new Error('API 地址必须是 HTTP(S)，不能包含密码')
+  if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password)
+   throw new Error('API 地址必须是 HTTP(S)，不能包含密码')
   const old = this.value.profiles.find(v => v.id === p.id),
    key = p.apiKey?.trim() || this.decrypt(old?.encryptedKey)
   if (!key) throw new Error('请填写 API Key，或使用此配置已保存的密钥')

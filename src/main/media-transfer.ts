@@ -5,7 +5,16 @@ import {join, resolve} from 'node:path'
 import {z} from 'zod'
 
 type Fetcher = (url: string, init?: RequestInit) => Promise<Response>
-const checkpointSchema = z.object({version: z.literal(1), identity: z.string(), size: z.number().int().nonnegative().safe(), hash: z.string().regex(/^[a-f0-9]{64}$/), etag: z.string(), total: z.number().int().nonnegative().safe().nullable()}).strict()
+const checkpointSchema = z
+ .object({
+  version: z.literal(1),
+  identity: z.string(),
+  size: z.number().int().nonnegative().safe(),
+  hash: z.string().regex(/^[a-f0-9]{64}$/),
+  etag: z.string(),
+  total: z.number().int().nonnegative().safe().nullable()
+ })
+ .strict()
 async function hashFile(path: string) {
  const hash = createHash('sha256')
  for await (const chunk of createReadStream(path)) hash.update(chunk)
@@ -15,13 +24,32 @@ const strongETag = (value: string | null) => (value && /^"[^"\r\n]+"$/.test(valu
 /** Caller supplies an owned task directory and an already validated platform URL.
  * A returned file is still intermediate; the queue must validate final media before publishing it.
  */
-export async function transferMedia(input: {directory: string; key: string; identity: string; url: string; signal: AbortSignal; fetcher: Fetcher; headers?: Record<string, string>; maxBytes?: number; writeBufferBytes?: number; chunkBytes?: number; progress?: (downloaded: number, total: number | null) => void}) {
- if (!/^[a-zA-Z0-9_-]{1,80}$/.test(input.key) || !input.identity || input.identity.length > 500) throw new Error('下载分段标识无效')
+export async function transferMedia(input: {
+ directory: string
+ key: string
+ identity: string
+ url: string
+ signal: AbortSignal
+ fetcher: Fetcher
+ headers?: Record<string, string>
+ maxBytes?: number
+ writeBufferBytes?: number
+ chunkBytes?: number
+ progress?: (downloaded: number, total: number | null) => void
+}) {
+ if (!/^[a-zA-Z0-9_-]{1,80}$/.test(input.key) || !input.identity || input.identity.length > 500)
+  throw new Error('下载分段标识无效')
  const writeBuffer = input.writeBufferBytes ?? 65536
- if (!Number.isSafeInteger(writeBuffer) || writeBuffer < 1024 || writeBuffer > 10485760) throw new Error('下载写入缓冲区大小无效')
+ if (!Number.isSafeInteger(writeBuffer) || writeBuffer < 1024 || writeBuffer > 10485760)
+  throw new Error('下载写入缓冲区大小无效')
  const directory = resolve(input.directory),
   stat = await lstat(directory)
- if (!stat.isDirectory() || stat.isSymbolicLink() || resolve(await realpath(directory)).toLowerCase() !== directory.toLowerCase()) throw new Error('下载任务目录无效')
+ if (
+  !stat.isDirectory() ||
+  stat.isSymbolicLink() ||
+  resolve(await realpath(directory)).toLowerCase() !== directory.toLowerCase()
+ )
+  throw new Error('下载任务目录无效')
  const path = join(directory, input.key + '.partial'),
   journal = join(directory, input.key + '.resume.json'),
   lock = join(directory, input.key + '.lock')
@@ -52,27 +80,61 @@ export async function transferMedia(input: {directory: string; key: string; iden
   try {
    const old = checkpointSchema.parse(JSON.parse(await readFile(journal, 'utf8'))),
     file = await lstat(path)
-   if (old.identity === input.identity && file.size === old.size && old.etag && old.size > 0 && old.size <= max && (await hashFile(path)) === old.hash) {
+   if (
+    old.identity === input.identity &&
+    file.size === old.size &&
+    old.etag &&
+    old.size > 0 &&
+    old.size <= max &&
+    (await hashFile(path)) === old.hash
+   ) {
     size = old.size
     total = old.total
     etag = old.etag
    }
   } catch (error) {
-   if (input.signal.aborted) throw error /* Incomplete crash checkpoints restart instead of appending unverified bytes. */
+   if (input.signal.aborted)
+    throw error /* Incomplete crash checkpoints restart instead of appending unverified bytes. */
   }
-  const headers = {...input.headers, 'Accept-Encoding': 'identity', ...(size ? {Range: `bytes=${size}-`, 'If-Range': etag} : {})}
-  const response = await input.fetcher(input.url, {headers, signal: input.signal, redirect: 'error', credentials: 'omit'})
+  const headers = {
+   ...input.headers,
+   'Accept-Encoding': 'identity',
+   ...(size ? {Range: `bytes=${size}-`, 'If-Range': etag} : {})
+  }
+  const response = await input.fetcher(input.url, {
+   headers,
+   signal: input.signal,
+   redirect: 'error',
+   credentials: 'omit'
+  })
   if (response.body) reader = response.body.getReader()
-  if (response.status === 416 && size > 0 && total === size && response.headers.get('content-range') === 'bytes */' + size && strongETag(response.headers.get('etag')) === etag) return {path, size, hash: await hashFile(path), etag, total}
+  if (
+   response.status === 416 &&
+   size > 0 &&
+   total === size &&
+   response.headers.get('content-range') === 'bytes */' + size &&
+   strongETag(response.headers.get('etag')) === etag
+  )
+   return {path, size, hash: await hashFile(path), etag, total}
   if (!response.ok || !response.body) throw new Error(`媒体下载未完成（HTTP ${response.status}）`)
-  if (response.headers.get('content-encoding') && response.headers.get('content-encoding') !== 'identity') throw new Error('媒体响应压缩方式不支持断点校验')
+  if (response.headers.get('content-encoding') && response.headers.get('content-encoding') !== 'identity')
+   throw new Error('媒体响应压缩方式不支持断点校验')
   const incomingTag = strongETag(response.headers.get('etag'))
   const lengthHeader = response.headers.get('content-length'),
    length = lengthHeader !== null && /^\d+$/.test(lengthHeader) ? Number(lengthHeader) : null
   if (length !== null && !Number.isSafeInteger(length)) throw new Error('媒体长度无效')
   if (size && response.status === 206) {
    const range = /^bytes (\d+)-(\d+)\/(\d+)$/.exec(response.headers.get('content-range') || '')
-   if (!range || Number(range[1]) !== size || Number(range[2]) < size || Number(range[3]) <= Number(range[2]) || incomingTag !== etag || (total !== null && Number(range[3]) !== total) || (length !== null && length !== Number(range[2]) - size + 1)) throw new Error('断点响应与原分段不一致，请重新建立下载')
+   if (
+    !range ||
+    Number(range[1]) !== size ||
+    Number(range[2]) < size ||
+    Number(range[3]) <= Number(range[2]) ||
+    incomingTag !== etag ||
+    (total !== null && Number(range[3]) !== total) ||
+    (length !== null && length !== Number(range[2]) - size + 1)
+   )
+    throw new Error('断点响应与原分段不一致，请重新建立下载')
    total = Number(range[3])
   } else if (response.status === 200) {
    size = 0
@@ -88,7 +150,8 @@ export async function transferMedia(input: {directory: string; key: string; iden
    const chunk = await reader!.read()
    input.signal.throwIfAborted()
    if (chunk.done) break
-   if (size + chunk.value.byteLength > max || (total !== null && size + chunk.value.byteLength > total)) throw new Error('媒体响应超过声明长度')
+   if (size + chunk.value.byteLength > max || (total !== null && size + chunk.value.byteLength > total))
+    throw new Error('媒体响应超过声明长度')
    let offset = 0
    while (offset < chunk.value.byteLength) {
     input.signal.throwIfAborted()

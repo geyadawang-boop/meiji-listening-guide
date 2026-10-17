@@ -2,18 +2,44 @@ import {useEffect, useState} from 'react'
 import type {Profile, Settings} from '../../shared/types'
 const invoke = <T,>(action: string, args?: unknown) => window.assistant.invoke<T>(action, args)
 const available = ['deepseek-flash', 'deepseek-v4-pro']
-export function DeepSeekSettings({value, update, save, close, busy, navigation}: {value: Settings; update: (patch: Partial<Settings>) => void; save: () => void; close: () => void; busy: boolean; navigation: React.ReactNode}) {
+export function DeepSeekSettings({
+ value,
+ update,
+ save,
+ close,
+ busy,
+ navigation
+}: {
+ value: Settings
+ update: (patch: Partial<Settings>) => void
+ save: () => void
+ close: () => void
+ busy: boolean
+ navigation: React.ReactNode
+}) {
  const [pending, setPending] = useState(false),
   [notice, setNotice] = useState('')
- const profile = value.profiles.find(p => p.id === value.activeProfile && p.provider === 'deepseek') || value.profiles.find(p => p.provider === 'deepseek')
+ const profile =
+  value.profiles.find(p => p.id === value.activeProfile && p.provider === 'deepseek') ||
+  value.profiles.find(p => p.provider === 'deepseek')
  useEffect(() => {
   if (!profile) {
-   const p: Profile = {id: crypto.randomUUID(), name: 'DeepSeek 官方 API', provider: 'deepseek', baseUrl: 'https://api.deepseek.com', model: 'deepseek-flash', apiFormat: 'responses', models: available, parameters: {'deepseek-flash': {reasoningEffort: 'low'}}}
+   const p: Profile = {
+    id: crypto.randomUUID(),
+    name: 'DeepSeek 官方 API',
+    provider: 'deepseek',
+    baseUrl: 'https://api.deepseek.com',
+    model: 'deepseek-flash',
+    apiFormat: 'responses',
+    models: available,
+    parameters: {'deepseek-flash': {reasoningEffort: 'low'}}
+   }
    update({profiles: [...value.profiles, p], activeProfile: p.id})
   }
  }, [])
  if (!profile) return null
- const patch = (fields: Partial<Profile>) => update({activeProfile: profile.id, profiles: value.profiles.map(p => (p.id === profile.id ? {...p, ...fields} : p))})
+ const patch = (fields: Partial<Profile>) =>
+  update({activeProfile: profile.id, profiles: value.profiles.map(p => (p.id === profile.id ? {...p, ...fields} : p))})
  const effort = profile.parameters?.[profile.model]?.reasoningEffort || 'low',
   disabled = busy || pending,
   hasKey = !!(profile.apiKey?.trim() || profile.hasKey)
@@ -63,15 +89,34 @@ export function DeepSeekSettings({value, update, save, close, busy, navigation}:
     </div>
     <label>
      API 地址
-     <input aria-label="DeepSeek API 地址" value={profile.baseUrl} disabled={disabled} onChange={e => patch({baseUrl: e.target.value})} />
+     <input
+      aria-label="DeepSeek API 地址"
+      value={profile.baseUrl}
+      disabled={disabled}
+      onChange={e => patch({baseUrl: e.target.value})}
+     />
     </label>
     <label>
      API Key
-     <input aria-label="DeepSeek API Key" type="password" autoComplete="off" spellCheck={false} disabled={disabled} value={profile.apiKey || ''} placeholder={profile.hasKey ? '已加密保存，留空保留原密钥' : '填写 DeepSeek API Key'} onChange={e => patch({apiKey: e.target.value})} />
+     <input
+      aria-label="DeepSeek API Key"
+      type="password"
+      autoComplete="off"
+      spellCheck={false}
+      disabled={disabled}
+      value={profile.apiKey || ''}
+      placeholder={profile.hasKey ? '已加密保存，留空保留原密钥' : '填写 DeepSeek API Key'}
+      onChange={e => patch({apiKey: e.target.value})}
+     />
     </label>
     <label>
      模型
-     <select aria-label="DeepSeek 模型" disabled={disabled} value={available.includes(profile.model) ? profile.model : ''} onChange={e => patch({model: e.target.value, apiFormat: 'responses'})}>
+     <select
+      aria-label="DeepSeek 模型"
+      disabled={disabled}
+      value={available.includes(profile.model) ? profile.model : ''}
+      onChange={e => patch({model: e.target.value, apiFormat: 'responses'})}
+     >
       {!available.includes(profile.model) && <option value="">请选择当前模型</option>}
       {available.map(m => (
        <option key={m} value={m}>
@@ -82,7 +127,12 @@ export function DeepSeekSettings({value, update, save, close, busy, navigation}:
     </label>
     <label>
      推理强度
-     <select aria-label="DeepSeek 推理强度" disabled={disabled} value={effort} onChange={e => patch({parameters: {...profile.parameters, [profile.model]: {reasoningEffort: e.target.value}}})}>
+     <select
+      aria-label="DeepSeek 推理强度"
+      disabled={disabled}
+      value={effort}
+      onChange={e => patch({parameters: {...profile.parameters, [profile.model]: {reasoningEffort: e.target.value}}})}
+     >
       <option value="low">低 · 回复较快</option>
       <option value="high">高 · 深入分析</option>
       <option value="max">最高 · 复杂任务</option>

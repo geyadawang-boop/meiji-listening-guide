@@ -15,7 +15,12 @@ export function verifyWeixinKey(key: Buffer, page: Buffer) {
   macKey.fill(0)
  }
 }
-export type WeixinMemory = {read: (address: number, length: number) => Buffer | undefined; find: (needle: Buffer) => number[]; module: {base: number; size: number}; guard: () => void}
+export type WeixinMemory = {
+ read: (address: number, length: number) => Buffer | undefined
+ find: (needle: Buffer) => number[]
+ module: {base: number; size: number}
+ guard: () => void
+}
 function pointer(data: Buffer, offset = 0) {
  const value = data.readBigUInt64LE(offset)
  return value >= 65536n && value < 140737488355328n ? Number(value) : 0
@@ -30,7 +35,11 @@ export function readWeixinIdentity(memory: WeixinMemory) {
   if (!image) continue
   for (let i = Math.floor(Math.min(1048576, image.length - 16) / 8) * 8; i >= 16; i -= 8) {
    if (i % 8192 === 0) memory.guard()
-   if (image.readUInt32LE(i) === 13 && (image.readUInt32LE(i + 8) | 15) === 15 && image.subarray(i - 16, i - 3).equals(Buffer.from('global_config'))) {
+   if (
+    image.readUInt32LE(i) === 13 &&
+    (image.readUInt32LE(i + 8) | 15) === 15 &&
+    image.subarray(i - 16, i - 3).equals(Buffer.from('global_config'))
+   ) {
     position = offset + i
     break
    }
@@ -66,7 +75,13 @@ export function scanWeixinKeys(memory: WeixinMemory, pages: Map<string, Buffer>)
    for (const at of memory.find(pair)) {
     memory.guard()
     const node = memory.read(at - 16, 80)
-    if (!node || node.length < 64 || !needles.includes(pointer(node, 16)) || Number(node.readBigUInt64LE(24)) !== marker.length) continue
+    if (
+     !node ||
+     node.length < 64 ||
+     !needles.includes(pointer(node, 16)) ||
+     Number(node.readBigUInt64LE(24)) !== marker.length
+    )
+     continue
     const config = pointer(node, 40)
     if (!config) continue
     const obj = memory.read(config + 136, 40)
@@ -80,7 +95,11 @@ export function scanWeixinKeys(memory: WeixinMemory, pages: Map<string, Buffer>)
     try {
      for (const match of decoded.toString('latin1').matchAll(/[xX]'([0-9a-fA-F]{64,192})'/g)) {
       const run = match[1],
-       starts = [0, ...(run.length > 96 ? Array.from({length: Math.floor((run.length - 64) / 32) + 1}, (_, i) => i * 32) : []), ...(run.length > 96 ? [run.length - 64] : [])]
+       starts = [
+        0,
+        ...(run.length > 96 ? Array.from({length: Math.floor((run.length - 64) / 32) + 1}, (_, i) => i * 32) : []),
+        ...(run.length > 96 ? [run.length - 64] : [])
+       ]
       for (const start of new Set(starts)) {
        memory.guard()
        const candidate = Buffer.from(run.slice(start, start + 64), 'hex')
@@ -90,7 +109,12 @@ export function scanWeixinKeys(memory: WeixinMemory, pages: Map<string, Buffer>)
        }
        tested.add(candidate.toString('hex'))
        if (tested.size > 4096) throw new Error('微信密钥核验达到预算')
-       const choices = [candidate, ...(start + 96 <= run.length ? [Buffer.concat([candidate, Buffer.from(run.slice(start + 64, start + 96), 'hex')])] : [])]
+       const choices = [
+        candidate,
+        ...(start + 96 <= run.length
+         ? [Buffer.concat([candidate, Buffer.from(run.slice(start + 64, start + 96), 'hex')])]
+         : [])
+       ]
        try {
         for (const choice of choices)
          for (const [path, page] of pages) {

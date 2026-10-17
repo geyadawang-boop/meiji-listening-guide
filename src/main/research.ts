@@ -4,8 +4,22 @@ import {z} from 'zod'
 import {BACKEND_PROTOCOL, backendRequest} from '../shared/backend-protocol'
 import type {ResearchModel} from './research-engine'
 const messageSchema = z.discriminatedUnion('kind', [
- z.object({protocol: z.literal(BACKEND_PROTOCOL), kind: z.literal('result'), id: z.number().int().positive(), ok: z.boolean(), result: z.unknown().optional(), error: z.string().max(4000).optional()}),
- z.object({protocol: z.literal(BACKEND_PROTOCOL), kind: z.literal('model'), key: z.number().int().positive(), connection: z.string().max(200), system: z.string().max(30000), user: z.string().max(250000)}),
+ z.object({
+  protocol: z.literal(BACKEND_PROTOCOL),
+  kind: z.literal('result'),
+  id: z.number().int().positive(),
+  ok: z.boolean(),
+  result: z.unknown().optional(),
+  error: z.string().max(4000).optional()
+ }),
+ z.object({
+  protocol: z.literal(BACKEND_PROTOCOL),
+  kind: z.literal('model'),
+  key: z.number().int().positive(),
+  connection: z.string().max(200),
+  system: z.string().max(30000),
+  user: z.string().max(250000)
+ }),
  z.object({protocol: z.literal(BACKEND_PROTOCOL), kind: z.literal('model-cancel'), key: z.number().int().positive()})
 ])
 /** Model credentials remain in the parent. Background research exchanges only selected text and connection fingerprints. */
@@ -13,7 +27,10 @@ export class NativeResearchBackend {
  private worker: UtilityProcess | undefined
  private sequence = 0
  private closed = false
- private pending = new Map<number, {resolve: (value: unknown) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout>}>()
+ private pending = new Map<
+  number,
+  {resolve: (value: unknown) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout>}
+ >()
  private models = new Map<number, AbortController>()
  constructor(
   private root: string,
@@ -25,7 +42,11 @@ export class NativeResearchBackend {
  }
  private start() {
   if (this.worker) return this.worker
-  const worker = utilityProcess.fork(fileURLToPath(new URL('./research-worker.js', import.meta.url)), [this.root, this.resources], {stdio: 'pipe', serviceName: '原生研究工具'})
+  const worker = utilityProcess.fork(
+   fileURLToPath(new URL('./research-worker.js', import.meta.url)),
+   [this.root, this.resources],
+   {stdio: 'pipe', serviceName: '原生研究工具'}
+  )
   this.worker = worker
   worker.stdout?.on('data', () => {})
   worker.stderr?.on('data', () => {})
@@ -61,10 +82,18 @@ export class NativeResearchBackend {
     const controller = new AbortController()
     this.models.set(reply.key, controller)
     try {
-     const text = await this.model({connection: reply.connection, system: reply.system, user: reply.user}, controller.signal)
+     const text = await this.model(
+      {connection: reply.connection, system: reply.system, user: reply.user},
+      controller.signal
+     )
      if (this.worker === worker) worker.postMessage({kind: 'model-result', key: reply.key, text})
     } catch (error) {
-     if (this.worker === worker) worker.postMessage({kind: 'model-result', key: reply.key, error: error instanceof Error ? error.message.slice(0, 1000) : '模型请求失败'})
+     if (this.worker === worker)
+      worker.postMessage({
+       kind: 'model-result',
+       key: reply.key,
+       error: error instanceof Error ? error.message.slice(0, 1000) : '模型请求失败'
+      })
     } finally {
      this.models.delete(reply.key)
     }

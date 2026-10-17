@@ -5,9 +5,11 @@ import {spawn} from 'node:child_process'
 export function chromeCandidates(env: NodeJS.ProcessEnv = process.env) {
  return [
   ...new Set(
-   [env.PROGRAMFILES && join(env.PROGRAMFILES, 'Google', 'Chrome', 'Application', 'chrome.exe'), env['PROGRAMFILES(X86)'] && join(env['PROGRAMFILES(X86)']!, 'Google', 'Chrome', 'Application', 'chrome.exe'), env.LOCALAPPDATA && join(env.LOCALAPPDATA, 'Google', 'Chrome', 'Application', 'chrome.exe')].filter(
-    (p): p is string => !!p
-   )
+   [
+    env.PROGRAMFILES && join(env.PROGRAMFILES, 'Google', 'Chrome', 'Application', 'chrome.exe'),
+    env['PROGRAMFILES(X86)'] && join(env['PROGRAMFILES(X86)']!, 'Google', 'Chrome', 'Application', 'chrome.exe'),
+    env.LOCALAPPDATA && join(env.LOCALAPPDATA, 'Google', 'Chrome', 'Application', 'chrome.exe')
+   ].filter((p): p is string => !!p)
   )
  ]
 }
@@ -37,7 +39,8 @@ export async function openCodexLoginInChrome(
  }
 ) {
  const link = new URL(url)
- if (link.protocol !== 'https:' || !['auth.openai.com', 'chatgpt.com'].includes(link.hostname)) throw new Error('Codex 登录地址不符合官方域名')
+ if (link.protocol !== 'https:' || !['auth.openai.com', 'chatgpt.com'].includes(link.hostname))
+  throw new Error('Codex 登录地址不符合官方域名')
  for (const path of deps.candidates()) {
   if (await deps.exists(path)) {
    await deps.launch(path, link.href)

@@ -10,10 +10,24 @@ export const studyEntrySchema = z.object({
  subId: z.string().regex(/^\d+$/).optional()
 })
 export type StudyEntry = z.infer<typeof studyEntrySchema>
-export const checkAt = (endsAt: string) => (endsAt ? new Date(Date.parse(endsAt) + 4 * 60 * 60 * 1000).toISOString() : '')
-export const highlightColors = {teacher: [0.76, 0.61, 0.44], focus: [1, 0.57, 0.57], ppt: [0.53, 0.76, 1], senior: [1, 0.66, 0.81]} as const
+export const checkAt = (endsAt: string) =>
+ endsAt ? new Date(Date.parse(endsAt) + 4 * 60 * 60 * 1000).toISOString() : ''
+export const highlightColors = {
+ teacher: [0.76, 0.61, 0.44],
+ focus: [1, 0.57, 0.57],
+ ppt: [0.53, 0.76, 1],
+ senior: [1, 0.66, 0.81]
+} as const
 export const highlightLabels = {focus: '老师重点', senior: '学长学姐重点', teacher: '老师讲授内容', ppt: 'PPT 内容'}
-export const highlightSchema = z.object({id: z.string().uuid(), page: z.number().int().positive(), rect: z.tuple([z.number(), z.number(), z.number(), z.number()]), source: z.enum(['teacher', 'focus', 'ppt', 'senior']), quote: z.string().min(1).max(3000), evidence: z.string().min(1).max(5000), extension: z.boolean()})
+export const highlightSchema = z.object({
+ id: z.string().uuid(),
+ page: z.number().int().positive(),
+ rect: z.tuple([z.number(), z.number(), z.number(), z.number()]),
+ source: z.enum(['teacher', 'focus', 'ppt', 'senior']),
+ quote: z.string().min(1).max(3000),
+ evidence: z.string().min(1).max(5000),
+ extension: z.boolean()
+})
 export type Highlight = z.infer<typeof highlightSchema>
 export const highlightPriority = {focus: 0, senior: 1, teacher: 2, ppt: 3} as const
 // Subtract only the covered area; preserve the rest of a lower-priority line.

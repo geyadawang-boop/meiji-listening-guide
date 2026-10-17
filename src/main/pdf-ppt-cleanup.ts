@@ -21,13 +21,22 @@ export function verifyGeneratedPdf(data: Buffer, expectedPages: number) {
  if (pages !== expectedPages || pages < 1) throw new Error('PDF 页数检查失败，PPT 已保留')
 }
 
-export async function deleteConvertedPpt(source: string, sourceHash: string, pdf: string, expectedPdf: Buffer, pages: number, replaceReferences: () => void) {
- if (!['.ppt', '.pptx'].includes(extname(source).toLowerCase()) || resolve(source) === resolve(pdf)) throw new Error('PPT 清理路径无效')
+export async function deleteConvertedPpt(
+ source: string,
+ sourceHash: string,
+ pdf: string,
+ expectedPdf: Buffer,
+ pages: number,
+ replaceReferences: () => void
+) {
+ if (!['.ppt', '.pptx'].includes(extname(source).toLowerCase()) || resolve(source) === resolve(pdf))
+  throw new Error('PPT 清理路径无效')
  const actualPdf = await readFile(pdf)
  if (!actualPdf.equals(expectedPdf)) throw new Error('PDF 保存检查失败，PPT 已保留')
  verifyGeneratedPdf(actualPdf, pages)
  const info = await lstat(source)
- if (info.isSymbolicLink() || !info.isFile() || resolve(await realpath(source)) !== resolve(source)) throw new Error('PPT 是链接或路径已改变，已保留')
+ if (info.isSymbolicLink() || !info.isFile() || resolve(await realpath(source)) !== resolve(source))
+  throw new Error('PPT 是链接或路径已改变，已保留')
  if (fileHash(await readFile(source)) !== sourceHash) throw new Error('PPT 在分析后发生变化，已保留')
  // Persist associations before deleting the exact analyzed file. Never scan by
  // filename prefix or delete unrelated course files.

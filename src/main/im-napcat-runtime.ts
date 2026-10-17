@@ -8,7 +8,12 @@ import {imLocalJson} from './im-loopback'
 import {z} from 'zod'
 const version = '4.18.37',
  archiveSha = '05c79761361321f6af4358aef92f80a7f8e319b6459c260ebf9a159615e96fe4'
-const secretsSchema = z.object({webui_port: z.number().int().min(1024).max(65535), onebot_port: z.number().int().min(1024).max(65535), webui_token: z.string().regex(/^[a-f0-9]{64}$/), onebot_token: z.string().regex(/^[a-f0-9]{64}$/)})
+const secretsSchema = z.object({
+ webui_port: z.number().int().min(1024).max(65535),
+ onebot_port: z.number().int().min(1024).max(65535),
+ webui_token: z.string().regex(/^[a-f0-9]{64}$/),
+ onebot_token: z.string().regex(/^[a-f0-9]{64}$/)
+})
 export type NativeNapcatSecrets = z.infer<typeof secretsSchema>
 const sha = (data: Buffer) => createHash('sha256').update(data).digest('hex')
 async function freePort() {
@@ -45,7 +50,11 @@ export class NativeNapcatRuntime {
   for (const part of target.slice(base.length).split(sep).filter(Boolean)) {
    current = join(current, part)
    try {
-    if ((await lstat(current)).isSymbolicLink() || resolve(await realpath(current)).toLowerCase() !== current.toLowerCase()) throw new Error('QQ 组件路径包含链接')
+    if (
+     (await lstat(current)).isSymbolicLink() ||
+     resolve(await realpath(current)).toLowerCase() !== current.toLowerCase()
+    )
+     throw new Error('QQ 组件路径包含链接')
    } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
    }
@@ -54,7 +63,11 @@ export class NativeNapcatRuntime {
  }
  async prepare() {
   await mkdir(this.root, {recursive: true})
-  if ((await lstat(this.root)).isSymbolicLink() || resolve(await realpath(this.root)).toLowerCase() !== resolve(this.root).toLowerCase()) throw new Error('QQ 组件根目录无效')
+  if (
+   (await lstat(this.root)).isSymbolicLink() ||
+   resolve(await realpath(this.root)).toLowerCase() !== resolve(this.root).toLowerCase()
+  )
+   throw new Error('QQ 组件根目录无效')
   const bytes = await readFile(join(this.resources, 'knowledge/vendor/NapCat.Shell.Windows.Node.zip'))
   if (sha(bytes) !== archiveSha) throw new Error('QQ 组件压缩包校验失败')
   const zip = await JSZip.loadAsync(bytes),
@@ -63,7 +76,14 @@ export class NativeNapcatRuntime {
   for (const entry of entries) {
    const name = entry.unsafeOriginalName || entry.name,
     mode = typeof entry.unixPermissions === 'string' ? parseInt(entry.unixPermissions, 8) : entry.unixPermissions || 0
-   if (/[:\x00]/.test(name) || name.startsWith('/') || name.includes('\\') || name.split('/').some(part => part === '..') || (mode & 0o170000) === 0o120000) throw new Error('QQ 组件包路径无效')
+   if (
+    /[:\x00]/.test(name) ||
+    name.startsWith('/') ||
+    name.includes('\\') ||
+    name.split('/').some(part => part === '..') ||
+    (mode & 0o170000) === 0o120000
+   )
+    throw new Error('QQ 组件包路径无效')
   }
   const target = await this.owned(join(this.root, 'native-v' + version)),
    marker = join(target, '.native-package.json')
@@ -110,7 +130,8 @@ export class NativeNapcatRuntime {
   for (const name of ['node.exe', 'index.js', 'napcat/napcat.mjs', 'wrapper.node', 'package.json', 'config.json']) {
    const original = zip.file(name)
    if (!original) throw new Error('QQ 组件缺少必要文件')
-   if (sha(await readFile(await this.owned(join(target, name)))) !== sha(await original.async('nodebuffer'))) throw new Error('QQ 组件执行文件已改变')
+   if (sha(await readFile(await this.owned(join(target, name)))) !== sha(await original.async('nodebuffer')))
+    throw new Error('QQ 组件执行文件已改变')
   }
   const privatePath = await this.owned(join(this.root, 'native-owner.dpapi'))
   let value: NativeNapcatSecrets
@@ -118,7 +139,12 @@ export class NativeNapcatRuntime {
    value = secretsSchema.parse(JSON.parse(windowsProtect(await readFile(privatePath), true).toString('utf8')))
   } catch (error) {
    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
-   value = {webui_port: await freePort(), onebot_port: await freePort(), webui_token: randomBytes(32).toString('hex'), onebot_token: randomBytes(32).toString('hex')}
+   value = {
+    webui_port: await freePort(),
+    onebot_port: await freePort(),
+    webui_token: randomBytes(32).toString('hex'),
+    onebot_token: randomBytes(32).toString('hex')
+   }
    if (value.webui_port === value.onebot_port) throw new Error('通讯端口冲突，请重试')
    await writeFile(privatePath, windowsProtect(Buffer.from(JSON.stringify(value))), {flag: 'wx'})
   }
@@ -136,7 +162,10 @@ export class NativeNapcatRuntime {
   } catch (error) {
    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
   }
-  await writeFile(await this.owned(join(config, 'webui.json')), JSON.stringify({host: '127.0.0.1', port: value.webui_port, token: value.webui_token, autoLoginAccount: ''}))
+  await writeFile(
+   await this.owned(join(config, 'webui.json')),
+   JSON.stringify({host: '127.0.0.1', port: value.webui_port, token: value.webui_token, autoLoginAccount: ''})
+  )
   const settingsPath = await this.owned(join(config, 'napcat.json')),
    settings = JSON.parse(await readFile(settingsPath, 'utf8'))
   await writeFile(settingsPath, JSON.stringify({...settings, fileLog: false, consoleLog: false}))
@@ -165,8 +194,22 @@ export class NativeNapcatRuntime {
     await new Promise<void>(resolve => server.close(() => resolve()))
    }
    const env = {...process.env}
-   for (const key of ['NAPCAT_QUICK_ACCOUNT', 'NAPCAT_QUICK_PASSWORD', 'NAPCAT_QUICK_PASSWORD_MD5', 'NODE_OPTIONS', 'NODE_PATH', 'ELECTRON_RUN_AS_NODE', 'NAPCAT_WORKER_PROCESS', 'NAPCAT_WEBUI_PREFERRED_PORT']) delete env[key]
-   Object.assign(env, {NAPCAT_WORKDIR: join(directory, 'napcat'), NAPCAT_DISABLE_MULTI_PROCESS: '1', NAPCAT_WEBUI_SECRET_KEY: value.webui_token})
+   for (const key of [
+    'NAPCAT_QUICK_ACCOUNT',
+    'NAPCAT_QUICK_PASSWORD',
+    'NAPCAT_QUICK_PASSWORD_MD5',
+    'NODE_OPTIONS',
+    'NODE_PATH',
+    'ELECTRON_RUN_AS_NODE',
+    'NAPCAT_WORKER_PROCESS',
+    'NAPCAT_WEBUI_PREFERRED_PORT'
+   ])
+    delete env[key]
+   Object.assign(env, {
+    NAPCAT_WORKDIR: join(directory, 'napcat'),
+    NAPCAT_DISABLE_MULTI_PROCESS: '1',
+    NAPCAT_WEBUI_SECRET_KEY: value.webui_token
+   })
    this.job?.close()
    this.job = new NativeWindowsJob()
    this.child = this.job.spawn([join(directory, 'node.exe'), join(directory, 'index.js')], directory, env)
@@ -175,7 +218,13 @@ export class NativeNapcatRuntime {
    while (Date.now() < deadline) {
     if (this.closed || this.child.poll() !== null) throw new Error('QQ 组件启动后退出')
     try {
-     const response = await imLocalJson('http://127.0.0.1:' + value.webui_port, '/api/auth/login', {hash: sha(Buffer.from(value.webui_token + '.napcat'))}, '', AbortSignal.timeout(2000))
+     const response = await imLocalJson(
+      'http://127.0.0.1:' + value.webui_port,
+      '/api/auth/login',
+      {hash: sha(Buffer.from(value.webui_token + '.napcat'))},
+      '',
+      AbortSignal.timeout(2000)
+     )
      const data = z.object({code: z.literal(0), data: z.object({Credential: z.string().min(1)})}).parse(response)
      if (data.data.Credential) {
       this.state = 'ready'

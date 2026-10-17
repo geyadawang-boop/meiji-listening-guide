@@ -29,9 +29,22 @@ export function createMediaTransport(base: Fetcher, options: NativeMediaOptions)
   const proxy = new URL(options.proxy)
   if (proxy.protocol === 'socks5:' || proxy.protocol === 'socks5h:') {
    proxy.protocol = 'socks5:'
-   dispatcher = new Socks5ProxyAgent(proxy, {connect, connectTimeout: seconds * 1000, headersTimeout: seconds * 1000, bodyTimeout: seconds * 1000})
-  } else dispatcher = new ProxyAgent({uri: proxy.href, proxyTls: {family: options.force_ipv4 ? 4 : undefined, timeout: seconds * 1000}, requestTls: {timeout: seconds * 1000}, headersTimeout: seconds * 1000, bodyTimeout: seconds * 1000})
- } else if (options.force_ipv4 || tuning['--socket-timeout']) dispatcher = new Agent({connect, headersTimeout: seconds * 1000, bodyTimeout: seconds * 1000})
+   dispatcher = new Socks5ProxyAgent(proxy, {
+    connect,
+    connectTimeout: seconds * 1000,
+    headersTimeout: seconds * 1000,
+    bodyTimeout: seconds * 1000
+   })
+  } else
+   dispatcher = new ProxyAgent({
+    uri: proxy.href,
+    proxyTls: {family: options.force_ipv4 ? 4 : undefined, timeout: seconds * 1000},
+    requestTls: {timeout: seconds * 1000},
+    headersTimeout: seconds * 1000,
+    bodyTimeout: seconds * 1000
+   })
+ } else if (options.force_ipv4 || tuning['--socket-timeout'])
+  dispatcher = new Agent({connect, headersTimeout: seconds * 1000, bodyTimeout: seconds * 1000})
  const nativeDispatcher = dispatcher ? new Dispatcher1Wrapper(dispatcher) : undefined
  let scheduled = 0,
   lastRequest = Number.NEGATIVE_INFINITY
@@ -41,7 +54,10 @@ export function createMediaTransport(base: Fetcher, options: NativeMediaOptions)
    next = Math.max(now, lastRequest + interval)
   lastRequest = next
   await mediaDelay(next - now, init.signal)
-  const response = await base(url, {...init, ...(nativeDispatcher ? {dispatcher: nativeDispatcher} : {})} as RequestInit)
+  const response = await base(url, {
+   ...init,
+   ...(nativeDispatcher ? {dispatcher: nativeDispatcher} : {})
+  } as RequestInit)
   if (!options.rate_kbps || !response.body) return response
   const reader = response.body.getReader(),
    signal = init.signal

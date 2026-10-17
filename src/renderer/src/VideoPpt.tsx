@@ -4,13 +4,49 @@ import {VideoMindmap} from './VideoMindmap'
 import type {VideoNoteMode, VideoNoteResult} from '../../shared/video-notes'
 import ReactMarkdown from 'react-markdown'
 import {useEffect, useRef, useState} from 'react'
-import {defaultVideoPrompt, type VideoSource, type VideoReview, type VideoSeries, type VideoBatchItem, type PendingVideoTask} from '../../shared/video-ppt'
+import {
+ defaultVideoPrompt,
+ type VideoSource,
+ type VideoReview,
+ type VideoSeries,
+ type VideoBatchItem,
+ type PendingVideoTask
+} from '../../shared/video-ppt'
 import type {SubtitleSyncTask} from '../../shared/subtitle-sync'
 import type {LibraryFile} from '../../shared/types'
-type BiliSubtitle = {title: string; page: number; source: string; warning: string; srt: string; count: number; savedPath?: string}
+type BiliSubtitle = {
+ title: string
+ page: number
+ source: string
+ warning: string
+ srt: string
+ count: number
+ savedPath?: string
+}
 const invoke = <T,>(action: string, args?: unknown) => window.assistant.invoke<T>(action, args)
-const time = (s: number) => `${Math.floor(s / 3600) ? Math.floor(s / 3600) + ':' : ''}${String(Math.floor(s / 60) % 60).padStart(2, '0')}:${String(Math.floor(s) % 60).padStart(2, '0')}`
-export function VideoPpt({visible, view, select, close, courseId, courseName, files, incomingUrl, consumeUrl}: {visible: boolean; view: LearningView; select: (view: LearningView) => void; close: () => void; courseId: string; courseName?: string; files: () => void; incomingUrl?: string; consumeUrl?: () => void}) {
+const time = (s: number) =>
+ `${Math.floor(s / 3600) ? Math.floor(s / 3600) + ':' : ''}${String(Math.floor(s / 60) % 60).padStart(2, '0')}:${String(Math.floor(s) % 60).padStart(2, '0')}`
+export function VideoPpt({
+ visible,
+ view,
+ select,
+ close,
+ courseId,
+ courseName,
+ files,
+ incomingUrl,
+ consumeUrl
+}: {
+ visible: boolean
+ view: LearningView
+ select: (view: LearningView) => void
+ close: () => void
+ courseId: string
+ courseName?: string
+ files: () => void
+ incomingUrl?: string
+ consumeUrl?: () => void
+}) {
  const [url, setUrl] = useState(''),
   [prompt, setPrompt] = useState(defaultVideoPrompt),
   [source, setSource] = useState<VideoSource | null>(null),
@@ -19,7 +55,13 @@ export function VideoPpt({visible, view, select, close, courseId, courseName, fi
   [error, setError] = useState(''),
   [progress, setProgress] = useState(''),
   [checked, setChecked] = useState(false),
-  [saved, setSaved] = useState<{path: string; kept: number; removed: number; cleaned: boolean; cleanupWarning: string} | null>(null),
+  [saved, setSaved] = useState<{
+   path: string
+   kept: number
+   removed: number
+   cleaned: boolean
+   cleanupWarning: string
+  } | null>(null),
   [pdfs, setPdfs] = useState<LibraryFile[]>([])
  const working = useRef(false)
  const [series, setSeries] = useState<VideoSeries | null>(null),
@@ -49,9 +91,15 @@ export function VideoPpt({visible, view, select, close, courseId, courseName, fi
   }
  }, [visible, incomingUrl])
  async function refresh() {
-  const files = (await invoke<LibraryFile[]>('library:list')).filter(f => !courseName || !f.course || f.course === courseName)
+  const files = (await invoke<LibraryFile[]>('library:list')).filter(
+   f => !courseName || !f.course || f.course === courseName
+  )
   setPdfs(files.filter(f => f.category === 'PPT' && f.name.endsWith('-视频课件.pdf')))
-  setOutputs(files.filter(f => (f.category === '语音原文' || f.category === '笔记') && /\.(srt|vtt|txt|md|docx|pdf|svg)$/i.test(f.name)))
+  setOutputs(
+   files.filter(
+    f => (f.category === '语音原文' || f.category === '笔记') && /\.(srt|vtt|txt|md|docx|pdf|svg)$/i.test(f.name)
+   )
+  )
   setPending(await invoke('video-ppt:pending'))
   setSyncTasks(await invoke('subtitle-sync:list'))
  }
@@ -78,7 +126,9 @@ export function VideoPpt({visible, view, select, close, courseId, courseName, fi
   } finally {
    working.current = false
    setBusy(false)
-   void refresh().catch(e => setError(current => current || '任务列表刷新失败：' + (e instanceof Error ? e.message : String(e))))
+   void refresh().catch(e =>
+    setError(current => current || '任务列表刷新失败：' + (e instanceof Error ? e.message : String(e)))
+   )
   }
  }
  async function load(args: unknown) {
@@ -100,7 +150,12 @@ export function VideoPpt({visible, view, select, close, courseId, courseName, fi
   isTasks = view === 'videoTasks'
  const kept = review?.pages.filter(p => p.keep).length || 0
  return (
-  <section className="ppt-extract-page video-ppt-page learning-window" aria-label={active.title} hidden={!visible} style={!visible ? {display: 'none'} : undefined}>
+  <section
+   className="ppt-extract-page video-ppt-page learning-window"
+   aria-label={active.title}
+   hidden={!visible}
+   style={!visible ? {display: 'none'} : undefined}
+  >
    <aside className="learning-menu" aria-label="视频学习导航">
     <h2>视频学习</h2>
     <p>
@@ -109,7 +164,12 @@ export function VideoPpt({visible, view, select, close, courseId, courseName, fi
      可复习的字幕、课件和笔记
     </p>
     {learningViews.map(item => (
-     <button key={item.id} className={view === item.id ? 'active' : ''} aria-current={view === item.id ? 'page' : undefined} onClick={() => select(item.id)}>
+     <button
+      key={item.id}
+      className={view === item.id ? 'active' : ''}
+      aria-current={view === item.id ? 'page' : undefined}
+      onClick={() => select(item.id)}
+     >
       <LearningIcon view={item.id} />
       <span>{item.title}</span>
      </button>
@@ -216,11 +276,20 @@ export function VideoPpt({visible, view, select, close, courseId, courseName, fi
         <>
          <strong>{series.title}</strong>
          <div className="video-course-toolbar">
-          <input aria-label="搜索课程分集" placeholder="搜索课程名称" disabled={busy} value={filter} onChange={e => setFilter(e.target.value)} />
+          <input
+           aria-label="搜索课程分集"
+           placeholder="搜索课程名称"
+           disabled={busy}
+           value={filter}
+           onChange={e => setFilter(e.target.value)}
+          />
           <span>
            已选 {selected.length} / {series.episodes.length}
           </span>
-          <button disabled={busy} onClick={() => setSelected(series.episodes.filter(e => e.title.includes(filter)).map(e => e.page))}>
+          <button
+           disabled={busy}
+           onClick={() => setSelected(series.episodes.filter(e => e.title.includes(filter)).map(e => e.page))}
+          >
            选择当前列表
           </button>
           <button disabled={busy} onClick={() => setSelected([])}>
@@ -234,7 +303,13 @@ export function VideoPpt({visible, view, select, close, courseId, courseName, fi
             const item = batch.find(i => i.page === e.page)
             return (
              <label key={e.page} className={selected.includes(e.page) ? 'selected' : ''}>
-              <input type="checkbox" aria-label={`选择 P${e.page} ${e.title}`} disabled={busy} checked={selected.includes(e.page)} onChange={ev => setSelected(s => (ev.target.checked ? [...s, e.page] : s.filter(p => p !== e.page)))} />
+              <input
+               type="checkbox"
+               aria-label={`选择 P${e.page} ${e.title}`}
+               disabled={busy}
+               checked={selected.includes(e.page)}
+               onChange={ev => setSelected(s => (ev.target.checked ? [...s, e.page] : s.filter(p => p !== e.page)))}
+              />
               <span className="video-course-number">P{e.page}</span>
               <span className="video-course-title">
                {e.title}
@@ -268,9 +343,16 @@ export function VideoPpt({visible, view, select, close, courseId, courseName, fi
               setSaved(null)
               setSource(null)
               setReview(null)
-              const result = await invoke<VideoBatchItem[]>('video-ppt:batch', {url, pages: selected, prompt, courseId: courseId || undefined})
+              const result = await invoke<VideoBatchItem[]>('video-ppt:batch', {
+               url,
+               pages: selected,
+               prompt,
+               courseId: courseId || undefined
+              })
               setBatch(result)
-              setProgress(`所选课程已处理：完成 ${result.filter(i => i.status === '已完成').length}，失败 ${result.filter(i => i.status === '失败').length}`)
+              setProgress(
+               `所选课程已处理：完成 ${result.filter(i => i.status === '已完成').length}，失败 ${result.filter(i => i.status === '失败').length}`
+              )
              })
             }
            >
@@ -295,7 +377,9 @@ export function VideoPpt({visible, view, select, close, courseId, courseName, fi
          disabled={busy}
          onClick={() =>
           void run(async () => {
-           const result = await invoke<BiliSubtitle | null>('video-ppt:subtitle-import', {courseId: courseId || undefined})
+           const result = await invoke<BiliSubtitle | null>('video-ppt:subtitle-import', {
+            courseId: courseId || undefined
+           })
            if (result) {
             setSubtitle(result)
             setSubtitleSaved(result.savedPath || '')
@@ -344,7 +428,10 @@ export function VideoPpt({visible, view, select, close, courseId, courseName, fi
          onClick={() =>
           void run(async () => {
            const target = series?.episodes.find(e => e.page === subtitlePage)?.url || url
-           const result = await invoke<BiliSubtitle>('video-ppt:subtitle-transcribe', {url: target, courseId: courseId || undefined})
+           const result = await invoke<BiliSubtitle>('video-ppt:subtitle-transcribe', {
+            url: target,
+            courseId: courseId || undefined
+           })
            setSubtitle(result)
            setSubtitleSaved(result.savedPath || '')
           })
@@ -356,7 +443,9 @@ export function VideoPpt({visible, view, select, close, courseId, courseName, fi
          disabled={busy}
          onClick={() =>
           void run(async () => {
-           const result = await invoke<BiliSubtitle | null>('video-ppt:subtitle-transcribe-local', {courseId: courseId || undefined})
+           const result = await invoke<BiliSubtitle | null>('video-ppt:subtitle-transcribe-local', {
+            courseId: courseId || undefined
+           })
            if (result) {
             setSubtitle(result)
             setSubtitleSaved(result.savedPath || '')
@@ -386,7 +475,14 @@ export function VideoPpt({visible, view, select, close, courseId, courseName, fi
           onClick={() =>
            void run(async () => {
             const target = series?.episodes.find(e => e.page === subtitlePage)?.url || url
-            setSubtitleSaved(await invoke<string>('video-ppt:subtitle-save', {url: target, title: subtitle.title, srt: subtitle.srt, courseId: courseId || undefined}))
+            setSubtitleSaved(
+             await invoke<string>('video-ppt:subtitle-save', {
+              url: target,
+              title: subtitle.title,
+              srt: subtitle.srt,
+              courseId: courseId || undefined
+             })
+            )
            })
           }
          >
@@ -399,7 +495,12 @@ export function VideoPpt({visible, view, select, close, courseId, courseName, fi
             disabled={busy}
             onClick={() =>
              void run(async () => {
-              const path = await invoke<string>('video-ppt:subtitle-export', {title: subtitle.title, srt: subtitle.srt, format, courseId: courseId || undefined})
+              const path = await invoke<string>('video-ppt:subtitle-export', {
+               title: subtitle.title,
+               srt: subtitle.srt,
+               format,
+               courseId: courseId || undefined
+              })
               setProgress(`${format.toUpperCase()} 字幕已保存：${path}`)
              })
             }
@@ -421,7 +522,9 @@ export function VideoPpt({visible, view, select, close, courseId, courseName, fi
        <header>
         <div>
          <h3>批量获取分集字幕</h3>
-         <p className="hint">使用上方勾选的分集；优先保存站内字幕，没有字幕时逐集离线转写。每集单独保存，成功后清理该集临时视频。</p>
+         <p className="hint">
+          使用上方勾选的分集；优先保存站内字幕，没有字幕时逐集离线转写。每集单独保存，成功后清理该集临时视频。
+         </p>
         </div>
         <button
          className="primary"
@@ -429,9 +532,15 @@ export function VideoPpt({visible, view, select, close, courseId, courseName, fi
          onClick={() =>
           void run(async () => {
            setSubtitleBatch([])
-           const result = await invoke<VideoBatchItem[]>('video-ppt:batch-subtitles', {url, pages: selected, courseId: courseId || undefined})
+           const result = await invoke<VideoBatchItem[]>('video-ppt:batch-subtitles', {
+            url,
+            pages: selected,
+            courseId: courseId || undefined
+           })
            setSubtitleBatch(result)
-           setProgress(`字幕处理完成：成功 ${result.filter(i => i.status === '已完成').length}，失败 ${result.filter(i => i.status === '失败').length}`)
+           setProgress(
+            `字幕处理完成：成功 ${result.filter(i => i.status === '已完成').length}，失败 ${result.filter(i => i.status === '失败').length}`
+           )
           })
          }
         >
@@ -458,22 +567,38 @@ export function VideoPpt({visible, view, select, close, courseId, courseName, fi
        <header>
         <div>
          <h3>同步字幕到知识库</h3>
-         <p className="hint">仅同步上方勾选的分集，保留分集网址和字幕版本。相同内容重复同步不新增资料；同时保存课程 SRT。没有站内字幕时保留失败记录，可离线转写后为该分集选择已有 SRT。</p>
+         <p className="hint">
+          仅同步上方勾选的分集，保留分集网址和字幕版本。相同内容重复同步不新增资料；同时保存课程
+          SRT。没有站内字幕时保留失败记录，可离线转写后为该分集选择已有 SRT。
+         </p>
         </div>
        </header>
        <div className="row">
         <label>
          知识库分类
-         <input aria-label="字幕知识库分类" placeholder={courseName || '未分类'} disabled={busy} value={syncCategory} onChange={e => setSyncCategory(e.target.value)} />
+         <input
+          aria-label="字幕知识库分类"
+          placeholder={courseName || '未分类'}
+          disabled={busy}
+          value={syncCategory}
+          onChange={e => setSyncCategory(e.target.value)}
+         />
         </label>
         <button
          className="primary"
          disabled={busy || !selected.length}
          onClick={() =>
           void run(async () => {
-           const task = await invoke<SubtitleSyncTask>('subtitle-sync:start', {url, pages: selected, category: syncCategory.trim() || courseName || '', courseId: courseId || undefined})
+           const task = await invoke<SubtitleSyncTask>('subtitle-sync:start', {
+            url,
+            pages: selected,
+            category: syncCategory.trim() || courseName || '',
+            courseId: courseId || undefined
+           })
            setSyncTasks(current => [task, ...current.filter(item => item.id !== task.id)])
-           setProgress(`同步结束：完成 ${task.items.filter(item => item.status === '已完成').length}，失败 ${task.items.filter(item => item.status === '失败').length}`)
+           setProgress(
+            `同步结束：完成 ${task.items.filter(item => item.status === '已完成').length}，失败 ${task.items.filter(item => item.status === '失败').length}`
+           )
           })
          }
         >
@@ -483,7 +608,16 @@ export function VideoPpt({visible, view, select, close, courseId, courseName, fi
        <p className="hint">笔记、导图和 PDF 沿用对应页面的生成按钮，由你选择是否生成。</p>
       </section>
      )}
-     {(isTasks || isSubtitles) && <SubtitleBatchRecords visible={visible} tasks={syncTasks} busy={busy} run={run} refresh={refresh} courseName={courseName} />}
+     {(isTasks || isSubtitles) && (
+      <SubtitleBatchRecords
+       visible={visible}
+       tasks={syncTasks}
+       busy={busy}
+       run={run}
+       refresh={refresh}
+       courseName={courseName}
+      />
+     )}
      {isNotes && (
       <section className="video-course-picker" aria-label="视频课程摘要">
        <header>
@@ -497,7 +631,9 @@ export function VideoPpt({visible, view, select, close, courseId, courseName, fi
          disabled={busy}
          onClick={() =>
           void run(async () => {
-           const result = await invoke<BiliSubtitle | null>('video-ppt:subtitle-import', {courseId: courseId || undefined})
+           const result = await invoke<BiliSubtitle | null>('video-ppt:subtitle-import', {
+            courseId: courseId || undefined
+           })
            if (result) {
             setSubtitle(result)
             setSubtitleSaved(result.savedPath || '')
@@ -509,7 +645,12 @@ export function VideoPpt({visible, view, select, close, courseId, courseName, fi
         </button>
         <label>
          摘要形式
-         <select aria-label="摘要形式" value={summaryMode} disabled={busy} onChange={e => setSummaryMode(e.target.value as VideoNoteMode)}>
+         <select
+          aria-label="摘要形式"
+          value={summaryMode}
+          disabled={busy}
+          onChange={e => setSummaryMode(e.target.value as VideoNoteMode)}
+         >
           <option value="brief">简要摘要</option>
           <option value="detailed">详细摘要</option>
           <option value="keypoints">课程要点</option>
@@ -522,7 +663,14 @@ export function VideoPpt({visible, view, select, close, courseId, courseName, fi
          onClick={() =>
           void run(async () => {
            setSummary(null)
-           setSummary(await invoke('video-ppt:summary', {mode: summaryMode, srt: subtitle!.srt, title: subtitle!.title, courseId: courseId || undefined}))
+           setSummary(
+            await invoke('video-ppt:summary', {
+             mode: summaryMode,
+             srt: subtitle!.srt,
+             title: subtitle!.title,
+             courseId: courseId || undefined
+            })
+           )
           })
          }
         >
@@ -541,7 +689,13 @@ export function VideoPpt({visible, view, select, close, courseId, courseName, fi
           <summary>查看保存位置</summary>
           <input aria-label="笔记保存位置" readOnly value={summary.path} />
          </details>
-         <div className="learning-summary">{summaryMode === 'mindmap' ? <VideoMindmap title={subtitle?.title || '课程笔记'} points={summary.points} /> : <ReactMarkdown>{summary.markdown}</ReactMarkdown>}</div>
+         <div className="learning-summary">
+          {summaryMode === 'mindmap' ? (
+           <VideoMindmap title={subtitle?.title || '课程笔记'} points={summary.points} />
+          ) : (
+           <ReactMarkdown>{summary.markdown}</ReactMarkdown>
+          )}
+         </div>
          <div className="row">
           <button disabled={busy} onClick={() => void open(summary.path)}>
            打开 Markdown
@@ -603,7 +757,12 @@ export function VideoPpt({visible, view, select, close, courseId, courseName, fi
          <span className="video-option-chevron" aria-hidden="true" />
         </summary>
         <div className="video-option-body">
-         <textarea aria-label="视频处理提示词" value={prompt} disabled={busy} onChange={e => setPrompt(e.target.value)} />
+         <textarea
+          aria-label="视频处理提示词"
+          value={prompt}
+          disabled={busy}
+          onChange={e => setPrompt(e.target.value)}
+         />
          <button disabled={busy} onClick={() => setPrompt(defaultVideoPrompt)}>
           恢复默认提示词
          </button>
@@ -611,7 +770,11 @@ export function VideoPpt({visible, view, select, close, courseId, courseName, fi
        </details>
       </div>
      )}
-     {isVideo && <p className="hint">保存到：{courseName || '未分类资料'}。全程后台下载、裁剪和去重，PDF 检查成功后清理本次视频和临时图片。</p>}
+     {isVideo && (
+      <p className="hint">
+       保存到：{courseName || '未分类资料'}。全程后台下载、裁剪和去重，PDF 检查成功后清理本次视频和临时图片。
+      </p>
+     )}
     </div>
     {error && (
      <div className="alert" role="alert">
@@ -630,12 +793,29 @@ export function VideoPpt({visible, view, select, close, courseId, courseName, fi
       {source.warning && <p role="alert">{source.warning}</p>}
       <div className="video-region-image">
        <img alt="完整视频画面，确认 PPT 区域" src={source.preview} />
-       <div style={{left: source.crop.left * 100 + '%', top: source.crop.top * 100 + '%', width: (source.crop.right - source.crop.left) * 100 + '%', height: (source.crop.bottom - source.crop.top) * 100 + '%'}} />
+       <div
+        style={{
+         left: source.crop.left * 100 + '%',
+         top: source.crop.top * 100 + '%',
+         width: (source.crop.right - source.crop.left) * 100 + '%',
+         height: (source.crop.bottom - source.crop.top) * 100 + '%'
+        }}
+       />
       </div>
       <div className="ppt-crop-inputs">
        {(['left', 'right', 'top', 'bottom'] as const).map((key, i) => (
         <label key={key}>
-         {['左边界', '右边界', '上边界', '下边界'][i]} %<input type="number" min="0" max="100" step=".1" aria-label={`PPT ${key}`} value={Number((source.crop[key] * 100).toFixed(1))} disabled={busy} onChange={e => setSource({...source, crop: {...source.crop, [key]: Number(e.target.value) / 100}})} />
+         {['左边界', '右边界', '上边界', '下边界'][i]} %
+         <input
+          type="number"
+          min="0"
+          max="100"
+          step=".1"
+          aria-label={`PPT ${key}`}
+          value={Number((source.crop[key] * 100).toFixed(1))}
+          disabled={busy}
+          onChange={e => setSource({...source, crop: {...source.crop, [key]: Number(e.target.value) / 100}})}
+         />
         </label>
        ))}
       </div>
@@ -668,7 +848,14 @@ export function VideoPpt({visible, view, select, close, courseId, courseName, fi
         disabled={busy || !checked || !kept}
         onClick={() =>
          void run(async () => {
-          setSaved(await invoke('video-ppt:export', {id: review.id, courseId: courseId || undefined, checked, pages: review.pages.map(({page, keep, crop}) => ({page, keep, crop}))}))
+          setSaved(
+           await invoke('video-ppt:export', {
+            id: review.id,
+            courseId: courseId || undefined,
+            checked,
+            pages: review.pages.map(({page, keep, crop}) => ({page, keep, crop}))
+           })
+          )
           await refresh()
           setProgress('PDF 已保存并逐页检查')
          })
@@ -700,13 +887,25 @@ export function VideoPpt({visible, view, select, close, courseId, courseName, fi
             checked={p.keep}
             onChange={e => {
              setChecked(false)
-             setReview({...review, pages: review.pages.map(q => (q.page === p.page ? {...q, keep: e.target.checked} : q))})
+             setReview({
+              ...review,
+              pages: review.pages.map(q => (q.page === p.page ? {...q, keep: e.target.checked} : q))
+             })
             }}
            />
            第 {p.page} 页 · {time(p.time)} · {p.keep ? '保留' : '删除'}
           </label>
           <div className="ppt-extract-preview" style={{aspectRatio: (p.width * w) / (p.height * h)}}>
-           <img alt={`视频课件第 ${p.page} 页`} src={p.preview} style={{width: 100 / w + '%', height: 100 / h + '%', left: (-100 * c.left) / w + '%', top: (-100 * c.top) / h + '%'}} />
+           <img
+            alt={`视频课件第 ${p.page} 页`}
+            src={p.preview}
+            style={{
+             width: 100 / w + '%',
+             height: 100 / h + '%',
+             left: (-100 * c.left) / w + '%',
+             top: (-100 * c.top) / h + '%'
+            }}
+           />
           </div>
           <p>{p.reason}</p>
           <details>
@@ -758,7 +957,9 @@ export function VideoPpt({visible, view, select, close, courseId, courseName, fi
        <article key={t.id}>
         <div>
          <strong>{t.name}</strong>
-         {t.kind === 'subtitle' && <p className="hint">{t.savedPath ? '字幕已保存，待核对并清理临时视频' : '字幕转写可继续'}</p>}
+         {t.kind === 'subtitle' && (
+          <p className="hint">{t.savedPath ? '字幕已保存，待核对并清理临时视频' : '字幕转写可继续'}</p>
+         )}
          {t.error && (
           <p className="hint" role="alert">
            {t.error}
@@ -795,7 +996,9 @@ export function VideoPpt({visible, view, select, close, courseId, courseName, fi
           disabled={busy || !!t.error}
           onClick={() =>
            void run(async () => {
-            const restored = await invoke<{source: VideoSource; review: VideoReview | null}>('video-ppt:restore', {id: t.id})
+            const restored = await invoke<{source: VideoSource; review: VideoReview | null}>('video-ppt:restore', {
+             id: t.id
+            })
             setSource(restored.source)
             setReview(restored.review)
             setSaved(null)

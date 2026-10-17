@@ -38,7 +38,14 @@ export class NativeDownloadService {
   this.legacy = new LegacyDownloads(root)
   this.auth = new NativeMediaAuth(root)
   this.catalog = new NativePlatformCatalog(api, fetcher, this.auth)
-  this.runner = new NativeBiliDownloadRunner(this.jobs, this.catalog, fetcher, new NativeMediaMux(resources), (id, downloaded, total) => this.progress.set(id, {downloaded, ...(total === null ? {} : {total})}), this.auth)
+  this.runner = new NativeBiliDownloadRunner(
+   this.jobs,
+   this.catalog,
+   fetcher,
+   new NativeMediaMux(resources),
+   (id, downloaded, total) => this.progress.set(id, {downloaded, ...(total === null ? {} : {total})}),
+   this.auth
+  )
  }
  private mutate<T>(run: () => Promise<T>) {
   const next = this.control.then(run)
@@ -95,7 +102,9 @@ export class NativeDownloadService {
   }
   const args = z.record(z.string(), z.unknown()).parse(input)
   if (action === 'catalog') {
-   const request = z.object({url: z.string().max(2000), playlist: z.boolean().default(false), options: z.unknown().optional()}).parse(args)
+   const request = z
+    .object({url: z.string().max(2000), playlist: z.boolean().default(false), options: z.unknown().optional()})
+    .parse(args)
    const result = await this.catalog.read(request.url, request.playlist, AbortSignal.timeout(60000), request.options)
    if (!('identity' in result)) return result
    for (const [key, item] of this.tokens) if (item.expires < Date.now()) this.tokens.delete(key)
@@ -121,10 +130,16 @@ export class NativeDownloadService {
     if (!saved || saved.expires < Date.now()) throw new Error('格式目录已失效，请重新读取')
     const options = mediaOptions(args.options)
     const fresh = await this.catalog.read(saved.source.catalog.url, false, AbortSignal.timeout(60000), options)
-    if (!('identity' in fresh) || fresh.identity !== saved.source.identity) throw new Error('视频分集身份已改变，请重新读取')
+    if (!('identity' in fresh) || fresh.identity !== saved.source.identity)
+     throw new Error('视频分集身份已改变，请重新读取')
     if (options.skip_existing)
      for (const row of await this.jobs.list())
-      if (row.state === 'completed' && row.identity === fresh.identity && row.source_url === fresh.catalog.url && JSON.stringify(row.recipe) === JSON.stringify(options)) {
+      if (
+       row.state === 'completed' &&
+       row.identity === fresh.identity &&
+       row.source_url === fresh.catalog.url &&
+       JSON.stringify(row.recipe) === JSON.stringify(options)
+      ) {
        try {
         await this.jobs.file(row.id)
         return this.project(row)
@@ -145,7 +160,12 @@ export class NativeDownloadService {
         /* Invalid or differently configured legacy outputs are not reused. */
        }
       }
-    const row = await this.jobs.create({identity: fresh.identity, url: fresh.catalog.url, title: fresh.catalog.title, options})
+    const row = await this.jobs.create({
+     identity: fresh.identity,
+     url: fresh.catalog.url,
+     title: fresh.catalog.title,
+     options
+    })
     this.queue.push(row.id)
     this.pump()
     return this.project(row)
@@ -160,9 +180,16 @@ export class NativeDownloadService {
      }
      const saved = await this.legacy.recipe(id),
       fresh = await this.catalog.read(saved.url, false, AbortSignal.timeout(60000), saved.options)
-     if (!('identity' in fresh) || fresh.identity !== saved.identity) throw new Error('旧任务与当前站点分集身份不一致，原记录保留')
+     if (!('identity' in fresh) || fresh.identity !== saved.identity)
+      throw new Error('旧任务与当前站点分集身份不一致，原记录保留')
      await this.legacy.unchanged(saved.row)
-     const row = await this.jobs.create({identity: saved.identity, url: saved.url, title: saved.row.title, options: saved.options, legacy: {id, recordHash: saved.row.recordHash}})
+     const row = await this.jobs.create({
+      identity: saved.identity,
+      url: saved.url,
+      title: saved.row.title,
+      options: saved.options,
+      legacy: {id, recordHash: saved.row.recordHash}
+     })
      this.queue.push(id)
      this.pump()
      return this.project(row)
@@ -176,7 +203,8 @@ export class NativeDownloadService {
     return this.project(queued)
    }
    if (action === 'cancel') {
-    if (!(await this.jobs.list()).some(row => row.id === id)) throw new Error('旧任务以只读方式保留；请在旧程序停止实际任务，原记录未改写')
+    if (!(await this.jobs.list()).some(row => row.id === id))
+     throw new Error('旧任务以只读方式保留；请在旧程序停止实际任务，原记录未改写')
     this.cancelling.add(id)
     const active = this.active?.id === id ? this.active : undefined
     active?.controller.abort()

@@ -3,10 +3,20 @@ import type {Profile} from '../shared/types'
 export const deepseekModels = ['deepseek-flash', 'deepseek-v4-pro'] as const
 export type DeepSeekConnection = Profile & {key: string}
 export function validateDeepSeek(profile: DeepSeekConnection): DeepSeekConnection {
- if (!deepseekModels.includes(profile.model as (typeof deepseekModels)[number])) throw new Error('请选择 DeepSeek Flash 或 DeepSeek V4 Pro')
+ if (!deepseekModels.includes(profile.model as (typeof deepseekModels)[number]))
+  throw new Error('请选择 DeepSeek Flash 或 DeepSeek V4 Pro')
  if (!profile.key.trim()) throw new Error('请先填写并保存 DeepSeek API Key')
  const url = new URL(profile.baseUrl)
- if (url.protocol !== 'https:' || url.hostname !== 'api.deepseek.com' || url.username || url.password || url.search || url.hash || !['/', '/v1', '/v1/'].includes(url.pathname)) throw new Error('DeepSeek 官方接口地址应为 https://api.deepseek.com')
+ if (
+  url.protocol !== 'https:' ||
+  url.hostname !== 'api.deepseek.com' ||
+  url.username ||
+  url.password ||
+  url.search ||
+  url.hash ||
+  !['/', '/v1', '/v1/'].includes(url.pathname)
+ )
+  throw new Error('DeepSeek 官方接口地址应为 https://api.deepseek.com')
  const effort = profile.parameters?.[profile.model]?.reasoningEffort || 'low'
  if (!['low', 'high', 'max'].includes(effort)) throw new Error('DeepSeek 推理强度应为低、高或最高')
  return {...profile, baseUrl: url.origin, key: profile.key.trim()}
@@ -50,7 +60,11 @@ export function deepseekCatalog() {
    availability_nux: null,
    upgrade: null,
    priority: index + 1,
-   model_messages: {instructions_template: '你是听课助手，请按本次任务要求回答。', instructions_variables: {personality_default: '', personality_friendly: '', personality_pragmatic: ''}, approvals: null},
+   model_messages: {
+    instructions_template: '你是听课助手，请按本次任务要求回答。',
+    instructions_variables: {personality_default: '', personality_friendly: '', personality_pragmatic: ''},
+    approvals: null
+   },
    experimental_supported_tools: [],
    supports_search_tool: false,
    default_service_tier: null,

@@ -30,7 +30,20 @@ export class NativeKnowledgeService {
    case 'generation':
     return this.store.generation(z.string().min(1).max(2000).parse(args.locator))
    case 'import':
-    return this.store.import(z.object({title: z.string(), text: z.string(), locator: z.string(), sourceHash: z.string(), category: z.string().optional(), sourceMethod: z.string().optional(), origin: z.string().optional(), expectedGeneration: z.string().nullable().optional()}).parse(args))
+    return this.store.import(
+     z
+      .object({
+       title: z.string(),
+       text: z.string(),
+       locator: z.string(),
+       sourceHash: z.string(),
+       category: z.string().optional(),
+       sourceMethod: z.string().optional(),
+       origin: z.string().optional(),
+       expectedGeneration: z.string().nullable().optional()
+      })
+      .parse(args)
+    )
    case 'read':
     return this.store.read(z.string().parse(args.id))
    case 'citation':
@@ -38,7 +51,9 @@ export class NativeKnowledgeService {
    case 'delete':
     return this.store.delete(z.string().parse(args.id))
    case 'organize': {
-    const value = z.object({items: z.array(z.object({id: z.string(), generation: z.string()})), target: z.string()}).parse(args)
+    const value = z
+     .object({items: z.array(z.object({id: z.string(), generation: z.string()})), target: z.string()})
+     .parse(args)
     return this.store.organize(value.items, value.target)
    }
    case 'classification-options':
@@ -68,9 +83,16 @@ export class NativeKnowledgeService {
     const query = z.string().trim().min(1).max(2000).parse(args.query),
      ids = args.ids === undefined ? undefined : z.array(z.string()).max(5000).parse(args.ids)
     const status = this.store.vectorStatus()
-    if (status.active && status.index === 'ready') return this.store.semanticSearch(query, await this.embedding.encode(query, true), ids)
+    if (status.active && status.index === 'ready')
+     return this.store.semanticSearch(query, await this.embedding.encode(query, true), ids)
     const result = this.store.search(query, ids)
-    result.trace.vector = {state: status.index, note: status.index === 'stale' ? '资料已更新，请重建语义索引；本次使用当前版本关键词结果。' : '本次使用关键词检索，可启用本地语义模型并建立索引。'}
+    result.trace.vector = {
+     state: status.index,
+     note:
+      status.index === 'stale'
+       ? '资料已更新，请重建语义索引；本次使用当前版本关键词结果。'
+       : '本次使用关键词检索，可启用本地语义模型并建立索引。'
+    }
     return result
    }
    case 'rebuild':

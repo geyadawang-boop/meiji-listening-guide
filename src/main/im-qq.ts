@@ -1,8 +1,15 @@
 import {createHash} from 'node:crypto'
 import {z} from 'zod'
 import {imLocalJson, imLoopback} from './im-loopback'
-const qq = z.union([z.string().regex(/^\d{1,18}$/), z.number().int().positive().max(Number.MAX_SAFE_INTEGER).transform(String)])
-export const onebotConfig = z.object({url: z.string().transform(imLoopback), token: z.string().max(8192), account: qq.optional()})
+const qq = z.union([
+ z.string().regex(/^\d{1,18}$/),
+ z.number().int().positive().max(Number.MAX_SAFE_INTEGER).transform(String)
+])
+export const onebotConfig = z.object({
+ url: z.string().transform(imLoopback),
+ token: z.string().max(8192),
+ account: qq.optional()
+})
 export type OnebotConfig = z.infer<typeof onebotConfig>
 function peer(value: string) {
  const match = /^(private|group):(\d{1,18})$/.exec(value)
@@ -19,14 +26,31 @@ export class NativeQqSession {
   this.config = onebotConfig.parse(config)
  }
  async action(name: string, body: unknown, signal: AbortSignal) {
-  if (!['get_login_info', 'get_status', 'get_friend_list', 'get_group_list', 'get_friend_msg_history', 'get_group_msg_history', 'send_private_msg', 'send_group_msg'].includes(name)) throw new Error('此 QQ 操作未启用')
-  const result = z.object({status: z.literal('ok'), retcode: z.literal(0), data: z.unknown()}).parse(await imLocalJson(this.config.url, '/' + name, body, this.config.token, signal, this.fetcher))
+  if (
+   ![
+    'get_login_info',
+    'get_status',
+    'get_friend_list',
+    'get_group_list',
+    'get_friend_msg_history',
+    'get_group_msg_history',
+    'send_private_msg',
+    'send_group_msg'
+   ].includes(name)
+  )
+   throw new Error('此 QQ 操作未启用')
+  const result = z
+   .object({status: z.literal('ok'), retcode: z.literal(0), data: z.unknown()})
+   .parse(await imLocalJson(this.config.url, '/' + name, body, this.config.token, signal, this.fetcher))
   return result.data
  }
  async verify(account: string, signal: AbortSignal) {
   const login = z.object({user_id: qq}).parse(await this.action('get_login_info', {}, signal)),
-   status = z.object({online: z.literal(true), good: z.boolean().optional()}).parse(await this.action('get_status', {}, signal))
-  if (status.good === false || login.user_id !== account || (this.config.account && this.config.account !== account)) throw new Error('QQ 账号或在线状态已改变，未读取或发送消息')
+   status = z
+    .object({online: z.literal(true), good: z.boolean().optional()})
+    .parse(await this.action('get_status', {}, signal))
+  if (status.good === false || login.user_id !== account || (this.config.account && this.config.account !== account))
+   throw new Error('QQ 账号或在线状态已改变，未读取或发送消息')
   return login.user_id
  }
  async identity(signal: AbortSignal) {
@@ -56,15 +80,34 @@ export class NativeQqSession {
  }
  async receive(selected: string, account: string, signal: AbortSignal) {
   const target = peer(selected),
-   result = z.object({messages: z.array(z.record(z.string(), z.unknown())).max(5000)}).parse(await this.action(target.group ? 'get_group_msg_history' : 'get_friend_msg_history', {[target.group ? 'group_id' : 'user_id']: target.id, count: 50}, signal))
+   result = z
+    .object({messages: z.array(z.record(z.string(), z.unknown())).max(5000)})
+    .parse(
+     await this.action(
+      target.group ? 'get_group_msg_history' : 'get_friend_msg_history',
+      {[target.group ? 'group_id' : 'user_id']: target.id, count: 50},
+      signal
+     )
+    )
   return result.messages.map(row => {
-   if ((row.self_id !== undefined && qq.parse(row.self_id) !== account) || (row[target.group ? 'group_id' : 'user_id'] !== undefined && qq.parse(row[target.group ? 'group_id' : 'user_id']) !== String(target.id))) throw new Error('QQ 历史回包账号或所选会话不一致，未保存')
-   const message = z.union([z.string(), z.array(z.object({type: z.string(), data: z.record(z.string(), z.unknown())}))]).parse(row.message),
-    text = typeof message === 'string' ? message : message.map(part => (part.type === 'text' ? z.string().parse(part.data.text) : '[' + part.type + ']')).join('')
+   if (
+    (row.self_id !== undefined && qq.parse(row.self_id) !== account) ||
+    (row[target.group ? 'group_id' : 'user_id'] !== undefined &&
+     qq.parse(row[target.group ? 'group_id' : 'user_id']) !== String(target.id))
+   )
+    throw new Error('QQ 历史回包账号或所选会话不一致，未保存')
+   const message = z
+     .union([z.string(), z.array(z.object({type: z.string(), data: z.record(z.string(), z.unknown())}))])
+     .parse(row.message),
+    text =
+     typeof message === 'string'
+      ? message
+      : message.map(part => (part.type === 'text' ? z.string().parse(part.data.text) : '[' + part.type + ']')).join('')
    return {
     mid: z.union([z.string(), z.number().int().finite().transform(String)]).parse(row.message_id),
     ts: z.number().finite().nonnegative().parse(row.time),
-    sender: typeof row.sender === 'object' && row.sender ? String((row.sender as {user_id?: unknown}).user_id || '') : '',
+    sender:
+     typeof row.sender === 'object' && row.sender ? String((row.sender as {user_id?: unknown}).user_id || '') : '',
     text: text.slice(0, 50000),
     kind: 'text'
    }
@@ -72,7 +115,15 @@ export class NativeQqSession {
  }
  async send(selected: string, text: string, signal: AbortSignal) {
   const target = peer(selected),
-   result = z.object({message_id: z.union([z.string().min(1).max(200), z.number().int().finite().transform(String)])}).parse(await this.action(target.group ? 'send_group_msg' : 'send_private_msg', {[target.group ? 'group_id' : 'user_id']: target.id, message: [{type: 'text', data: {text}}]}, signal))
+   result = z
+    .object({message_id: z.union([z.string().min(1).max(200), z.number().int().finite().transform(String)])})
+    .parse(
+     await this.action(
+      target.group ? 'send_group_msg' : 'send_private_msg',
+      {[target.group ? 'group_id' : 'user_id']: target.id, message: [{type: 'text', data: {text}}]},
+      signal
+     )
+    )
   return result.message_id
  }
 }
@@ -90,8 +141,19 @@ export class NativeNapcatLogin {
   onebotConfig.parse(onebot)
  }
  private async action(name: string, body: unknown, signal: AbortSignal, authenticated = true) {
-  if (!['auth/login', 'QQLogin/CheckLoginStatus', 'QQLogin/GetQQLoginInfo', 'OB11Config/GetConfig', 'OB11Config/SetConfig'].includes(name)) throw new Error('QQ 登录操作无效')
-  const result = z.object({code: z.literal(0), data: z.unknown()}).parse(await imLocalJson(this.url, '/api/' + name, body, authenticated ? this.credential : '', signal, this.fetcher))
+  if (
+   ![
+    'auth/login',
+    'QQLogin/CheckLoginStatus',
+    'QQLogin/GetQQLoginInfo',
+    'OB11Config/GetConfig',
+    'OB11Config/SetConfig'
+   ].includes(name)
+  )
+   throw new Error('QQ 登录操作无效')
+  const result = z
+   .object({code: z.literal(0), data: z.unknown()})
+   .parse(await imLocalJson(this.url, '/api/' + name, body, authenticated ? this.credential : '', signal, this.fetcher))
   return result.data
  }
  async start(signal: AbortSignal) {
@@ -112,12 +174,25 @@ export class NativeNapcatLogin {
   return this.poll(signal)
  }
  async poll(signal: AbortSignal) {
-  const result = z.object({isLogin: z.boolean(), loginError: z.unknown().optional(), qrLoginAccepted: z.boolean().optional(), qrcodeurl: z.string().max(8192).optional()}).parse(await this.action('QQLogin/CheckLoginStatus', {}, signal))
+  const result = z
+   .object({
+    isLogin: z.boolean(),
+    loginError: z.unknown().optional(),
+    qrLoginAccepted: z.boolean().optional(),
+    qrcodeurl: z.string().max(8192).optional()
+   })
+   .parse(await this.action('QQLogin/CheckLoginStatus', {}, signal))
   if (result.isLogin) return {state: 'verifying' as const, qr: ''}
   if (result.loginError) throw new Error('QQ 组件拒绝此次扫码登录')
   if (result.qrcodeurl) {
    const url = new URL(result.qrcodeurl)
-   if (url.protocol !== 'https:' || url.username || url.password || !(url.hostname === 'qq.com' || url.hostname.endsWith('.qq.com'))) throw new Error('QQ 二维码地址未通过核验')
+   if (
+    url.protocol !== 'https:' ||
+    url.username ||
+    url.password ||
+    !(url.hostname === 'qq.com' || url.hostname.endsWith('.qq.com'))
+   )
+    throw new Error('QQ 二维码地址未通过核验')
   }
   return {state: result.qrLoginAccepted ? ('scanned' as const) : ('waiting_scan' as const), qr: result.qrcodeurl || ''}
  }
@@ -131,7 +206,17 @@ export class NativeNapcatLogin {
    if (owned.length > 1) throw new Error('QQ 消息接口存在重名配置，未覆盖')
    config.network.httpServers = [
     ...config.network.httpServers.filter(row => row.name !== 'meijiang-native-http'),
-    {name: 'meijiang-native-http', enable: true, host: '127.0.0.1', port: Number(new URL(this.onebot.url).port), enableCors: false, enableWebsocket: false, messagePostFormat: 'array', token: this.onebot.token, debug: false}
+    {
+     name: 'meijiang-native-http',
+     enable: true,
+     host: '127.0.0.1',
+     port: Number(new URL(this.onebot.url).port),
+     enableCors: false,
+     enableWebsocket: false,
+     messagePostFormat: 'array',
+     token: this.onebot.token,
+     debug: false
+    }
    ]
    await this.action('OB11Config/SetConfig', {config: JSON.stringify(config)}, signal)
    this.configured = true
@@ -151,8 +236,20 @@ export class NativeNapcatLogin {
    }
   } while (Date.now() < deadline)
   if (!account) throw lastError || new Error('QQ 消息接口未就绪')
-  const control = z.object({online: z.literal(true), uin: qq}).parse(await this.action('QQLogin/GetQQLoginInfo', {}, signal))
-  if (control.uin !== account || (this.onebot.account && this.onebot.account !== account)) throw new Error('QQ 管理端和消息接口账号不同，未绑定')
-  return {account, session: {onebot: {...this.onebot, account}}, capabilities: {identity: 'personal_qq', history: 'onebot_extension_unverified', messages: 'selected_conversation', send: 'explicit_confirmed_text'}}
+  const control = z
+   .object({online: z.literal(true), uin: qq})
+   .parse(await this.action('QQLogin/GetQQLoginInfo', {}, signal))
+  if (control.uin !== account || (this.onebot.account && this.onebot.account !== account))
+   throw new Error('QQ 管理端和消息接口账号不同，未绑定')
+  return {
+   account,
+   session: {onebot: {...this.onebot, account}},
+   capabilities: {
+    identity: 'personal_qq',
+    history: 'onebot_extension_unverified',
+    messages: 'selected_conversation',
+    send: 'explicit_confirmed_text'
+   }
+  }
  }
 }

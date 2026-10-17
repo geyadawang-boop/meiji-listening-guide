@@ -8,7 +8,15 @@ export interface KnowledgeEntry {
  sourceHash: string
  sourceMethod?: string
  generation_id: string
- classification?: {type: string; topic: string; difficulty: string; language: string; duration: string; subtopics: string[]; keywords: string[]}
+ classification?: {
+  type: string
+  topic: string
+  difficulty: string
+  language: string
+  duration: string
+  subtopics: string[]
+  keywords: string[]
+ }
 }
 export interface KnowledgeHit {
  bvid: string

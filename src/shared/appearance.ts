@@ -20,8 +20,27 @@ export const appearanceSchema = z.object({
  contentWidth: z.number().min(560).max(1040)
 })
 export type Appearance = z.infer<typeof appearanceSchema>
-export const defaultAppearance: Appearance = {background: 'none', image: '', opacity: 0.7, blur: 2, scrim: 0.5, accent: 'default', fontSize: 16, lineHeight: 1.65, avatarSize: 40, avatarShape: 'round', showNames: true, assistantBubble: false, bubbleRadius: 18, messageGap: 28, contentWidth: 832}
-export const appearanceStateSchema = z.object({global: appearanceSchema, courses: z.record(z.string().uuid(), appearanceSchema)})
+export const defaultAppearance: Appearance = {
+ background: 'none',
+ image: '',
+ opacity: 0.7,
+ blur: 2,
+ scrim: 0.5,
+ accent: 'default',
+ fontSize: 16,
+ lineHeight: 1.65,
+ avatarSize: 40,
+ avatarShape: 'round',
+ showNames: true,
+ assistantBubble: false,
+ bubbleRadius: 18,
+ messageGap: 28,
+ contentWidth: 832
+}
+export const appearanceStateSchema = z.object({
+ global: appearanceSchema,
+ courses: z.record(z.string().uuid(), appearanceSchema)
+})
 export type AppearanceState = z.infer<typeof appearanceStateSchema>
 export const defaultAppearanceState: AppearanceState = {global: defaultAppearance, courses: {}}
 export function resolveAppearance(state: AppearanceState, courseId: string) {

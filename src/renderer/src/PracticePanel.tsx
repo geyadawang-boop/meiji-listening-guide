@@ -6,7 +6,12 @@ import {questionOptions} from '../../shared/practice'
 import {StudyIcon} from './StudyIcon'
 import {IdentityAvatar} from './Identity'
 type Group = 'past' | 'extended' | 'generated'
-type Actions = {disabled: boolean; submit: (group: Group, index: number, response: string) => Promise<void>; answer: (group: Group, index: number) => Promise<void>; reset: (group: Group, index: number) => Promise<void>}
+type Actions = {
+ disabled: boolean
+ submit: (group: Group, index: number, response: string) => Promise<void>
+ answer: (group: Group, index: number) => Promise<void>
+ reset: (group: Group, index: number) => Promise<void>
+}
 export function PracticePanel({data, ...actions}: Actions & {data: PracticeSet}) {
  return (
   <div className="practice interactive-practice">
@@ -27,7 +32,15 @@ export function PracticePanel({data, ...actions}: Actions & {data: PracticeSet})
   </div>
  )
 }
-function Question({q, group, index, submit, answer, reset, disabled}: Actions & {q: PracticeQuestion; group: Group; index: number}) {
+function Question({
+ q,
+ group,
+ index,
+ submit,
+ answer,
+ reset,
+ disabled
+}: Actions & {q: PracticeQuestion; group: Group; index: number}) {
  const [draft, setDraft] = useState(q.attempt?.response || ''),
   [open, setOpen] = useState(false),
   [showAnswer, setShowAnswer] = useState(!questionOptions(q.stem).length || !!q.attempt),
@@ -48,7 +61,12 @@ function Question({q, group, index, submit, answer, reset, disabled}: Actions & 
    setPending(false)
   }
  }
- const origin = q.answerSource === 'searched' ? '搜索答案 · 同题来源已核验' : q.answerSource === 'imported' || (q.answer && !q.aiAnswer) ? '题库附带答案' : ''
+ const origin =
+  q.answerSource === 'searched'
+   ? '搜索答案 · 同题来源已核验'
+   : q.answerSource === 'imported' || (q.answer && !q.aiAnswer)
+     ? '题库附带答案'
+     : ''
  return (
   <article className="question-card practice-card" aria-label={'题目 ' + (index + 1)}>
    <div className="question-meta">
@@ -68,7 +86,22 @@ function Question({q, group, index, submit, answer, reset, disabled}: Actions & 
      <div className="answer-options" role="group" aria-label="选择答案">
       {options.map(o => (
        <label className={'answer-option ' + (selected.includes(o.key) ? 'selected' : '')} key={o.key}>
-        <input type={multiple ? 'checkbox' : 'radio'} name={group + index} value={o.key} disabled={pending || !!q.attempt} checked={selected.includes(o.key)} onChange={e => setDraft(multiple ? (e.target.checked ? [...selected.filter(Boolean), o.key] : selected.filter(k => k !== o.key)).sort().join(',') : o.key)} />
+        <input
+         type={multiple ? 'checkbox' : 'radio'}
+         name={group + index}
+         value={o.key}
+         disabled={pending || !!q.attempt}
+         checked={selected.includes(o.key)}
+         onChange={e =>
+          setDraft(
+           multiple
+            ? (e.target.checked ? [...selected.filter(Boolean), o.key] : selected.filter(k => k !== o.key))
+               .sort()
+               .join(',')
+            : o.key
+          )
+         }
+        />
         <span className="option-letter">{o.key}</span>
         <span>{o.text}</span>
        </label>
@@ -143,7 +176,9 @@ function Question({q, group, index, submit, answer, reset, disabled}: Actions & 
    </div>
    {!!options.length && q.attempt && (
     <div className={'practice-feedback ' + q.attempt.verdict} role="status">
-     <strong>{q.attempt.verdict === 'correct' ? '回答正确' : q.attempt.verdict === 'incorrect' ? '需要再练习' : '待自查'}</strong>
+     <strong>
+      {q.attempt.verdict === 'correct' ? '回答正确' : q.attempt.verdict === 'incorrect' ? '需要再练习' : '待自查'}
+     </strong>
      <p>{q.attempt.feedback}</p>
     </div>
    )}
@@ -169,7 +204,9 @@ function Question({q, group, index, submit, answer, reset, disabled}: Actions & 
        {q.answer}
       </p>
      )}
-     <ReactMarkdown remarkPlugins={[remarkGfm]}>{q.explanation || '这道题尚未保存详解。需要时请点击上方“补全已有答案与详解”，完成后再查看。'}</ReactMarkdown>
+     <ReactMarkdown remarkPlugins={[remarkGfm]}>
+      {q.explanation || '这道题尚未保存详解。需要时请点击上方“补全已有答案与详解”，完成后再查看。'}
+     </ReactMarkdown>
      <small>{q.searchStatus} · 详解由 AI 辅助整理</small>
      {q.answerSourceUrl && (
       <a

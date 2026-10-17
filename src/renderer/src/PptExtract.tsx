@@ -2,18 +2,40 @@ import type {LibraryFile} from '../../shared/types'
 import {useEffect, useRef, useState} from 'react'
 import {defaultPptExtractPrompt, type PptExtractReview, type PptExtractPage} from '../../shared/ppt-extract'
 const invoke = <T,>(action: string, args?: unknown) => window.assistant.invoke<T>(action, args)
-export function PptExtract({visible, close, courseId, courseName, files}: {visible: boolean; close: () => void; courseId: string; courseName?: string; files: () => void}) {
+export function PptExtract({
+ visible,
+ close,
+ courseId,
+ courseName,
+ files
+}: {
+ visible: boolean
+ close: () => void
+ courseId: string
+ courseName?: string
+ files: () => void
+}) {
  const [path, setPath] = useState(''),
   [prompt, setPrompt] = useState(defaultPptExtractPrompt),
   [review, setReview] = useState<PptExtractReview | null>(null),
   [busy, setBusy] = useState(false),
   [error, setError] = useState(''),
   [progress, setProgress] = useState(''),
-  [saved, setSaved] = useState<{path: string; kept: number; removed: number; sourceDeleted: boolean; cleanupWarning: string} | null>(null)
+  [saved, setSaved] = useState<{
+   path: string
+   kept: number
+   removed: number
+   sourceDeleted: boolean
+   cleanupWarning: string
+  } | null>(null)
  const [pdfs, setPdfs] = useState<LibraryFile[]>([]),
   [sourceDeleted, setSourceDeleted] = useState(false)
  async function refresh() {
-  setPdfs((await invoke<LibraryFile[]>('library:list')).filter(f => f.category === 'PPT' && /\.pdf$/i.test(f.name) && (!courseName || !f.course || f.course === courseName)))
+  setPdfs(
+   (await invoke<LibraryFile[]>('library:list')).filter(
+    f => f.category === 'PPT' && /\.pdf$/i.test(f.name) && (!courseName || !f.course || f.course === courseName)
+   )
+  )
  }
  useEffect(() => {
   if (visible) void refresh().catch(e => setError(String(e)))
@@ -134,7 +156,10 @@ export function PptExtract({visible, close, courseId, courseName, files}: {visib
     </div>
     {sourceDeleted && <p className="hint">原始 PPT 已删除。现有预览可以调整并再次导出；重新分析请另选 PPT。</p>}
     <p className="hint">保存到：{courseName || '未分类资料'}。</p>
-    <p className="hint">整份 PPT 在一个新对话中分析。支持每页一张图片的 PPTX，结果保存到 PPT 资料文件夹；PDF 保存并检查成功后自动删除对应的原始 PPT。按原页序导出一份 PDF，每页保留裁剪后的尺寸。</p>
+    <p className="hint">
+     整份 PPT 在一个新对话中分析。支持每页一张图片的 PPTX，结果保存到 PPT 资料文件夹；PDF
+     保存并检查成功后自动删除对应的原始 PPT。按原页序导出一份 PDF，每页保留裁剪后的尺寸。
+    </p>
    </div>
    {error && (
     <div className="alert" role="alert">
@@ -161,7 +186,10 @@ export function PptExtract({visible, close, courseId, courseName, files}: {visib
       <strong>
        保留 {kept} 页 · 删除 {review.pages.length - kept} 页
       </strong>
-      <button disabled={busy} onClick={() => setReview({...review, pages: review.pages.map(p => ({...p, keep: p.width > 0 && p.height > 0}))})}>
+      <button
+       disabled={busy}
+       onClick={() => setReview({...review, pages: review.pages.map(p => ({...p, keep: p.width > 0 && p.height > 0}))})}
+      >
        保留全部
       </button>
       <button
@@ -170,7 +198,17 @@ export function PptExtract({visible, close, courseId, courseName, files}: {visib
        onClick={() =>
         void run(async () => {
          setProgress('正在生成 PDF')
-         const result = await invoke<{path: string; kept: number; removed: number; sourceDeleted: boolean; cleanupWarning: string}>('ppt-extract:export', {id: review.id, courseId: courseId || undefined, pages: review.pages.map(({page, keep, crop}) => ({page, keep, crop}))})
+         const result = await invoke<{
+          path: string
+          kept: number
+          removed: number
+          sourceDeleted: boolean
+          cleanupWarning: string
+         }>('ppt-extract:export', {
+          id: review.id,
+          courseId: courseId || undefined,
+          pages: review.pages.map(({page, keep, crop}) => ({page, keep, crop}))
+         })
          setSaved(result)
          setSourceDeleted(result.sourceDeleted)
          await refresh()
@@ -189,10 +227,30 @@ export function PptExtract({visible, close, courseId, courseName, files}: {visib
        return (
         <article key={p.page} className={p.keep ? '' : 'removed'}>
          <label>
-          <input type="checkbox" aria-label={`保留第 ${p.page} 页`} checked={p.keep} disabled={busy || !p.preview} onChange={e => change(p.page, {keep: e.target.checked})} />第 {p.page} 页 · {p.keep ? '保留' : '删除'}
+          <input
+           type="checkbox"
+           aria-label={`保留第 ${p.page} 页`}
+           checked={p.keep}
+           disabled={busy || !p.preview}
+           onChange={e => change(p.page, {keep: e.target.checked})}
+          />
+          第 {p.page} 页 · {p.keep ? '保留' : '删除'}
          </label>
          <div className="ppt-extract-preview" style={{aspectRatio: p.height ? (p.width * w) / (p.height * h) : 16 / 9}}>
-          {p.preview ? <img alt={`第 ${p.page} 页裁剪预览`} src={p.preview} style={{width: 100 / w + '%', height: 100 / h + '%', left: (-100 * c.left) / w + '%', top: (-100 * c.top) / h + '%'}} /> : <span>图片无法读取</span>}
+          {p.preview ? (
+           <img
+            alt={`第 ${p.page} 页裁剪预览`}
+            src={p.preview}
+            style={{
+             width: 100 / w + '%',
+             height: 100 / h + '%',
+             left: (-100 * c.left) / w + '%',
+             top: (-100 * c.top) / h + '%'
+            }}
+           />
+          ) : (
+           <span>图片无法读取</span>
+          )}
          </div>
          <p>{p.reason}</p>
          <details>

@@ -10,9 +10,19 @@ const root = resolve('.'),
  version = JSON.parse(await readFile(join(root, 'package.json'), 'utf8')).version as string
 if (target !== resolve('D:/ChatGPT/New project/梅酱的听课指南-副本')) throw Error('Unexpected installation target')
 const backup = join(target, '.runtime-before-' + version)
-for (const path of [source, target]) if ((await lstat(path)).isSymbolicLink()) throw Error('Installation paths cannot be links')
-const running = spawnSync('powershell.exe', ['-NoProfile', '-Command', "@(Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -like 'D:\\ChatGPT\\New project\\梅酱的听课指南-副本\\*' }).Count"], {encoding: 'utf8', windowsHide: true})
-if (running.status !== 0 || running.stdout.trim() !== '0') throw Error('Please close the installed copy before updating')
+for (const path of [source, target])
+ if ((await lstat(path)).isSymbolicLink()) throw Error('Installation paths cannot be links')
+const running = spawnSync(
+ 'powershell.exe',
+ [
+  '-NoProfile',
+  '-Command',
+  "@(Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -like 'D:\\ChatGPT\\New project\\梅酱的听课指南-副本\\*' }).Count"
+ ],
+ {encoding: 'utf8', windowsHide: true}
+)
+if (running.status !== 0 || running.stdout.trim() !== '0')
+ throw Error('Please close the installed copy before updating')
 async function hash(path: string) {
  const h = createHash('sha256')
  for await (const bytes of createReadStream(path)) h.update(bytes)
@@ -46,7 +56,8 @@ for (const component of manifest.components)
  }
 const asar = createRequire(import.meta.url)('@electron/asar'),
  packed = join(source, 'resources/app.asar')
-if (JSON.parse(asar.extractFile(packed, 'package.json').toString()).version !== version) throw Error('Packaged application version mismatch')
+if (JSON.parse(asar.extractFile(packed, 'package.json').toString()).version !== version)
+ throw Error('Packaged application version mismatch')
 await mkdir(backup)
 await writeFile(join(backup, 'user-data-before.json'), JSON.stringify(before))
 await rename(join(target, 'resources'), join(backup, 'resources'))
@@ -63,9 +74,20 @@ for (const entry of await readdir(source, {withFileTypes: true}))
 await cp(join(source, 'resources'), join(target, 'resources'), {recursive: true, errorOnExist: true, force: false})
 await cp(join(source, 'locales'), join(target, 'locales'), {recursive: true})
 const after = {courses: await snapshot(join(target, '课程数据')), materials: await snapshot(join(target, '资料'))}
-if (JSON.stringify(before) !== JSON.stringify(after) || (await hash(original)) !== originalHash) throw Error('Protected user data or original application changed')
+if (JSON.stringify(before) !== JSON.stringify(after) || (await hash(original)) !== originalHash)
+ throw Error('Protected user data or original application changed')
 const appAsarSha256 = await hash(join(target, 'resources/app.asar'))
 if (appAsarSha256 !== (await hash(packed))) throw Error('Installed application hash differs')
-const report = {version, target, backup, installedAt: new Date().toISOString(), appAsarSha256, runtimeFilesVerified, userCoursesAndMaterialsUnchanged: true, originalUntouched: true, actualInstalledStartupVerified: false}
+const report = {
+ version,
+ target,
+ backup,
+ installedAt: new Date().toISOString(),
+ appAsarSha256,
+ runtimeFilesVerified,
+ userCoursesAndMaterialsUnchanged: true,
+ originalUntouched: true,
+ actualInstalledStartupVerified: false
+}
 await writeFile(join(root, 'TypeScript' + version + '安装记录.json'), JSON.stringify(report, null, 2))
 console.log(JSON.stringify(report))

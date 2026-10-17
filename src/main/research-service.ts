@@ -36,7 +36,14 @@ export class NativeResearchService {
   this.sources = new NativeResearchSources(this.knowledge, this.store.rootId)
   this.extensions = new NativeResearchExtensions(this.store)
   this.mcp = new NativeResearchMcp(this.store)
-  this.engine = new NativeResearchEngine(this.store, this.sources, model, () => this.connection, this.extensions, this.mcp)
+  this.engine = new NativeResearchEngine(
+   this.store,
+   this.sources,
+   model,
+   () => this.connection,
+   this.extensions,
+   this.mcp
+  )
   this.notes = new NativeResearchNotes(this.store, this.engine, root)
   this.workflows = new NativeResearchWorkflows(this.store, this.sources, this.engine)
  }
@@ -47,12 +54,17 @@ export class NativeResearchService {
   switch (action) {
    case 'im': {
     if (!this.resources) throw new Error('通讯组件资源路径缺失')
-    this.im ??= new NativeImService(this.root, this.resources, undefined, this.model, {id: this.store.rootId, search: query => this.sources.search(query), verify: sources => this.sources.verify(sources)})
+    this.im ??= new NativeImService(this.root, this.resources, undefined, this.model, {
+     id: this.store.rootId,
+     search: query => this.sources.search(query),
+     verify: sources => this.sources.verify(sources)
+    })
     return this.im.execute(z.string().parse(args.action), args.value || {}, this.connection)
    }
    case 'configure': {
     const value = z.object({connection: z.string().min(1).max(200), model: z.string().max(200)}).parse(args)
-    if (this.connection && this.connection !== value.connection) for (const task of this.engine.list()) if (task.status === 'running') this.engine.stop(task.task_id)
+    if (this.connection && this.connection !== value.connection)
+     for (const task of this.engine.list()) if (task.status === 'running') this.engine.stop(task.task_id)
     this.connection = value.connection
     this.im?.configure(value.connection)
     return true
@@ -149,7 +161,8 @@ export class NativeResearchService {
    case 'workflow-create':
     return this.workflows.create(args)
    case 'workflow-action': {
-    if (this.store.legacyWorkflows().some(flow => flow.workflow_id === args.id)) throw new Error('旧工作流需要重新选择当前资料建立新任务，不会重放旧请求')
+    if (this.store.legacyWorkflows().some(flow => flow.workflow_id === args.id))
+     throw new Error('旧工作流需要重新选择当前资料建立新任务，不会重放旧请求')
     return this.workflows.action(args)
    }
    case 'workflow-export': {
@@ -159,10 +172,34 @@ export class NativeResearchService {
      return this.exportFile(
       '研究成果',
       old.workflow_id + '-工作流.md',
-      '# ' + old.question + '\n\n> 历史工作流导出（未重新核验）\n> ' + old.notice + '\n\n' + old.steps.map(step => '## ' + step.name + '\n\n保存状态：' + step.status + '；正文哈希：' + (step.hash_verified ? '与保存值一致' : '未确认') + '\n\n' + step.answer).join('\n\n')
+      '# ' +
+       old.question +
+       '\n\n> 历史工作流导出（未重新核验）\n> ' +
+       old.notice +
+       '\n\n' +
+       old.steps
+        .map(
+         step =>
+          '## ' +
+          step.name +
+          '\n\n保存状态：' +
+          step.status +
+          '；正文哈希：' +
+          (step.hash_verified ? '与保存值一致' : '未确认') +
+          '\n\n' +
+          step.answer
+        )
+        .join('\n\n')
      )
     const flow = this.workflows.verify(id),
-     text = '# ' + flow.question + '\n\n' + flow.steps.map(step => '## ' + step.name + '\n\n' + step.answer).join('\n\n') + '\n\n## 来源版本\n\n```json\n' + JSON.stringify(flow.bindings, null, 2) + '\n```\n'
+     text =
+      '# ' +
+      flow.question +
+      '\n\n' +
+      flow.steps.map(step => '## ' + step.name + '\n\n' + step.answer).join('\n\n') +
+      '\n\n## 来源版本\n\n```json\n' +
+      JSON.stringify(flow.bindings, null, 2) +
+      '\n```\n'
     return this.exportFile('研究成果', flow.workflow_id + '-工作流.md', text)
    }
    case 'overview':
@@ -172,18 +209,29 @@ export class NativeResearchService {
      mcp: this.mcp.list(),
      tasks: [...this.engine.list(), ...this.store.legacyResearchTasks()],
      workflows: [...this.workflows.list(), ...this.store.legacyWorkflows()],
-     migration: {runtimeLanguage: 'typescript', legacyRuntimeRequired: false, externalAcceptance: '详见版本说明；本地模拟不代表所有真实账号和站点已验收'},
-     runtime: {dependencies: [{id: 'typescript', label: '原生 TypeScript 研究后台', state: 'detected', version: 'native-v1'}]}
+     migration: {
+      runtimeLanguage: 'typescript',
+      legacyRuntimeRequired: false,
+      externalAcceptance: '详见版本说明；本地模拟不代表所有真实账号和站点已验收'
+     },
+     runtime: {
+      dependencies: [{id: 'typescript', label: '原生 TypeScript 研究后台', state: 'detected', version: 'native-v1'}]
+     }
     }
    default:
     throw new Error('此研究工具尚未完成原生适配：' + action)
   }
  }
  private async exportFile(folder: string, name: string, text: string) {
-  if (!/^[a-f0-9]{32}(?:-工作流)?\.md$/.test(name) || !['研究成果'].includes(folder)) throw new Error('研究导出名称无效')
+  if (!/^[a-f0-9]{32}(?:-工作流)?\.md$/.test(name) || !['研究成果'].includes(folder))
+   throw new Error('研究导出名称无效')
   const directory = resolve(this.root, folder)
   await mkdir(directory, {recursive: true})
-  if ((await lstat(directory)).isSymbolicLink() || resolve(await realpath(directory)).toLowerCase() !== directory.toLowerCase()) throw new Error('研究导出目录无效')
+  if (
+   (await lstat(directory)).isSymbolicLink() ||
+   resolve(await realpath(directory)).toLowerCase() !== directory.toLowerCase()
+  )
+   throw new Error('研究导出目录无效')
   const path = join(directory, name)
   try {
    await writeFile(path, text, {flag: 'wx'})

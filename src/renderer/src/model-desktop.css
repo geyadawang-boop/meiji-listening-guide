@@ -188,7 +188,11 @@
  border-radius: 12px;
  min-height: 165px;
  padding: 28px 35px;
- background: linear-gradient(90deg, color-mix(in srgb, var(--blue) 13%, var(--surface-raised)), var(--surface-raised) 65%);
+ background: linear-gradient(
+  90deg,
+  color-mix(in srgb, var(--blue) 13%, var(--surface-raised)),
+  var(--surface-raised) 65%
+ );
  margin-bottom: 30px;
 }
 .provider-hero img {

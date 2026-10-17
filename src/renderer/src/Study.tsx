@@ -6,7 +6,15 @@ import type {Course, Detail} from '../../shared/types'
 GlobalWorkerOptions.workerSrc = workerUrl
 const invoke = <T,>(action: string, args?: unknown) => window.assistant.invoke<T>(action, args)
 type Book = {id: string; path: string; pages: number}
-export function Study({courses, close, refresh}: {courses: Course[]; close: () => void; refresh: () => Promise<unknown>}) {
+export function Study({
+ courses,
+ close,
+ refresh
+}: {
+ courses: Course[]
+ close: () => void
+ refresh: () => Promise<unknown>
+}) {
  const [entries, setEntries] = useState<StudyEntry[]>([]),
   [text, setText] = useState(''),
   [timezone, setTimezone] = useState('Asia/Shanghai'),
@@ -27,7 +35,9 @@ export function Study({courses, close, refresh}: {courses: Course[]; close: () =
   [rectangle, setRectangle] = useState<Highlight['rect'] | null>(null),
   [image, setImage] = useState(''),
   [size, setSize] = useState({width: 1, height: 1})
- const viewport = useRef<ReturnType<import('pdfjs-dist/legacy/build/pdf.mjs').PDFPageProxy['getViewport']> | null>(null),
+ const viewport = useRef<ReturnType<import('pdfjs-dist/legacy/build/pdf.mjs').PDFPageProxy['getViewport']> | null>(
+   null
+  ),
   start = useRef<[number, number] | null>(null)
  const entry = entries.find(e => e.id === selected)
  async function run(fn: () => Promise<void>) {
@@ -62,7 +72,13 @@ export function Study({courses, close, refresh}: {courses: Course[]; close: () =
   const task = (async () => {
    if (!book) return
    const data = await invoke<string>('textbook:bytes', {id: book.id}),
-    pdfTask = getDocument({url: data, disableAutoFetch: true, disableStream: true, rangeChunkSize: 1048576, canvasMaxAreaInBytes: 32000000})
+    pdfTask = getDocument({
+     url: data,
+     disableAutoFetch: true,
+     disableStream: true,
+     rangeChunkSize: 1048576,
+     canvasMaxAreaInBytes: 32000000
+    })
    try {
     const pdf = await pdfTask.promise,
      page = await pdf.getPage(pageNumber),
@@ -121,7 +137,13 @@ export function Study({courses, close, refresh}: {courses: Course[]; close: () =
    if (last < first || last - first > 99 || last > book.pages) throw new Error('请选择不超过 100 页的章节范围')
    setNotice('正在识别扫描教材；请逐条核对文字和位置后保存')
    const data = await invoke<string>('textbook:bytes', {id: book.id}),
-    task = getDocument({url: data, disableAutoFetch: true, disableStream: true, rangeChunkSize: 1048576, canvasMaxAreaInBytes: 32000000}),
+    task = getDocument({
+     url: data,
+     disableAutoFetch: true,
+     disableStream: true,
+     rangeChunkSize: 1048576,
+     canvasMaxAreaInBytes: 32000000
+    }),
     images: string[] = []
    try {
     const pdf = await task.promise
@@ -141,7 +163,9 @@ export function Study({courses, close, refresh}: {courses: Course[]; close: () =
   }
   setDraft(result)
   setChosen(result.rows.map(r => r.id))
-  setNotice(result.rows.length ? '请核对划线内容、位置与依据，再保存到原教材' : '此范围没有找到依据充分的内容，原教材未修改')
+  setNotice(
+   result.rows.length ? '请核对划线内容、位置与依据，再保存到原教材' : '此范围没有找到依据充分的内容，原教材未修改'
+  )
  }
  function update(value: Partial<StudyEntry>) {
   setEntries(rows => rows.map(row => (row.id === selected ? {...row, ...value} : row)))
@@ -149,7 +173,10 @@ export function Study({courses, close, refresh}: {courses: Course[]; close: () =
  }
  function point(event: React.MouseEvent<HTMLDivElement>) {
   const r = event.currentTarget.getBoundingClientRect()
-  return [((event.clientX - r.left) / r.width) * size.width, ((event.clientY - r.top) / r.height) * size.height] as [number, number]
+  return [((event.clientX - r.left) / r.width) * size.width, ((event.clientY - r.top) / r.height) * size.height] as [
+   number,
+   number
+  ]
  }
  return (
   <section className="study-page" aria-label="课表与教材">
@@ -197,7 +224,13 @@ export function Study({courses, close, refresh}: {courses: Course[]; close: () =
       <button
        disabled={busy || !courses.length}
        onClick={() => {
-        const row: StudyEntry = {id: crypto.randomUUID(), courseId: courses[0].id, title: '', chapter: '', endsAt: new Date().toISOString()}
+        const row: StudyEntry = {
+         id: crypto.randomUUID(),
+         courseId: courses[0].id,
+         title: '',
+         chapter: '',
+         endsAt: new Date().toISOString()
+        }
         setEntries([...entries, row])
         setSelected(row.id)
        }}
@@ -237,14 +270,30 @@ export function Study({courses, close, refresh}: {courses: Course[]; close: () =
         <input value={entry.chapter} onChange={e => update({chapter: e.target.value})} />
        </label>
        <label>
-        <input type="checkbox" checked={!entry.endsAt} onChange={e => update({endsAt: e.target.checked ? '' : new Date().toISOString()})} />
+        <input
+         type="checkbox"
+         checked={!entry.endsAt}
+         onChange={e => update({endsAt: e.target.checked ? '' : new Date().toISOString()})}
+        />
         时间待定
        </label>
        <label>
         课程结束时间（含时区）
-        <input value={entry.endsAt} onChange={e => update({endsAt: e.target.value})} placeholder="2026-10-08T12:00:00+08:00" />
+        <input
+         value={entry.endsAt}
+         onChange={e => update({endsAt: e.target.value})}
+         placeholder="2026-10-08T12:00:00+08:00"
+        />
        </label>
-       <small>核验时间：{Number.isFinite(Date.parse(entry.endsAt)) ? new Date(checkAt(entry.endsAt)).toLocaleString() : entry.endsAt ? '请填写有效时间' : '补课时间待定，不安排核验'}（结束后 4 小时）</small>
+       <small>
+        核验时间：
+        {Number.isFinite(Date.parse(entry.endsAt))
+         ? new Date(checkAt(entry.endsAt)).toLocaleString()
+         : entry.endsAt
+           ? '请填写有效时间'
+           : '补课时间待定，不安排核验'}
+        （结束后 4 小时）
+       </small>
        <label>
         关联已有课次
         <select value={entry.lectureId || ''} onChange={e => update({lectureId: e.target.value || undefined})}>
@@ -258,7 +307,10 @@ export function Study({courses, close, refresh}: {courses: Course[]; close: () =
        </label>
        <label>
         智云课程编号
-        <input value={entry.zhiyunCourseId || ''} onChange={e => update({zhiyunCourseId: e.target.value || undefined})} />
+        <input
+         value={entry.zhiyunCourseId || ''}
+         onChange={e => update({zhiyunCourseId: e.target.value || undefined})}
+        />
        </label>
        <label>
         智云课次编号
@@ -282,7 +334,9 @@ export function Study({courses, close, refresh}: {courses: Course[]; close: () =
        void run(async () => {
         setEntries(await invoke('study:save', {entries}))
         await refresh()
-        setNotice('课表已保存，关联课次已按课表改名。核验时间已计算；自动运行通过 Codex 定时任务设置，教材不会自动划线。')
+        setNotice(
+         '课表已保存，关联课次已按课表改名。核验时间已计算；自动运行通过 Codex 定时任务设置，教材不会自动划线。'
+        )
        })
       }
      >
@@ -327,7 +381,13 @@ export function Study({courses, close, refresh}: {courses: Course[]; close: () =
         </label>
         <label>
          结束页
-         <input type="number" min={first} max={book.pages} value={last} onChange={e => setLast(Number(e.target.value))} />
+         <input
+          type="number"
+          min={first}
+          max={book.pages}
+          value={last}
+          onChange={e => setLast(Number(e.target.value))}
+         />
         </label>
        </div>
        <button
@@ -383,7 +443,11 @@ export function Study({courses, close, refresh}: {courses: Course[]; close: () =
           }}
          />
         </label>
-        <select aria-label="手动划线来源" value={source} onChange={e => setSource(e.target.value as Highlight['source'])}>
+        <select
+         aria-label="手动划线来源"
+         value={source}
+         onChange={e => setSource(e.target.value as Highlight['source'])}
+        >
          {Object.entries(highlightLabels).map(([key, label]) => (
           <option key={key} value={key}>
            {label}
@@ -432,7 +496,16 @@ export function Study({courses, close, refresh}: {courses: Course[]; close: () =
           const v = viewport.current!,
            a = v.convertToViewportPoint(rectangle[0], rectangle[1]),
            b = v.convertToViewportPoint(rectangle[0] + rectangle[2], rectangle[1] + rectangle[3])
-          return <span style={{left: (Math.min(a[0], b[0]) / size.width) * 100 + '%', top: (Math.min(a[1], b[1]) / size.height) * 100 + '%', width: (Math.abs(a[0] - b[0]) / size.width) * 100 + '%', height: (Math.abs(a[1] - b[1]) / size.height) * 100 + '%'}} />
+          return (
+           <span
+            style={{
+             left: (Math.min(a[0], b[0]) / size.width) * 100 + '%',
+             top: (Math.min(a[1], b[1]) / size.height) * 100 + '%',
+             width: (Math.abs(a[0] - b[0]) / size.width) * 100 + '%',
+             height: (Math.abs(a[1] - b[1]) / size.height) * 100 + '%'
+            }}
+           />
+          )
          })()}
        </div>
        <label>
@@ -448,7 +521,18 @@ export function Study({courses, close, refresh}: {courses: Course[]; close: () =
         disabled={busy || !rectangle || !evidence.trim()}
         onClick={() =>
          void run(async () => {
-          await invoke('textbook:manual', {id: book.id, highlight: {id: crypto.randomUUID(), page: pageNumber, rect: rectangle, source, quote: '手动框选区域', evidence, extension}})
+          await invoke('textbook:manual', {
+           id: book.id,
+           highlight: {
+            id: crypto.randomUUID(),
+            page: pageNumber,
+            rect: rectangle,
+            source,
+            quote: '手动框选区域',
+            evidence,
+            extension
+           }
+          })
           setNotice('手动划线已保存到原教材 · ' + new Date().toLocaleTimeString())
           setDraft(null)
          })
@@ -465,7 +549,11 @@ export function Study({courses, close, refresh}: {courses: Course[]; close: () =
        <h3>划线建议 · {chosen.length} 条选中</h3>
        {draft.rows.map(row => (
         <label key={row.id}>
-         <input type="checkbox" checked={chosen.includes(row.id)} onChange={e => setChosen(e.target.checked ? [...chosen, row.id] : chosen.filter(id => id !== row.id))} />
+         <input
+          type="checkbox"
+          checked={chosen.includes(row.id)}
+          onChange={e => setChosen(e.target.checked ? [...chosen, row.id] : chosen.filter(id => id !== row.id))}
+         />
          <span>
           第 {row.page} 页 · {highlightLabels[row.source]}
           {row.extension ? ' · 适当延伸' : ''}

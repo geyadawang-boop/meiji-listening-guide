@@ -53,7 +53,9 @@ export function SavedLearningNotes() {
   <>
    <section className="knowledge-card">
     <h3>保存研究笔记</h3>
-    <p className="hint">先预览完整笔记及出处，再明确保存。保存时核验引用的资料版本；来源改变会拒绝旧保存。保存后可编辑，并保留每次修订，不自动修改原文或教材。</p>
+    <p className="hint">
+     先预览完整笔记及出处，再明确保存。保存时核验引用的资料版本；来源改变会拒绝旧保存。保存后可编辑，并保留每次修订，不自动修改原文或教材。
+    </p>
     <div className="row">
      <select
       aria-label="待保存的研究"
@@ -70,7 +72,10 @@ export function SavedLearningNotes() {
        </option>
       ))}
      </select>
-     <button disabled={busy || !task} onClick={() => void run(async () => setPreview(await request<Preview>('note-preview', {id: task})))}>
+     <button
+      disabled={busy || !task}
+      onClick={() => void run(async () => setPreview(await request<Preview>('note-preview', {id: task})))}
+     >
       预览待保存笔记
      </button>
     </div>
@@ -84,7 +89,14 @@ export function SavedLearningNotes() {
        disabled={busy}
        onClick={() =>
         void run(async () => {
-         const saved = await request<Note>('note-save', {id: preview.task_id, expected: {kb_root_id: preview.kb_root_id, note_sha256: preview.note_sha256, sources_sha256: preview.sources_sha256}})
+         const saved = await request<Note>('note-save', {
+          id: preview.task_id,
+          expected: {
+           kb_root_id: preview.kb_root_id,
+           note_sha256: preview.note_sha256,
+           sources_sha256: preview.sources_sha256
+          }
+         })
          setPreview(undefined)
          await list()
          await read(saved.receipt.note_id)
@@ -100,7 +112,13 @@ export function SavedLearningNotes() {
    <section className="knowledge-card">
     <h3>我的笔记</h3>
     <div className="row">
-     <input aria-label="笔记检索词" placeholder="查找笔记正文或标题" maxLength={200} value={query} onChange={e => setQuery(e.target.value)} />
+     <input
+      aria-label="笔记检索词"
+      placeholder="查找笔记正文或标题"
+      maxLength={200}
+      value={query}
+      onChange={e => setQuery(e.target.value)}
+     />
      <select aria-label="笔记显示范围" value={state} onChange={e => setState(e.target.value)}>
       <option value="active">当前笔记</option>
       <option value="archived">已归档</option>
@@ -125,15 +143,32 @@ export function SavedLearningNotes() {
     {note && (
      <>
       <h4>{note.receipt.title}</h4>
-      <p className="hint">笔记保存时版本 · {note.lifecycle.state === 'archived' ? '已归档' : '当前有效'}。笔记是学习记录，不替代原始资料。</p>
-      <textarea aria-label="笔记正文" maxLength={40000} value={markdown} disabled={busy || note.lifecycle.state === 'archived'} onChange={e => setMarkdown(e.target.value)} />
+      <p className="hint">
+       笔记保存时版本 · {note.lifecycle.state === 'archived' ? '已归档' : '当前有效'}。笔记是学习记录，不替代原始资料。
+      </p>
+      <textarea
+       aria-label="笔记正文"
+       maxLength={40000}
+       value={markdown}
+       disabled={busy || note.lifecycle.state === 'archived'}
+       onChange={e => setMarkdown(e.target.value)}
+      />
       <div className="row">
        <button
         className="primary"
         disabled={busy || !markdown.trim() || markdown === note.markdown || note.lifecycle.state === 'archived'}
         onClick={() =>
          void run(async () => {
-          const saved = await request<Note>('note-revise', {value: {action: 'manual_revision', schema_version: '1', operation_id: op(), parent_note_id: note.receipt.note_id, parent_body_sha256: note.receipt.body_sha256, markdown}})
+          const saved = await request<Note>('note-revise', {
+           value: {
+            action: 'manual_revision',
+            schema_version: '1',
+            operation_id: op(),
+            parent_note_id: note.receipt.note_id,
+            parent_body_sha256: note.receipt.body_sha256,
+            markdown
+           }
+          })
           await list()
           await read(saved.receipt.note_id)
           setNotice('修订已保存，原版本保留')
@@ -168,7 +203,15 @@ export function SavedLearningNotes() {
         disabled={busy}
         onClick={() =>
          void run(async () => {
-          await request('note-lifecycle', {value: {note_id: note.receipt.note_id, body_sha256: note.receipt.body_sha256, expected_revision: note.lifecycle.revision, operation_id: op(), action: note.lifecycle.state === 'archived' ? 'restore' : 'archive'}})
+          await request('note-lifecycle', {
+           value: {
+            note_id: note.receipt.note_id,
+            body_sha256: note.receipt.body_sha256,
+            expected_revision: note.lifecycle.revision,
+            operation_id: op(),
+            action: note.lifecycle.state === 'archived' ? 'restore' : 'archive'
+           }
+          })
           await read(note.receipt.note_id)
           await list()
          })

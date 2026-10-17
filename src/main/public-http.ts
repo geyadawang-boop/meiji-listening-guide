@@ -49,11 +49,17 @@ export function publicHttps(input: string) {
  return url
 }
 type Resolver = (hostname: string) => Promise<{address: string; family: number}[]>
-export async function publicHttpResponse(input: string, init: RequestInit = {}, fetcher: typeof fetch = fetch, resolver: Resolver = hostname => lookup(hostname, {all: true, verbatim: true})) {
+export async function publicHttpResponse(
+ input: string,
+ init: RequestInit = {},
+ fetcher: typeof fetch = fetch,
+ resolver: Resolver = hostname => lookup(hostname, {all: true, verbatim: true})
+) {
  const url = publicHttps(input),
   hostname = url.hostname.replace(/^\[|\]$/g, ''),
   addresses = isIP(hostname) ? [{address: hostname, family: isIP(hostname)}] : await resolver(hostname)
- if (!addresses.length || addresses.some(row => !publicAddress(row.address))) throw new Error('服务地址指向本地或保留网络，请核对公开服务地址')
+ if (!addresses.length || addresses.some(row => !publicAddress(row.address)))
+  throw new Error('服务地址指向本地或保留网络，请核对公开服务地址')
  const pinned: LookupFunction = (name, options, callback) => {
   if (name !== hostname) {
    callback(new Error('服务连接主机已改变'), ' ', 4)
@@ -72,7 +78,13 @@ export async function publicHttpResponse(input: string, init: RequestInit = {}, 
  const agent = new Agent({connect: {lookup: pinned, timeout: 15000}, headersTimeout: 20000, bodyTimeout: 20000}),
   dispatcher = new Dispatcher1Wrapper(agent)
  try {
-  const response = await fetcher(url.href, {...init, dispatcher, redirect: 'error', credentials: 'omit', signal: AbortSignal.any([init.signal || new AbortController().signal, AbortSignal.timeout(60000)])} as RequestInit)
+  const response = await fetcher(url.href, {
+   ...init,
+   dispatcher,
+   redirect: 'error',
+   credentials: 'omit',
+   signal: AbortSignal.any([init.signal || new AbortController().signal, AbortSignal.timeout(60000)])
+  } as RequestInit)
   return {response, close: () => agent.destroy()}
  } catch (error) {
   await agent.destroy()

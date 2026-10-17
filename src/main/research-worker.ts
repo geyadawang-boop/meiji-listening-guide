@@ -40,9 +40,21 @@ port.on('message', event => {
  const raw = event.data as {kind?: string}
  if (raw.kind === 'model-result') {
   try {
-   const reply = z.object({kind: z.literal('model-result'), key: z.number().int().positive(), text: z.string().max(200000).optional(), error: z.string().max(1000).optional()}).parse(raw),
+   const reply = z
+     .object({
+      kind: z.literal('model-result'),
+      key: z.number().int().positive(),
+      text: z.string().max(200000).optional(),
+      error: z.string().max(1000).optional()
+     })
+     .parse(raw),
     request = pending.get(reply.key)
-   if (request) reply.error ? request.reject(new Error(reply.error)) : reply.text !== undefined ? request.resolve(reply.text) : request.reject(new Error('模型结果缺失'))
+   if (request)
+    reply.error
+     ? request.reject(new Error(reply.error))
+     : reply.text !== undefined
+       ? request.resolve(reply.text)
+       : request.reject(new Error('模型结果缺失'))
   } catch {
    process.exit(1)
   }
@@ -51,7 +63,14 @@ port.on('message', event => {
  void (async () => {
   let id: number | undefined
   try {
-   const request = z.object({protocol: z.literal(BACKEND_PROTOCOL), id: z.number().int().positive(), action: z.string(), args: z.unknown()}).parse(raw)
+   const request = z
+    .object({
+     protocol: z.literal(BACKEND_PROTOCOL),
+     id: z.number().int().positive(),
+     action: z.string(),
+     args: z.unknown()
+    })
+    .parse(raw)
    id = request.id
    const owner = await ownerReady
    if (closed) throw new Error('研究后台已关闭')
@@ -65,7 +84,13 @@ port.on('message', event => {
    const result = await service.execute(request.action, request.args)
    port.postMessage({protocol: BACKEND_PROTOCOL, kind: 'result', id, ok: true, result})
   } catch (error) {
-   port.postMessage({protocol: BACKEND_PROTOCOL, kind: 'result', id, ok: false, error: error instanceof Error ? error.message : '研究操作未完成'})
+   port.postMessage({
+    protocol: BACKEND_PROTOCOL,
+    kind: 'result',
+    id,
+    ok: false,
+    error: error instanceof Error ? error.message : '研究操作未完成'
+   })
   }
  })().catch(() => {
   process.exit(1)

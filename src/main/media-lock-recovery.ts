@@ -1,7 +1,11 @@
 import {lstat, readFile, readdir, unlink} from 'node:fs/promises'
 import {join} from 'node:path'
 import {z} from 'zod'
-const ownerSchema = z.object({version: z.literal(1), pid: z.number().int().positive().safe(), identity: z.string().min(1)})
+const ownerSchema = z.object({
+ version: z.literal(1),
+ pid: z.number().int().positive().safe(),
+ identity: z.string().min(1)
+})
 /** Called only after the worker holds its exclusive queue lease. Ambiguous locks are preserved. */
 export async function recoverDownloadLocks(directory: string, identity: string) {
  const preserved: string[] = [],

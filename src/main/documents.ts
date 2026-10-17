@@ -38,7 +38,11 @@ export async function parseDocument(path: string): Promise<{text: string; needsO
    for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i),
      content = await page.getTextContent()
-    text += `\n[第 ${i} 页]\n` + content.items.map(item => ('str' in item ? item.str + ('hasEOL' in item && item.hasEOL ? '\n' : ' ') : '')).join('')
+    text +=
+     `\n[第 ${i} 页]\n` +
+     content.items
+      .map(item => ('str' in item ? item.str + ('hasEOL' in item && item.hasEOL ? '\n' : ' ') : ''))
+      .join('')
    }
   } finally {
    await task.destroy()
@@ -70,11 +74,21 @@ export async function parseDocument(path: string): Promise<{text: string; needsO
  }
  if (!['.txt', '.md'].includes(ext)) throw new Error('资料只支持 PDF、DOCX、TXT 和 Markdown；PPT 请先另存为 PDF')
  let encoding = jschardet.detect(data).encoding || 'UTF-8'
- if (/gb|big5|windows-1252|iso-8859/i.test(encoding) && !new TextDecoder('utf-8', {fatal: false}).decode(data).includes('�')) encoding = 'UTF-8'
+ if (
+  /gb|big5|windows-1252|iso-8859/i.test(encoding) &&
+  !new TextDecoder('utf-8', {fatal: false}).decode(data).includes('�')
+ )
+  encoding = 'UTF-8'
  else if (/windows-1252|iso-8859/i.test(encoding)) encoding = 'GB18030'
  return {text: iconv.decode(data, iconv.encodingExists(encoding) ? encoding : 'GB18030'), needsOcr: false}
 }
-export async function copyInto(root: string, courseId: string, source: string, subdir = 'materials', directory?: string): Promise<string> {
+export async function copyInto(
+ root: string,
+ courseId: string,
+ source: string,
+ subdir = 'materials',
+ directory?: string
+): Promise<string> {
  const dir = directory || join(root, 'courses', courseId, subdir)
  await mkdir(dir, {recursive: true})
  const ext = extname(source),
@@ -83,10 +97,25 @@ export async function copyInto(root: string, courseId: string, source: string, s
  await copyFile(source, dest)
  return dest
 }
-export async function importDocument(root: string, courseId: string, kind: CourseFile['kind'], source: string, directory?: string): Promise<CourseFile> {
+export async function importDocument(
+ root: string,
+ courseId: string,
+ kind: CourseFile['kind'],
+ source: string,
+ directory?: string
+): Promise<CourseFile> {
  const parsed = await parseDocument(source),
   path = await copyInto(root, courseId, source, 'materials', directory)
- return {id: randomUUID(), course_id: courseId, kind, filename: basename(source), path, text: parsed.text, chunks: chunks(parsed.text), needs_ocr: parsed.needsOcr ? 1 : 0}
+ return {
+  id: randomUUID(),
+  course_id: courseId,
+  kind,
+  filename: basename(source),
+  path,
+  text: parsed.text,
+  chunks: chunks(parsed.text),
+  needs_ocr: parsed.needsOcr ? 1 : 0
+ }
 }
 
 export async function parseCourseware(path: string) {

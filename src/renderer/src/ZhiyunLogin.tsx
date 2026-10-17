@@ -16,7 +16,9 @@ export function ZhiyunLogin({close, exportResources}: {close: () => void; export
   if (!node) return
   const update = () => {
    const b = node.getBoundingClientRect()
-   void invoke('zhiyun:bounds', {bounds: {x: b.x, y: b.y, width: b.width, height: b.height}, visible: true}).catch(() => setError('登录页面无法打开，请重试'))
+   void invoke('zhiyun:bounds', {bounds: {x: b.x, y: b.y, width: b.width, height: b.height}, visible: true}).catch(() =>
+    setError('登录页面无法打开，请重试')
+   )
   }
   const observer = new ResizeObserver(update)
   observer.observe(node)

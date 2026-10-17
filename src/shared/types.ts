@@ -1,8 +1,29 @@
 import {z} from 'zod'
-export const questionSchema = z.object({id: z.string(), courseId: z.string(), sourceFile: z.string(), year: z.string().optional(), type: z.string(), stem: z.string().min(1), answer: z.string().optional(), knowledgePoints: z.array(z.string())})
-export const pointSchema = z.object({level: z.enum(['必考', '很可能考', '重要', '要求掌握']), topic: z.string(), detail: z.string(), quote: z.string().min(1), timestamp: z.string().regex(/^\d{2,}:\d{2}:\d{2}$/), pptRef: z.string().optional(), verified: z.boolean().optional()})
+export const questionSchema = z.object({
+ id: z.string(),
+ courseId: z.string(),
+ sourceFile: z.string(),
+ year: z.string().optional(),
+ type: z.string(),
+ stem: z.string().min(1),
+ answer: z.string().optional(),
+ knowledgePoints: z.array(z.string())
+})
+export const pointSchema = z.object({
+ level: z.enum(['必考', '很可能考', '重要', '要求掌握']),
+ topic: z.string(),
+ detail: z.string(),
+ quote: z.string().min(1),
+ timestamp: z.string().regex(/^\d{2,}:\d{2}:\d{2}$/),
+ pptRef: z.string().optional(),
+ verified: z.boolean().optional()
+})
 const quoteSchema = pointSchema.omit({level: true, detail: true, pptRef: true})
-export const notesSchema = z.object({keyPoints: z.array(pointSchema), notTested: z.array(quoteSchema), uncertain: z.array(quoteSchema).default([])})
+export const notesSchema = z.object({
+ keyPoints: z.array(pointSchema),
+ notTested: z.array(quoteSchema),
+ uncertain: z.array(quoteSchema).default([])
+})
 export type PastQuestion = z.infer<typeof questionSchema>
 export type LectureNotes = z.infer<typeof notesSchema>
 export interface Segment {
@@ -167,7 +188,11 @@ export interface Progress {
  total?: number
  error?: boolean
 }
-export type EventPayload = {kind: 'progress'; data: Progress} | {kind: 'chat'; requestId: string; text: string} | {kind: 'browser'; url: string} | {kind: 'video-batch'; items: import('./video-ppt.js').VideoBatchItem[]}
+export type EventPayload =
+ | {kind: 'progress'; data: Progress}
+ | {kind: 'chat'; requestId: string; text: string}
+ | {kind: 'browser'; url: string}
+ | {kind: 'video-batch'; items: import('./video-ppt.js').VideoBatchItem[]}
 export interface Bridge {
  invoke<T = unknown>(action: string, args?: unknown): Promise<T>
  onEvent(callback: (event: EventPayload) => void): () => void

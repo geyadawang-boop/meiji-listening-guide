@@ -31,7 +31,13 @@ export function BiliBrowse({useVideo}: {useVideo: (url: string, kind: 'videoPpt'
      void read('search')
     }}
    >
-    <input aria-label="视频搜索词" placeholder="课程、老师或视频名称" maxLength={100} value={query} onChange={e => setQuery(e.target.value)} />
+    <input
+     aria-label="视频搜索词"
+     placeholder="课程、老师或视频名称"
+     maxLength={100}
+     value={query}
+     onChange={e => setQuery(e.target.value)}
+    />
     <button className="primary" disabled={busy || !query.trim()}>
      搜索视频
     </button>

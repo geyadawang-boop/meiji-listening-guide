@@ -14,10 +14,23 @@ const requested = z
  .enum(['win', 'mac', 'linux'])
  .optional()
  .parse(process.argv.find(argument => argument.startsWith('--platform='))?.slice('--platform='.length))
-const platform = requested === 'win' ? Platform.WINDOWS : requested === 'mac' ? Platform.MAC : requested === 'linux' ? Platform.LINUX : Platform.current()
+const platform =
+ requested === 'win'
+  ? Platform.WINDOWS
+  : requested === 'mac'
+    ? Platform.MAC
+    : requested === 'linux'
+      ? Platform.LINUX
+      : Platform.current()
 const active = requested || (process.platform === 'win32' ? 'win' : process.platform === 'darwin' ? 'mac' : 'linux')
-const pkg = JSON.parse(await readFile(join(root, 'package.json'), 'utf8')) as {version: string; devDependencies: {electron: string}; build: Configuration}
-const manifest: RuntimeManifest = process.argv.includes('--prepared') ? JSON.parse(await readFile(join(root, 'resources/runtime-manifest.json'), 'utf8')) : await generate(root)
+const pkg = JSON.parse(await readFile(join(root, 'package.json'), 'utf8')) as {
+ version: string
+ devDependencies: {electron: string}
+ build: Configuration
+}
+const manifest: RuntimeManifest = process.argv.includes('--prepared')
+ ? JSON.parse(await readFile(join(root, 'resources/runtime-manifest.json'), 'utf8'))
+ : await generate(root)
 if (manifest.schema !== 1 || manifest.productVersion !== pkg.version) throw new Error('运行清单与产品版本不一致')
 const output = join(root, 'release', profile)
 if (profile === 'components') {
@@ -31,15 +44,23 @@ if (profile === 'components') {
    await mkdir(dirname(target), {recursive: true})
    await copyFile(join(root, 'resources', component.directory, ...file.path.split('/')), target)
   }
-  await writeFile(join(directory, 'component.json'), JSON.stringify({schema: 1, id: component.id, productVersion: pkg.version, bytes: component.bytes}, null, 2))
+  await writeFile(
+   join(directory, 'component.json'),
+   JSON.stringify({schema: 1, id: component.id, productVersion: pkg.version, bytes: component.bytes}, null, 2)
+  )
  }
  console.log('同版本本地组件包已生成')
 } else {
- if (profile === 'full' && platform !== Platform.WINDOWS) throw new Error('完整发布仅支持 Windows；macOS/Linux 请使用 lite')
+ if (profile === 'full' && platform !== Platform.WINDOWS)
+  throw new Error('完整发布仅支持 Windows；macOS/Linux 请使用 lite')
  const optional = new Set(manifest.components.map(component => component.directory))
  const entries = pkg.build.extraResources
  if (!Array.isArray(entries)) throw new Error('发布资源配置必须为数组')
- const missing = new Set(manifest.components.map(component => component.directory).filter(directory => !existsSync(join(root, 'resources', directory))))
+ const missing = new Set(
+  manifest.components
+   .map(component => component.directory)
+   .filter(directory => !existsSync(join(root, 'resources', directory)))
+ )
  if (profile === 'full' && missing.size) throw new Error('完整发布缺少组件目录：' + [...missing].join('、'))
  const resources = entries.filter(entry => {
   if (typeof entry === 'string' || !entry.from) return true
@@ -52,7 +73,14 @@ if (profile === 'components') {
   }
   return true
  })
- const targets = profile === 'portable' ? ['dir'] : platform === Platform.WINDOWS ? ['nsis'] : platform === Platform.MAC ? ['dmg', 'zip'] : ['AppImage', 'deb']
+ const targets =
+  profile === 'portable'
+   ? ['dir']
+   : platform === Platform.WINDOWS
+     ? ['nsis']
+     : platform === Platform.MAC
+       ? ['dmg', 'zip']
+       : ['AppImage', 'deb']
  const configPath = join(root, 'tmp', 'release-' + profile + '.json')
  await rm(join(output, 'release-info.json'), {force: true})
  await mkdir(dirname(configPath), {recursive: true})
@@ -72,7 +100,18 @@ if (profile === 'components') {
  const files = await readdir(output)
  await writeFile(
   join(output, 'release-info.json'),
-  JSON.stringify({productVersion: pkg.version, electronVersion: pkg.devDependencies.electron, profile, platform: active, optionalComponents: profile === 'lite' ? manifest.components.map(component => component.id) : [], artifacts: files.filter(file => /\.(?:exe|dmg|zip|AppImage|deb)$/.test(file))}, null, 2)
+  JSON.stringify(
+   {
+    productVersion: pkg.version,
+    electronVersion: pkg.devDependencies.electron,
+    profile,
+    platform: active,
+    optionalComponents: profile === 'lite' ? manifest.components.map(component => component.id) : [],
+    artifacts: files.filter(file => /\.(?:exe|dmg|zip|AppImage|deb)$/.test(file))
+   },
+   null,
+   2
+  )
  )
  console.log(`已构建 ${profile} ${pkg.version}（${active}）`)
 }

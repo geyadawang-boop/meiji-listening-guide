@@ -26,7 +26,15 @@ import {ZhiyunLogin} from './ZhiyunLogin'
 import {ZhiyunImporter} from './ZhiyunImporter'
 import {ChatMessage, ChatWaitingReply} from './ChatMessage'
 import {DshPlusIcon, DshSendIcon, DshStopIcon, DshChevronDownIcon} from './ChatIcons'
-import {PptExtractNavIcon, MessageNavIcon, ModelNavIcon, LoginNavIcon, CloudExportNavIcon, IdentityNavIcon, AppearanceNavIcon} from './SidebarIcons'
+import {
+ PptExtractNavIcon,
+ MessageNavIcon,
+ ModelNavIcon,
+ LoginNavIcon,
+ CloudExportNavIcon,
+ IdentityNavIcon,
+ AppearanceNavIcon
+} from './SidebarIcons'
 import {useEffect, useRef, useState} from 'react'
 import type {ChatSession, Course, Detail, LectureDetail, Progress, Settings} from '../../shared/types'
 import {milliseconds, time} from '../../shared/srt'
@@ -49,7 +57,29 @@ export default function App() {
   [lecture, setLecture] = useState<LectureDetail | null>(null),
   [tab, setTab] = useState<'chat' | 'activity' | 'subtitles' | 'notes' | 'practice'>('chat')
  const [settings, setSettings] = useState<Settings | null>(null),
-  [modal, setModal] = useState<'course' | 'lecture' | 'settings' | 'materials' | 'modelPicker' | 'zhiyun' | 'zhiyunLogin' | 'courseware' | 'transcript' | 'files' | 'identity' | 'appearance' | 'pptExtract' | LearningView | 'study' | 'knowledge' | 'biliResources' | 'visual' | 'tools' | 'communications' | null>(null)
+  [modal, setModal] = useState<
+   | 'course'
+   | 'lecture'
+   | 'settings'
+   | 'materials'
+   | 'modelPicker'
+   | 'zhiyun'
+   | 'zhiyunLogin'
+   | 'courseware'
+   | 'transcript'
+   | 'files'
+   | 'identity'
+   | 'appearance'
+   | 'pptExtract'
+   | LearningView
+   | 'study'
+   | 'knowledge'
+   | 'biliResources'
+   | 'visual'
+   | 'tools'
+   | 'communications'
+   | null
+  >(null)
  const [resourceUrl, setResourceUrl] = useState<string | undefined>()
  const [error, setError] = useState(''),
   [busy, setBusy] = useState(false),
@@ -131,7 +161,8 @@ export default function App() {
    })
    .catch(e => setError(String(e)))
   return window.assistant.onEvent(e => {
-   if (e.kind === 'progress' && e.data.stage === '片段完成' && e.data.lectureId === current.current.lectureId) void reloadLecture(e.data.lectureId).catch(() => {})
+   if (e.kind === 'progress' && e.data.stage === '片段完成' && e.data.lectureId === current.current.lectureId)
+    void reloadLecture(e.data.lectureId).catch(() => {})
    if (e.kind === 'progress' && (!e.data.lectureId || e.data.lectureId === current.current.lectureId)) {
     setProgress(e.data)
     setActivities(a => [...a, {...e.data, at: new Date().toLocaleTimeString()}])
@@ -162,7 +193,12 @@ export default function App() {
       setDetail(d)
       setSessions(v => [...v.filter(s => s.course_id !== courseId), ...d.sessions])
       setSessionId(selectedSessions.current[courseId] || d.sessions[0]?.id || '')
-      setLectureId(importedLecture.current || d.sessions.find(s => s.id === (selectedSessions.current[courseId] || d.sessions[0]?.id))?.lecture_id || d.lectures[0]?.id || '')
+      setLectureId(
+       importedLecture.current ||
+        d.sessions.find(s => s.id === (selectedSessions.current[courseId] || d.sessions[0]?.id))?.lecture_id ||
+        d.lectures[0]?.id ||
+        ''
+      )
       importedLecture.current = ''
      }
     })
@@ -186,8 +222,17 @@ export default function App() {
    node?.scrollIntoView({block: 'center', behavior: 'smooth'})
   })
  }
- const activeProfile = settings?.connection === 'deepseek' ? settings.profiles.find(p => p.id === settings.activeProfile) : settings?.codex ? {model: settings.codex.model} : undefined
- const modelBrand = activeProfile?.model.toLowerCase().startsWith('deepseek') ? 'deepseek' : /^(gpt|o[134](?:-|$)|chatgpt)/i.test(activeProfile?.model || '') ? 'openai' : 'custom'
+ const activeProfile =
+  settings?.connection === 'deepseek'
+   ? settings.profiles.find(p => p.id === settings.activeProfile)
+   : settings?.codex
+     ? {model: settings.codex.model}
+     : undefined
+ const modelBrand = activeProfile?.model.toLowerCase().startsWith('deepseek')
+  ? 'deepseek'
+  : /^(gpt|o[134](?:-|$)|chatgpt)/i.test(activeProfile?.model || '')
+    ? 'openai'
+    : 'custom'
  const exportResult = (kind: string, format: string) =>
   void task(async () => {
    const path = await invoke<string>('export', {id: lectureId, kind, format})
@@ -261,7 +306,13 @@ export default function App() {
      incomingUrl={resourceUrl}
      consumeUrl={() => setResourceUrl(undefined)}
     />
-    <PptExtract visible={modal === 'pptExtract'} close={() => setModal(null)} courseId={courseId} courseName={detail?.course.name} files={() => setModal('files')} />
+    <PptExtract
+     visible={modal === 'pptExtract'}
+     close={() => setModal(null)}
+     courseId={courseId}
+     courseName={detail?.course.name}
+     files={() => setModal('files')}
+    />
     {sessionDraft && (
      <Modal
       title="新建会话"
@@ -289,7 +340,12 @@ export default function App() {
       >
        <label>
         对应课次
-        <select aria-label="新会话对应课次" value={sessionDraft.lectureId} disabled={busy || !sessionDraft.detail.lectures.length} onChange={e => setSessionDraft({...sessionDraft, lectureId: e.target.value})}>
+        <select
+         aria-label="新会话对应课次"
+         value={sessionDraft.lectureId}
+         disabled={busy || !sessionDraft.detail.lectures.length}
+         onChange={e => setSessionDraft({...sessionDraft, lectureId: e.target.value})}
+        >
          {sessionDraft.detail.lectures.length ? (
           sessionDraft.detail.lectures.map(l => (
            <option key={l.id} value={l.id}>
@@ -307,7 +363,9 @@ export default function App() {
       </form>
      </Modal>
     )}
-    {modal === 'zhiyunLogin' && <ZhiyunLogin close={() => setModal('zhiyun')} exportResources={() => setModal('zhiyun')} />}
+    {modal === 'zhiyunLogin' && (
+     <ZhiyunLogin close={() => setModal('zhiyun')} exportResources={() => setModal('zhiyun')} />
+    )}
     {
      <ZhiyunImporter
       visible={modal === 'zhiyun'}
@@ -349,16 +407,36 @@ export default function App() {
     )}
     {busy && (
      <div className="busy-indicator">
-      <span className="pulse">●</span> {progress ? `${progress.stage} · ${progress.message}` : '正在处理，请稍等'} <button onClick={() => void invoke('cancel')}>取消任务</button>
+      <span className="pulse">●</span> {progress ? `${progress.stage} · ${progress.message}` : '正在处理，请稍等'}{' '}
+      <button onClick={() => void invoke('cancel')}>取消任务</button>
      </div>
     )}
-    {modal === 'appearance' && <AppearanceEditor initial={appearance} courseId={courseId} courses={courses} close={() => setModal(null)} saved={setAppearance} />}
-    {modal === 'identity' && <IdentityEditor initial={identity} close={() => setModal(null)} save={async value => setIdentity(await invoke<Identity>('identity:save', {identity: value}))} />}
+    {modal === 'appearance' && (
+     <AppearanceEditor
+      initial={appearance}
+      courseId={courseId}
+      courses={courses}
+      close={() => setModal(null)}
+      saved={setAppearance}
+     />
+    )}
+    {modal === 'identity' && (
+     <IdentityEditor
+      initial={identity}
+      close={() => setModal(null)}
+      save={async value => setIdentity(await invoke<Identity>('identity:save', {identity: value}))}
+     />
+    )}
     <nav className="app-icon-rail">
      <span className="rail-logo">
       <ListeningBuddy />
      </span>
-     <button className={modal === null ? 'active' : ''} title="课程对话" aria-label="课程对话" onClick={() => setModal(null)}>
+     <button
+      className={modal === null ? 'active' : ''}
+      title="课程对话"
+      aria-label="课程对话"
+      onClick={() => setModal(null)}
+     >
       <MessageNavIcon />
      </button>
      <button
@@ -372,41 +450,101 @@ export default function App() {
      >
       <ModelNavIcon />
      </button>
-     <button title="角色与头像" aria-label="角色与头像" className={modal === 'identity' ? 'active' : ''} onClick={() => setModal('identity')}>
+     <button
+      title="角色与头像"
+      aria-label="角色与头像"
+      className={modal === 'identity' ? 'active' : ''}
+      onClick={() => setModal('identity')}
+     >
       <IdentityNavIcon />
      </button>
-     <button title="智云登录" aria-label="智云登录" className={modal === 'zhiyunLogin' ? 'active' : ''} onClick={() => setModal('zhiyunLogin')}>
+     <button
+      title="智云登录"
+      aria-label="智云登录"
+      className={modal === 'zhiyunLogin' ? 'active' : ''}
+      onClick={() => setModal('zhiyunLogin')}
+     >
       <LoginNavIcon />
      </button>
-     <button title="智云搜索与导出" aria-label="智云搜索与导出" className={modal === 'zhiyun' ? 'active' : ''} onClick={() => setModal('zhiyun')}>
+     <button
+      title="智云搜索与导出"
+      aria-label="智云搜索与导出"
+      className={modal === 'zhiyun' ? 'active' : ''}
+      onClick={() => setModal('zhiyun')}
+     >
       <CloudExportNavIcon />
      </button>
-     <button title="文件管理" aria-label="文件管理" className={modal === 'files' ? 'active' : ''} onClick={() => setModal('files')}>
+     <button
+      title="文件管理"
+      aria-label="文件管理"
+      className={modal === 'files' ? 'active' : ''}
+      onClick={() => setModal('files')}
+     >
       <FolderNavIcon />
      </button>
-     <button title="聊天外观" aria-label="聊天外观" className={modal === 'appearance' ? 'active' : ''} onClick={() => setModal('appearance')}>
+     <button
+      title="聊天外观"
+      aria-label="聊天外观"
+      className={modal === 'appearance' ? 'active' : ''}
+      onClick={() => setModal('appearance')}
+     >
       <AppearanceNavIcon />
      </button>
-     <button title="截取 PPT" aria-label="截取 PPT" className={modal === 'pptExtract' ? 'active' : ''} onClick={() => setModal('pptExtract')}>
+     <button
+      title="截取 PPT"
+      aria-label="截取 PPT"
+      className={modal === 'pptExtract' ? 'active' : ''}
+      onClick={() => setModal('pptExtract')}
+     >
       <PptExtractNavIcon />
      </button>
      <LearningRail current={modal} select={setModal} />
-     <button title="视频资源" aria-label="视频资源" className={modal === 'biliResources' ? 'active' : ''} onClick={() => setModal('biliResources')}>
+     <button
+      title="视频资源"
+      aria-label="视频资源"
+      className={modal === 'biliResources' ? 'active' : ''}
+      onClick={() => setModal('biliResources')}
+     >
       <ResourceIcon />
      </button>
-     <button title="画面识别" aria-label="画面识别" className={modal === 'visual' ? 'active' : ''} onClick={() => setModal('visual')}>
+     <button
+      title="画面识别"
+      aria-label="画面识别"
+      className={modal === 'visual' ? 'active' : ''}
+      onClick={() => setModal('visual')}
+     >
       <VisualIcon />
      </button>
-     <button title="知识库" aria-label="知识库" className={modal === 'knowledge' ? 'active' : ''} onClick={() => setModal('knowledge')}>
+     <button
+      title="知识库"
+      aria-label="知识库"
+      className={modal === 'knowledge' ? 'active' : ''}
+      onClick={() => setModal('knowledge')}
+     >
       <KnowledgeIcon />
      </button>
-     <button title="通讯助手" aria-label="通讯助手" className={modal === 'communications' ? 'active' : ''} onClick={() => setModal('communications')}>
+     <button
+      title="通讯助手"
+      aria-label="通讯助手"
+      className={modal === 'communications' ? 'active' : ''}
+      onClick={() => setModal('communications')}
+     >
       <CommunicationIcon />
      </button>
-     <button title="工具与工作流" aria-label="工具与工作流" className={modal === 'tools' ? 'active' : ''} onClick={() => setModal('tools')}>
+     <button
+      title="工具与工作流"
+      aria-label="工具与工作流"
+      className={modal === 'tools' ? 'active' : ''}
+      onClick={() => setModal('tools')}
+     >
       <ToolsIcon />
      </button>
-     <button title="课表与教材" aria-label="课表与教材" className={modal === 'study' ? 'active' : ''} onClick={() => setModal('study')}>
+     <button
+      title="课表与教材"
+      aria-label="课表与教材"
+      className={modal === 'study' ? 'active' : ''}
+      onClick={() => setModal('study')}
+     >
       <StudyIcon name="notes" />
      </button>
      <div className="rail-spacer" />
@@ -466,7 +604,13 @@ export default function App() {
        void invoke<Detail>('course:detail', {id: cid})
         .then(d => {
          const linked = cid === courseId ? sessions.find(s => s.id === sessionId)?.lecture_id : undefined
-         setSessionDraft({detail: d, lectureId: linked || (cid === courseId && d.lectures.some(l => l.id === lectureId) ? lectureId : d.lectures[0]?.id) || ''})
+         setSessionDraft({
+          detail: d,
+          lectureId:
+           linked ||
+           (cid === courseId && d.lectures.some(l => l.id === lectureId) ? lectureId : d.lectures[0]?.id) ||
+           ''
+         })
         })
         .catch(e => setError(String(e)))
       }
@@ -502,7 +646,14 @@ export default function App() {
       </button>
      </div>
     </aside>
-    <main className={'workspace agent-workspace wallpaper-workspace ' + (tab === 'chat' ? 'chat-styled' : '')} style={chatStyle(activeAppearance)} data-names={activeAppearance.showNames} data-bubbles={activeAppearance.assistantBubble} onDragOver={e => e.preventDefault()} onDrop={dropped}>
+    <main
+     className={'workspace agent-workspace wallpaper-workspace ' + (tab === 'chat' ? 'chat-styled' : '')}
+     style={chatStyle(activeAppearance)}
+     data-names={activeAppearance.showNames}
+     data-bubbles={activeAppearance.assistantBubble}
+     onDragOver={e => e.preventDefault()}
+     onDrop={dropped}
+    >
      <Wallpaper value={activeAppearance} />
      <header className="workspace-header">
       <div className="agent-heading">
@@ -696,7 +847,11 @@ export default function App() {
             {tab === 'subtitles' && (
              <>
               <div className="toolbar">
-               <button className="primary" disabled={busy || !lecture.lecture.transcript_path || !lecture.lecture.ppt_path} onClick={() => void task(() => generate('subtitles:generate'))}>
+               <button
+                className="primary"
+                disabled={busy || !lecture.lecture.transcript_path || !lecture.lecture.ppt_path}
+                onClick={() => void task(() => generate('subtitles:generate'))}
+               >
                 <StudyIcon name="sparkle" />
                 {lecture.correction ? '继续校订字幕' : lecture.segments.length ? '重新校订字幕' : '原文 + PPT 校订字幕'}
                </button>
@@ -714,7 +869,10 @@ export default function App() {
                </button>
                {lecture.segments.length > 0 && (
                 <>
-                 <button disabled={busy || !!lecture.correction} onClick={() => setSrtEdit(srtEdit === null ? lecture.srt : null)}>
+                 <button
+                  disabled={busy || !!lecture.correction}
+                  onClick={() => setSrtEdit(srtEdit === null ? lecture.srt : null)}
+                 >
                   <StudyIcon name="edit" />
                   {srtEdit === null ? '编辑字幕' : '退出编辑'}
                  </button>
@@ -731,7 +889,8 @@ export default function App() {
               </div>
               {lecture.correction && (
                <p className="hint">
-                已保存 {lecture.correction.completed}/{lecture.correction.total} 条，以下为已完成部分；点击继续校订可恢复剩余内容。
+                已保存 {lecture.correction.completed}/{lecture.correction.total}{' '}
+                条，以下为已完成部分；点击继续校订可恢复剩余内容。
                </p>
               )}
               {srtEdit !== null ? (
@@ -754,7 +913,13 @@ export default function App() {
                </>
               ) : lecture.segments.length ? (
                <>
-                <input className="search" placeholder="搜索老师的原话…" aria-label="搜索字幕" value={search} onChange={e => setSearch(e.target.value)} />
+                <input
+                 className="search"
+                 placeholder="搜索老师的原话…"
+                 aria-label="搜索字幕"
+                 value={search}
+                 onChange={e => setSearch(e.target.value)}
+                />
                 <div className="transcript">
                  {lecture.segments
                   .filter(s => s.text.includes(search))
@@ -794,7 +959,11 @@ export default function App() {
             {tab === 'notes' && (
              <>
               <div className="toolbar">
-               <button className="primary" disabled={busy || !lecture.segments.length || !!lecture.correction} onClick={() => void task(() => generate('notes:generate'))}>
+               <button
+                className="primary"
+                disabled={busy || !lecture.segments.length || !!lecture.correction}
+                onClick={() => void task(() => generate('notes:generate'))}
+               >
                 {lecture.notes ? '重新提取重点' : '生成听课重点笔记'}
                </button>
                {lecture.notes && (
@@ -827,16 +996,23 @@ export default function App() {
             {tab === 'practice' && (
              <>
               <div className="toolbar">
-               <button className="primary" disabled={busy || !lecture.segments.length || !!lecture.correction} onClick={() => void task(() => generate('practice:generate'))}>
+               <button
+                className="primary"
+                disabled={busy || !lecture.segments.length || !!lecture.correction}
+                onClick={() => void task(() => generate('practice:generate'))}
+               >
                 <StudyIcon name="practice" />
                 生成课后练习
                </button>
-               {lecture.practice && [...lecture.practice.past, ...lecture.practice.extended, ...(lecture.practice.generated || [])].some(q => !q.answer || !q.explanation) && (
-                <button disabled={busy} onClick={() => void task(() => generate('practice:prepare'))}>
-                 <StudyIcon name="sparkle" />
-                 补全已有答案与详解
-                </button>
-               )}
+               {lecture.practice &&
+                [...lecture.practice.past, ...lecture.practice.extended, ...(lecture.practice.generated || [])].some(
+                 q => !q.answer || !q.explanation
+                ) && (
+                 <button disabled={busy} onClick={() => void task(() => generate('practice:prepare'))}>
+                  <StudyIcon name="sparkle" />
+                  补全已有答案与详解
+                 </button>
+                )}
                {lecture.practice &&
                 ['md', 'docx', 'pdf'].map(f => (
                  <button key={f} onClick={() => exportResult('practice', f)}>
@@ -846,7 +1022,12 @@ export default function App() {
                 ))}
               </div>
               <label className="practice-options">
-               <input type="checkbox" checked={withSearch} disabled={busy} onChange={e => setWithSearch(e.target.checked)} />
+               <input
+                type="checkbox"
+                checked={withSearch}
+                disabled={busy}
+                onChange={e => setWithSearch(e.target.checked)}
+               />
                搜索有来源的拓展题（较慢，需配置搜索服务）
               </label>
               {lecture.practice ? (
@@ -910,7 +1091,13 @@ export default function App() {
            setPendingChat(content)
            setInput('')
            try {
-            await invoke('chat', {courseId: id, lectureId: lid || undefined, sessionId: sid, content, requestId: request.current})
+            await invoke('chat', {
+             courseId: id,
+             lectureId: lid || undefined,
+             sessionId: sid,
+             content,
+             requestId: request.current
+            })
            } finally {
             try {
              await reloadCourse(id)
@@ -951,7 +1138,13 @@ export default function App() {
          />
          <div className="composer-controls">
           <div className="attachment-menu-anchor">
-           <button type="button" className="round-button" aria-label="附件与工具" aria-expanded={menu} onClick={() => setMenu(!menu)}>
+           <button
+            type="button"
+            className="round-button"
+            aria-label="附件与工具"
+            aria-expanded={menu}
+            onClick={() => setMenu(!menu)}
+           >
             <DshPlusIcon size={20} />
            </button>
            {menu && (
@@ -987,7 +1180,16 @@ export default function App() {
               }}
              >
               <span aria-hidden="true">
-               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+               <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.7"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+               >
                 <path d="M7 17H6a4 4 0 0 1-.5-8 6.5 6.5 0 0 1 12.4-1A4.5 4.5 0 0 1 18 17h-1M12 12v9m-3-3 3 3 3-3" />
                </svg>
               </span>
@@ -1078,7 +1280,15 @@ export default function App() {
             </div>
            )}
           </div>
-          <button type="button" className="composer-model-trigger" aria-label="选择对话模型" aria-haspopup="dialog" aria-expanded={modal === 'modelPicker'} disabled={busy} onClick={() => setModal('modelPicker')}>
+          <button
+           type="button"
+           className="composer-model-trigger"
+           aria-label="选择对话模型"
+           aria-haspopup="dialog"
+           aria-expanded={modal === 'modelPicker'}
+           disabled={busy}
+           onClick={() => setModal('modelPicker')}
+          >
            <span className={`composer-brand ${modelBrand}`} aria-hidden="true">
             {modelBrand === 'custom' && <ModelNavIcon />}
            </span>

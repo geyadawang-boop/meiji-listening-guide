@@ -1,10 +1,21 @@
 import {spawn} from 'node:child_process'
 import {fileURLToPath} from 'node:url'
 /** The guardian owns the OS child handle; IPC disconnect kills FFmpeg even if the caller is terminated. */
-export function mediaCommand(resources: string, name: 'ffmpeg.exe' | 'ffprobe.exe', args: string[], signal: AbortSignal, stream?: (bytes: Buffer) => void, onStarted?: (pid: number) => void) {
+export function mediaCommand(
+ resources: string,
+ name: 'ffmpeg.exe' | 'ffprobe.exe',
+ args: string[],
+ signal: AbortSignal,
+ stream?: (bytes: Buffer) => void,
+ onStarted?: (pid: number) => void
+) {
  signal.throwIfAborted()
  return new Promise<string>((resolve, reject) => {
-  const guardian = spawn(process.execPath, [fileURLToPath(new URL('./media-process-guardian.js', import.meta.url)), resources, name], {windowsHide: true, stdio: ['ignore', 'pipe', 'pipe', 'ipc'], env: {...process.env, ELECTRON_RUN_AS_NODE: '1'}})
+  const guardian = spawn(
+   process.execPath,
+   [fileURLToPath(new URL('./media-process-guardian.js', import.meta.url)), resources, name],
+   {windowsHide: true, stdio: ['ignore', 'pipe', 'pipe', 'ipc'], env: {...process.env, ELECTRON_RUN_AS_NODE: '1'}}
+  )
   let output = '',
    failure: Error | undefined
   const cancel = () => {

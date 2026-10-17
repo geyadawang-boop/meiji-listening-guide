@@ -24,7 +24,13 @@ function api() {
   duplicate: f('DuplicateHandle', 'int', [p, p, p, koffi.out(koffi.pointer(p)), 'uint32_t', 'int', 'uint32_t']),
   fileType: f('GetFileType', 'uint32_t', [p]),
   filePath: f('GetFinalPathNameByHandleW', 'uint32_t', [p, p, 'uint32_t', 'uint32_t']),
-  handles: nt.func('__stdcall', 'NtQueryInformationProcess', 'int32_t', [p, 'uint32_t', p, 'uint32_t', koffi.out(koffi.pointer('uint32_t'))])
+  handles: nt.func('__stdcall', 'NtQueryInformationProcess', 'int32_t', [
+   p,
+   'uint32_t',
+   p,
+   'uint32_t',
+   koffi.out(koffi.pointer('uint32_t'))
+  ])
  }
 }
 function a() {
@@ -58,7 +64,11 @@ export class WeixinProcessMemory implements WeixinMemory {
    const identity = this.identity()
    this.created = identity.created
    this.exe = identity.exe
-   if (basename(this.exe).toLowerCase() !== expectedExecutable.toLowerCase() || (expected !== undefined && expected !== this.created)) throw new Error('所选微信进程已变化')
+   if (
+    basename(this.exe).toLowerCase() !== expectedExecutable.toLowerCase() ||
+    (expected !== undefined && expected !== this.created)
+   )
+    throw new Error('所选微信进程已变化')
   } catch (error) {
    this.close()
    throw error
@@ -69,8 +79,12 @@ export class WeixinProcessMemory implements WeixinMemory {
    size = [32768],
    creation = Buffer.alloc(8),
    other = Buffer.alloc(8)
-  if (!a().image(this.handle, 0, path, size) || !a().times(this.handle, creation, other, other, other)) throw new Error('微信进程身份读取失败')
-  return {exe: resolve(wide(path, 0, size[0])), created: Number(creation.readBigUInt64LE() / 10n - 11644473600000000n) / 1000000}
+  if (!a().image(this.handle, 0, path, size) || !a().times(this.handle, creation, other, other, other))
+   throw new Error('微信进程身份读取失败')
+  return {
+   exe: resolve(wide(path, 0, size[0])),
+   created: Number(creation.readBigUInt64LE() / 10n - 11644473600000000n) / 1000000
+  }
  }
  guard = () => {
   if (!this.handle || Date.now() > this.deadline) throw new Error('本机微信读取达到预算或会话已关闭')
@@ -84,7 +98,14 @@ export class WeixinProcessMemory implements WeixinMemory {
  }
  read = (address: number, length: number) => {
   this.guard()
-  if (!Number.isSafeInteger(address) || address < 65536 || !Number.isSafeInteger(length) || length < 1 || length > 1049600) throw new Error('微信只读内存范围无效')
+  if (
+   !Number.isSafeInteger(address) ||
+   address < 65536 ||
+   !Number.isSafeInteger(length) ||
+   length < 1 ||
+   length > 1049600
+  )
+   throw new Error('微信只读内存范围无效')
   this.scanned += length
   if (this.scanned > 4 * 1024 ** 3) throw new Error('微信只读扫描达到预算')
   const buffer = Buffer.alloc(length),
@@ -160,12 +181,17 @@ export class WeixinProcessMemory implements WeixinMemory {
   }
   if (status < 0) throw new Error('无法核验微信打开的数据库')
   const count = Number(buffer.readBigUInt64LE())
-  if (!Number.isSafeInteger(count) || count > 65536 || 16 + count * 40 > buffer.length) throw new Error('微信数据库句柄达到预算')
+  if (!Number.isSafeInteger(count) || count > 65536 || 16 + count * 40 > buffer.length)
+   throw new Error('微信数据库句柄达到预算')
   const roots = new Set<string>()
   for (let i = 0; i < count; i++) {
    this.guard()
    const duplicate: [bigint | null] = [null]
-   if (!a().duplicate(this.handle, buffer.readBigUInt64LE(16 + i * 40), a().current(), duplicate, 0, 0, 2) || !duplicate[0]) continue
+   if (
+    !a().duplicate(this.handle, buffer.readBigUInt64LE(16 + i * 40), a().current(), duplicate, 0, 0, 2) ||
+    !duplicate[0]
+   )
+    continue
    try {
     if (a().fileType(duplicate[0]) !== 1) continue
     const path = Buffer.alloc(65536),

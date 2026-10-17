@@ -2,7 +2,21 @@ import {useState} from 'react'
 import type {Lecture} from '../../shared/types'
 import {LectureIcon, TrashIcon} from './ManagementIcons'
 import {DshChevronDownIcon} from './ChatIcons'
-export function LecturePicker({lectures, value, busy, select, create, remove}: {lectures: Lecture[]; value: string; busy: boolean; select: (id: string) => void; create: () => void; remove: (id: string) => Promise<unknown>}) {
+export function LecturePicker({
+ lectures,
+ value,
+ busy,
+ select,
+ create,
+ remove
+}: {
+ lectures: Lecture[]
+ value: string
+ busy: boolean
+ select: (id: string) => void
+ create: () => void
+ remove: (id: string) => Promise<unknown>
+}) {
  const [open, setOpen] = useState(false),
   [pending, setPending] = useState<Lecture | null>(null),
   [error, setError] = useState(''),
@@ -11,10 +25,18 @@ export function LecturePicker({lectures, value, busy, select, create, remove}: {
  return (
   <div className="lecture-bar">
    <div className="lecture-picker">
-    <button className="lecture-trigger" aria-label="选择课次" aria-expanded={open} disabled={busy} onClick={() => setOpen(!open)}>
+    <button
+     className="lecture-trigger"
+     aria-label="选择课次"
+     aria-expanded={open}
+     disabled={busy}
+     onClick={() => setOpen(!open)}
+    >
      <LectureIcon />
      <strong>{selected?.title || '选择课次'}</strong>
-     {selected && <span className={selected.status === '字幕完成' ? 'status-ready' : 'lecture-status'}>{selected.status}</span>}
+     {selected && (
+      <span className={selected.status === '字幕完成' ? 'status-ready' : 'lecture-status'}>{selected.status}</span>
+     )}
      <DshChevronDownIcon />
     </button>
     {open && (

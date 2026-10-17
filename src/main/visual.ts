@@ -4,8 +4,27 @@ import {createHash, randomUUID} from 'node:crypto'
 import {createReadStream} from 'node:fs'
 import {z} from 'zod'
 import type {MediaBackend} from './media'
-export type VisualFrame = {path: string; time: number; hash: string; status: '等待识别' | '已完成' | '失败'; text?: string; error?: string}
-export type VisualTask = {id: string; source: string; sourceHash: string; duration: number; frames: VisualFrame[]; gaps: unknown[]; connection: string; output?: string; outputHash?: string; cleaned?: boolean; preparation?: {cap: number; policy: string; status: string; error?: string}}
+export type VisualFrame = {
+ path: string
+ time: number
+ hash: string
+ status: '等待识别' | '已完成' | '失败'
+ text?: string
+ error?: string
+}
+export type VisualTask = {
+ id: string
+ source: string
+ sourceHash: string
+ duration: number
+ frames: VisualFrame[]
+ gaps: unknown[]
+ connection: string
+ output?: string
+ outputHash?: string
+ cleaned?: boolean
+ preparation?: {cap: number; policy: string; status: string; error?: string}
+}
 const digest = (bytes: Buffer | string) => createHash('sha256').update(bytes).digest('hex')
 async function fileDigest(path: string) {
  const hash = createHash('sha256')
@@ -32,7 +51,16 @@ export class VisualTasks {
   return result.reverse()
  }
  async create(path: string, cap: number, policy: string, connection: string, signal?: AbortSignal) {
-  const task: VisualTask = {id: randomUUID().replaceAll('-', ''), source: path, sourceHash: await fileDigest(path), duration: 0, frames: [], gaps: [], connection, preparation: {cap, policy, status: '等待提取'}}
+  const task: VisualTask = {
+   id: randomUUID().replaceAll('-', ''),
+   source: path,
+   sourceHash: await fileDigest(path),
+   duration: 0,
+   frames: [],
+   gaps: [],
+   connection,
+   preparation: {cap, policy, status: '等待提取'}
+  }
   await this.save(task)
   return this.prepare(task.id, connection, signal)
  }
@@ -53,7 +81,13 @@ export class VisualTasks {
    signal?.throwIfAborted()
    task.preparation.status = '提取中'
    await this.save(task)
-   const captured = await this.media.request<VisualTask>('visual-frames', {id, path: task.source, cap: task.preparation.cap, policy: task.preparation.policy, expectedHash: task.sourceHash})
+   const captured = await this.media.request<VisualTask>('visual-frames', {
+    id,
+    path: task.source,
+    cap: task.preparation.cap,
+    policy: task.preparation.policy,
+    expectedHash: task.sourceHash
+   })
    signal?.throwIfAborted()
    task.frames = captured.frames.map(frame => ({...frame, status: '等待识别'}))
    task.duration = captured.duration
@@ -71,15 +105,23 @@ export class VisualTasks {
    signal?.removeEventListener('abort', cancel)
   }
  }
- async run(id: string, connection: string, recognize: (frame: VisualFrame, signal: AbortSignal) => Promise<string>, progress: (message: string) => void, signal: AbortSignal) {
+ async run(
+  id: string,
+  connection: string,
+  recognize: (frame: VisualFrame, signal: AbortSignal) => Promise<string>,
+  progress: (message: string) => void,
+  signal: AbortSignal
+ ) {
   z.string()
    .regex(/^[a-f0-9]{32}$/)
    .parse(id)
   const task: VisualTask = JSON.parse(await readFile(join(this.root, id + '.json'), 'utf8'))
-  if (task.id !== id || task.connection !== connection) throw new Error('识别连接已有改变，请用当前配置新建任务；旧成果保留')
+  if (task.id !== id || task.connection !== connection)
+   throw new Error('识别连接已有改变，请用当前配置新建任务；旧成果保留')
   if (!task.frames.length) throw new Error('请先完成画面提取')
   if (task.output) {
-   if ((await fileDigest(task.output)) !== task.outputHash) throw new Error('识别成果已改变，保留当前文件，请重新建立任务')
+   if ((await fileDigest(task.output)) !== task.outputHash)
+    throw new Error('识别成果已改变，保留当前文件，请重新建立任务')
    if (!task.cleaned) {
     await this.media.request('visual-cleanup', {id})
     task.cleaned = true

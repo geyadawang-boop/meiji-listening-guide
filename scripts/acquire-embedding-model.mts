@@ -26,7 +26,9 @@ for (const [name, size, expected] of files) {
   bytes = await readFile(path)
  } catch (error) {
   if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
-  const response = await fetch(`https://huggingface.co/Xenova/bge-small-zh-v1.5/resolve/${revision}/${name}`, {signal: AbortSignal.timeout(120000)})
+  const response = await fetch(`https://huggingface.co/Xenova/bge-small-zh-v1.5/resolve/${revision}/${name}`, {
+   signal: AbortSignal.timeout(120000)
+  })
   if (!response.ok) throw new Error(`模型下载失败：HTTP ${response.status}`)
   bytes = Buffer.from(await response.arrayBuffer())
  }
@@ -49,11 +51,28 @@ try {
  license = await readFile(licensePath, 'utf8')
 } catch (error) {
  if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
- const response = await fetch('https://raw.githubusercontent.com/FlagOpen/FlagEmbedding/master/LICENSE', {signal: AbortSignal.timeout(30000)})
+ const response = await fetch('https://raw.githubusercontent.com/FlagOpen/FlagEmbedding/master/LICENSE', {
+  signal: AbortSignal.timeout(30000)
+ })
  if (!response.ok) throw new Error('官方模型许可读取失败')
  license = await response.text()
 }
 if (!license.includes('MIT License')) throw new Error('原语义模型许可缺失')
 await writeFile(join(directory, 'MODEL-LICENSE.txt'), license)
-await writeFile(join(directory, 'acquisition.json'), JSON.stringify({repository: 'Xenova/bge-small-zh-v1.5', revision, upstream: 'BAAI/bge-small-zh-v1.5', license: 'MIT', dtype: 'q8', files: saved, inferenceVerified: false}, null, 2))
+await writeFile(
+ join(directory, 'acquisition.json'),
+ JSON.stringify(
+  {
+   repository: 'Xenova/bge-small-zh-v1.5',
+   revision,
+   upstream: 'BAAI/bge-small-zh-v1.5',
+   license: 'MIT',
+   dtype: 'q8',
+   files: saved,
+   inferenceVerified: false
+  },
+  null,
+  2
+ )
+)
 console.log(JSON.stringify({directory, bytes: saved.reduce((sum, file) => sum + file.size, 0)}))

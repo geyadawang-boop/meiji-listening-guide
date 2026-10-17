@@ -9,6 +9,11 @@ export function biliQrImage(value: string): string {
  } catch {
   throw new Error('扫码地址无效')
  }
- if (url.username || url.password || !['https://passport.bilibili.com', 'https://account.bilibili.com'].includes(url.origin)) throw new Error('扫码地址无效')
+ if (
+  url.username ||
+  url.password ||
+  !['https://passport.bilibili.com', 'https://account.bilibili.com'].includes(url.origin)
+ )
+  throw new Error('扫码地址无效')
  return encodeQR(value, 'data-url', {border: 4, scale: 5})
 }

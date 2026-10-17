@@ -9,8 +9,18 @@ export async function mediaFileHash(path: string) {
  return hash.digest('hex')
 }
 const hash = z.string().regex(/^[a-f0-9]{64}$/)
-const reservation = z.object({version: z.literal(1), owner: z.string().uuid(), name: z.string(), plan: hash, prior: z.array(z.string()).max(1000)}).strict()
-const receipt = z.object({version: z.literal(1), owner: z.string().uuid(), plan: hash, bytes: z.number().int().positive().safe(), hash}).strict()
+const reservation = z
+ .object({
+  version: z.literal(1),
+  owner: z.string().uuid(),
+  name: z.string(),
+  plan: hash,
+  prior: z.array(z.string()).max(1000)
+ })
+ .strict()
+const receipt = z
+ .object({version: z.literal(1), owner: z.string().uuid(), plan: hash, bytes: z.number().int().positive().safe(), hash})
+ .strict()
 async function exists(path: string) {
  try {
   const info = await lstat(path)
@@ -43,7 +53,13 @@ export class OwnedMediaArtifact {
   private name: string,
   private plan: string
  ) {
-  if (!name || /[\\/<>:"|?*\x00-\x1f]/.test(name) || name.includes('..') || ['job.json', 'job.writing', 'job.dpapi', 'job.writing.dpapi'].includes(name)) throw new Error('媒体成果文件名无效')
+  if (
+   !name ||
+   /[\\/<>:"|?*\x00-\x1f]/.test(name) ||
+   name.includes('..') ||
+   ['job.json', 'job.writing', 'job.dpapi', 'job.writing.dpapi'].includes(name)
+  )
+   throw new Error('媒体成果文件名无效')
   hash.parse(plan)
   this.path = join(directory, name)
   this.reserve = this.path + '.reservation.json'
@@ -73,7 +89,15 @@ export class OwnedMediaArtifact {
   }
   if (proved) {
    const proof = receipt.parse(await json(this.proof))
-   if (!owner || !file || proof.owner !== owner.owner || proof.plan !== this.plan || proof.bytes !== file.size || proof.hash !== (await mediaFileHash(this.path))) throw new Error('已有待发布成果被修改或缺失，原文件保留')
+   if (
+    !owner ||
+    !file ||
+    proof.owner !== owner.owner ||
+    proof.plan !== this.plan ||
+    proof.bytes !== file.size ||
+    proof.hash !== (await mediaFileHash(this.path))
+   )
+    throw new Error('已有待发布成果被修改或缺失，原文件保留')
    this.owner = owner
    return {reused: true, path: this.path}
   }
@@ -102,7 +126,13 @@ export class OwnedMediaArtifact {
   if (!this.owner) throw new Error('成果尚未预留')
   const file = await exists(this.path)
   if (!file || !file.size) throw new Error('媒体成果为空')
-  const value = {version: 1 as const, owner: this.owner.owner, plan: this.plan, bytes: file.size, hash: await mediaFileHash(this.path)}
+  const value = {
+   version: 1 as const,
+   owner: this.owner.owner,
+   plan: this.plan,
+   bytes: file.size,
+   hash: await mediaFileHash(this.path)
+  }
   if (await exists(this.proof)) {
    const prior = receipt.parse(await json(this.proof))
    if (JSON.stringify(prior) !== JSON.stringify(value)) throw new Error('媒体核验记录已改变')
@@ -111,6 +141,12 @@ export class OwnedMediaArtifact {
  }
  intermediates() {
   if (!this.owner) throw new Error('成果尚未预留')
-  return [this.name + '.reservation.json', this.name + '.reservation.json.writing', this.name + '.receipt.json', this.name + '.receipt.json.writing', ...this.owner.prior]
+  return [
+   this.name + '.reservation.json',
+   this.name + '.reservation.json.writing',
+   this.name + '.receipt.json',
+   this.name + '.receipt.json.writing',
+   ...this.owner.prior
+  ]
  }
 }

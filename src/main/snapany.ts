@@ -2,11 +2,29 @@ import {BrowserWindow, net, session} from 'electron'
 import {bilibiliUrl, videoMediaUrl} from './video-policy'
 import {downloadVideoMedia} from './video-download'
 
-export async function snapanyDownload(parent: BrowserWindow, input: string, destination: string, progress: (text: string) => void, signal: AbortSignal) {
+export async function snapanyDownload(
+ parent: BrowserWindow,
+ input: string,
+ destination: string,
+ progress: (text: string) => void,
+ signal: AbortSignal
+) {
  const url = bilibiliUrl(input),
   ses = session.fromPartition('persist:snapany-video')
  ses.setPermissionRequestHandler((_wc, _p, cb) => cb(false))
- const win = new BrowserWindow({show: false, width: 1100, height: 850, title: 'SnapAny · 后台解析', webPreferences: {session: ses, nodeIntegration: false, contextIsolation: true, sandbox: true, backgroundThrottling: false}})
+ const win = new BrowserWindow({
+  show: false,
+  width: 1100,
+  height: 850,
+  title: 'SnapAny · 后台解析',
+  webPreferences: {
+   session: ses,
+   nodeIntegration: false,
+   contextIsolation: true,
+   sandbox: true,
+   backgroundThrottling: false
+  }
+ })
  const media = await new Promise<string>((resolve, reject) => {
   let finished = false,
    timer: ReturnType<typeof setInterval>,
@@ -34,7 +52,8 @@ export async function snapanyDownload(parent: BrowserWindow, input: string, dest
   }
   win.webContents.setWindowOpenHandler(({url}) => {
    if (videoMediaUrl(url)) finish(url)
-   else if (allowed(url)) void win.loadURL(url).catch(() => finish(undefined, new Error('后台解析页面无法打开，请检查网络后重试')))
+   else if (allowed(url))
+    void win.loadURL(url).catch(() => finish(undefined, new Error('后台解析页面无法打开，请检查网络后重试')))
    return {action: 'deny'}
   })
   win.webContents.on('will-navigate', (e, url) => {
@@ -46,7 +65,8 @@ export async function snapanyDownload(parent: BrowserWindow, input: string, dest
   // Background website session only. Never show or focus this window. The
   // website has no preload or access to assistant IPC or local account files.
   const fill = `(()=>{if(window.__meiPrefilled)return;const input=[...document.querySelectorAll('textarea,input:not([type]),input[type=url],input[type=text]')].find(e=>e.getBoundingClientRect().width>0);const button=[...document.querySelectorAll('button,[role=button]')].find(b=>b.textContent.includes('提取视频'));if(!input||!button)return;const setter=Object.getOwnPropertyDescriptor(input instanceof HTMLTextAreaElement?HTMLTextAreaElement.prototype:HTMLInputElement.prototype,'value').set;setter.call(input,${JSON.stringify(url)});input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));window.__meiPrefilled=true;button.click()})()`
-  const scriptFailed = () => finish(undefined, new Error('SnapAny 后台页面解析失败，网页结构可能已变化，请重试或导入已下载的视频'))
+  const scriptFailed = () =>
+   finish(undefined, new Error('SnapAny 后台页面解析失败，网页结构可能已变化，请重试或导入已下载的视频'))
   win.webContents.once('did-finish-load', () => {
    void win.webContents.executeJavaScript(fill).catch(scriptFailed)
   })
@@ -68,9 +88,14 @@ export async function snapanyDownload(parent: BrowserWindow, input: string, dest
      polling = false
     })
   }, 1500)
-  timeout = setTimeout(() => finish(undefined, new Error('SnapAny 暂未返回视频链接，网站可能需要验证；请稍后重试或导入已下载的视频')), 3 * 60 * 1000)
+  timeout = setTimeout(
+   () => finish(undefined, new Error('SnapAny 暂未返回视频链接，网站可能需要验证；请稍后重试或导入已下载的视频')),
+   3 * 60 * 1000
+  )
   progress('正在后台通过 SnapAny 解析视频网址')
-  void win.loadURL('https://snapany.com/zh/bilibili').catch(() => finish(undefined, new Error('无法打开 SnapAny，请检查网络后重试')))
+  void win
+   .loadURL('https://snapany.com/zh/bilibili')
+   .catch(() => finish(undefined, new Error('无法打开 SnapAny，请检查网络后重试')))
   if (signal.aborted) abort()
  })
  signal.throwIfAborted()

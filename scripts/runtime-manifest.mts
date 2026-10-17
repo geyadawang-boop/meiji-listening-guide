@@ -12,9 +12,11 @@ const catalog = [
  ['video', '视频下载与处理工具', 'video']
 ] as const
 function included(id: string, path: string) {
- if (id === 'knowledge') return path.startsWith('onnx-bge/') || ['vendor/NapCat.Shell.Windows.Node.zip', 'BiliSum-LICENSE'].includes(path)
+ if (id === 'knowledge')
+  return path.startsWith('onnx-bge/') || ['vendor/NapCat.Shell.Windows.Node.zip', 'BiliSum-LICENSE'].includes(path)
  if (id === 'asr') return path.startsWith('onnx-small/')
- if (id === 'video') return ['ffmpeg.exe', 'ffprobe.exe', 'LICENSE-ffmpeg-static.txt', 'LICENSE-ffprobe.txt'].includes(path)
+ if (id === 'video')
+  return ['ffmpeg.exe', 'ffprobe.exe', 'LICENSE-ffmpeg-static.txt', 'LICENSE-ffprobe.txt'].includes(path)
  return !/\.(?:py|pyc)$/i.test(path)
 }
 export async function generate(root: string): Promise<RuntimeManifest> {
@@ -31,7 +33,11 @@ export async function generate(root: string): Promise<RuntimeManifest> {
      source = join(path, entry.name)
     if (entry.isSymbolicLink()) throw new Error('运行资源不能包含目录链接：' + relative)
     if (entry.isDirectory()) {
-     if (id === 'knowledge' && !['onnx-bge/', 'vendor/'].some(prefix => prefix.startsWith(relative + '/') || relative.startsWith(prefix))) continue
+     if (
+      id === 'knowledge' &&
+      !['onnx-bge/', 'vendor/'].some(prefix => prefix.startsWith(relative + '/') || relative.startsWith(prefix))
+     )
+      continue
      if (id === 'asr' && relative !== 'onnx-small' && !relative.startsWith('onnx-small/')) continue
      await walk(source, relative + '/')
     } else if (included(id, relative)) pending.push({path: relative, source})
@@ -48,7 +54,8 @@ export async function generate(root: string): Promise<RuntimeManifest> {
       hash = createHash('sha256')
      for await (const bytes of createReadStream(entry.source, {highWaterMark: 1048576})) hash.update(bytes)
      const after = await stat(entry.source)
-     if (before.size !== after.size || before.mtimeMs !== after.mtimeMs) throw new Error('清单生成期间运行资源改变：' + entry.path)
+     if (before.size !== after.size || before.mtimeMs !== after.mtimeMs)
+      throw new Error('清单生成期间运行资源改变：' + entry.path)
      files.push({path: entry.path, size: before.size, sha256: hash.digest('hex')})
     }
    })
@@ -62,5 +69,7 @@ export async function generate(root: string): Promise<RuntimeManifest> {
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
  const manifest = await generate(resolve(dirname(fileURLToPath(import.meta.url)), '..'))
- console.log(manifest.components.map(component => `${component.id}: ${(component.bytes / 1048576).toFixed(1)} MiB`).join('\n'))
+ console.log(
+  manifest.components.map(component => `${component.id}: ${(component.bytes / 1048576).toFixed(1)} MiB`).join('\n')
+ )
 }

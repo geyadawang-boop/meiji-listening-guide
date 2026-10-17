@@ -25,11 +25,23 @@ const itemSchema = z.object({
  sourceMethod: z.enum(['站内字幕', '用户指定 SRT']).optional(),
  generation: z.string().nullable().optional()
 })
-const taskSchema = z.object({id: z.string().uuid(), category: z.string().max(100), courseName: z.string().optional(), createdAt: z.string(), items: z.array(itemSchema).min(1).max(1000), interrupted: z.boolean()})
+const taskSchema = z.object({
+ id: z.string().uuid(),
+ category: z.string().max(100),
+ courseName: z.string().optional(),
+ createdAt: z.string(),
+ items: z.array(itemSchema).min(1).max(1000),
+ interrupted: z.boolean()
+})
 type Dependencies = {
  acquire: (item: SubtitleSyncItem, signal: AbortSignal) => Promise<{srt: string; path: string}>
  generation?: (url: string) => Promise<string | null>
- publish: (item: SubtitleSyncItem, srt: string, category: string, signal: AbortSignal) => Promise<{unchanged: boolean; entry?: {generation_id: string}}>
+ publish: (
+  item: SubtitleSyncItem,
+  srt: string,
+  category: string,
+  signal: AbortSignal
+ ) => Promise<{unchanged: boolean; entry?: {generation_id: string}}>
  progress: (message: string) => void
 }
 /** Frozen user selection and verified local receipts survive process interruption.
@@ -63,14 +75,23 @@ export class SubtitleSync {
   return result.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
  }
  async create(items: Pick<SubtitleSyncItem, 'page' | 'title' | 'url'>[], category: string, courseName?: string) {
-  const task = taskSchema.parse({id: randomUUID(), createdAt: new Date().toISOString(), category, courseName, interrupted: true, items: items.map(item => ({...item, url: subtitleLocator(item.url), status: '等待处理'}))})
+  const task = taskSchema.parse({
+   id: randomUUID(),
+   createdAt: new Date().toISOString(),
+   category,
+   courseName,
+   interrupted: true,
+   items: items.map(item => ({...item, url: subtitleLocator(item.url), status: '等待处理'}))
+  })
   if (new Set(task.items.map(item => item.url)).size !== task.items.length) throw new Error('不能重复选择同一分集')
   await this.save(task)
   return task
  }
  async attach(id: string, selector: number | string, path: string) {
   const task = await this.read(id),
-   matches = task.items.filter(item => (typeof selector === 'string' ? item.url === subtitleLocator(selector) : item.page === selector)),
+   matches = task.items.filter(item =>
+    typeof selector === 'string' ? item.url === subtitleLocator(selector) : item.page === selector
+   ),
    item = matches[0]
   if (matches.length !== 1) throw new Error('请按视频网址明确选择本次同步的分集')
   const location = relative(resolve(this.library), resolve(path))

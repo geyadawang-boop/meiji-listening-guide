@@ -17,12 +17,27 @@ const uin = z
  .transform(value => BigInt(value))
  .refine(value => value > 0n && value < 2n ** 64n)
  .transform(String)
-const keySchema = z.object({Count: z.number().int().min(1).max(100), List: z.array(z.object({Key: z.number().int().safe(), Val: z.number().int().safe()})).max(100)}).refine(value => value.Count === value.List.length)
-const loginSchema = z.object({wxuin: uin, wxsid: secret, skey: z.string().max(8192), pass_ticket: z.string().max(8192).optional()})
+const keySchema = z
+ .object({
+  Count: z.number().int().min(1).max(100),
+  List: z.array(z.object({Key: z.number().int().safe(), Val: z.number().int().safe()})).max(100)
+ })
+ .refine(value => value.Count === value.List.length)
+const loginSchema = z.object({
+ wxuin: uin,
+ wxsid: secret,
+ skey: z.string().max(8192),
+ pass_ticket: z.string().max(8192).optional()
+})
 const sessionSchema = z.object({
  domain: z.enum(hosts as [string, ...string[]]),
  login: loginSchema,
- BaseRequest: z.object({Uin: z.number().int().positive().safe(), Sid: secret, Skey: z.string().max(8192), DeviceID: z.string().regex(/^e\d{15}$/)}),
+ BaseRequest: z.object({
+  Uin: z.number().int().positive().safe(),
+  Sid: secret,
+  Skey: z.string().max(8192),
+  DeviceID: z.string().regex(/^e\d{15}$/)
+ }),
  user: z.string().min(1).max(256).optional(),
  SyncKey: keySchema.optional(),
  cookies: z.array(z.record(z.string(), z.unknown())).max(200).default([])
@@ -31,7 +46,16 @@ type Session = z.infer<typeof sessionSchema>
 const record = z.record(z.string(), z.unknown())
 export function weixinRedirect(value: string) {
  const url = new URL(value)
- if (url.protocol !== 'https:' || !hosts.includes(url.hostname) || url.port || url.username || url.password || url.hash || url.pathname !== '/cgi-bin/mmwebwx-bin/webwxnewloginpage') throw new Error('微信返回不支持的确认地址')
+ if (
+  url.protocol !== 'https:' ||
+  !hosts.includes(url.hostname) ||
+  url.port ||
+  url.username ||
+  url.password ||
+  url.hash ||
+  url.pathname !== '/cgi-bin/mmwebwx-bin/webwxnewloginpage'
+ )
+  throw new Error('微信返回不支持的确认地址')
  const parts = url.search
   .slice(1)
   .split('&')
@@ -95,14 +119,27 @@ export class NativeWeixinWebSession {
     .max(200)
     .parse(raw.cookies || [])
    this.session = sessionSchema.parse({...raw, cookies: []})
-   if (String(this.session.BaseRequest.Uin) !== this.session.login.wxuin || this.session.BaseRequest.Sid !== this.session.login.wxsid || this.session.BaseRequest.Skey !== this.session.login.skey) throw new Error('保存的微信身份不一致')
+   if (
+    String(this.session.BaseRequest.Uin) !== this.session.login.wxuin ||
+    this.session.BaseRequest.Sid !== this.session.login.wxsid ||
+    this.session.BaseRequest.Skey !== this.session.login.skey
+   )
+    throw new Error('保存的微信身份不一致')
    for (const item of cookies) {
     const legacy = item.key === undefined
     if (legacy && item.port_specified) throw new Error('保存的微信 Cookie 端口范围无法兼容，请重新扫码')
     const domain = z.string().parse(item.domain).replace(/^\./, '').toLowerCase()
     if (!cookieHosts.includes(domain)) throw new Error('保存的微信 Cookie 域无效')
     const cookie = legacy
-     ? new Cookie({key: z.string().parse(item.name), value: z.string().parse(item.value), domain, path: z.string().parse(item.path || '/'), secure: !!item.secure, hostOnly: item.domain_specified === false, expires: typeof item.expires === 'number' ? new Date(item.expires * 1000) : 'Infinity'})
+     ? new Cookie({
+        key: z.string().parse(item.name),
+        value: z.string().parse(item.value),
+        domain,
+        path: z.string().parse(item.path || '/'),
+        secure: !!item.secure,
+        hostOnly: item.domain_specified === false,
+        expires: typeof item.expires === 'number' ? new Date(item.expires * 1000) : 'Infinity'
+       })
      : Cookie.fromJSON(item)
     if (!cookie) throw new Error('保存的微信 Cookie 无效')
     this.jar.setCookieSync(cookie, 'https://' + domain + (cookie.path || '/'))
@@ -113,7 +150,14 @@ export class NativeWeixinWebSession {
   return {...session, cookies: this.jar.serializeSync()?.cookies || []}
  }
  private async request(url: URL, signal: AbortSignal, body?: unknown) {
-  if (url.protocol !== 'https:' || url.port || url.username || url.password || ![...hosts, 'login.wx.qq.com'].includes(url.hostname)) throw new Error('微信服务地址无效')
+  if (
+   url.protocol !== 'https:' ||
+   url.port ||
+   url.username ||
+   url.password ||
+   ![...hosts, 'login.wx.qq.com'].includes(url.hostname)
+  )
+   throw new Error('微信服务地址无效')
   signal.throwIfAborted()
   let response: Response
   try {
@@ -121,7 +165,12 @@ export class NativeWeixinWebSession {
     method: body === undefined ? 'GET' : 'POST',
     redirect: 'error',
     credentials: 'omit',
-    headers: {'User-Agent': 'Mozilla/5.0 (Linux; U; UOS x86_64; zh-cn) AppleWebKit/537.36 Chrome/91.0.4472.124 Safari/537.36 UOSBrowser/6.0.1.1001', Cookie: this.jar.getCookieStringSync(url.href), ...(body === undefined ? {} : {'Content-Type': 'application/json;charset=UTF-8'})},
+    headers: {
+     'User-Agent':
+      'Mozilla/5.0 (Linux; U; UOS x86_64; zh-cn) AppleWebKit/537.36 Chrome/91.0.4472.124 Safari/537.36 UOSBrowser/6.0.1.1001',
+     Cookie: this.jar.getCookieStringSync(url.href),
+     ...(body === undefined ? {} : {'Content-Type': 'application/json;charset=UTF-8'})
+    },
     ...(body === undefined ? {} : {body: JSON.stringify(body)}),
     signal: AbortSignal.any([signal, AbortSignal.timeout(15000)])
    })
@@ -158,7 +207,13 @@ export class NativeWeixinWebSession {
  }
  async start(signal: AbortSignal) {
   const url = new URL('https://login.wx.qq.com/jslogin')
-  url.search = new URLSearchParams({appid: 'wx782c26e4c19acffb', fun: 'new', lang: 'zh_CN', _: String(Date.now()), redirect_uri: 'https://wx.qq.com/cgi-bin/mmwebwx-bin/webwxnewloginpage'}).toString()
+  url.search = new URLSearchParams({
+   appid: 'wx782c26e4c19acffb',
+   fun: 'new',
+   lang: 'zh_CN',
+   _: String(Date.now()),
+   redirect_uri: 'https://wx.qq.com/cgi-bin/mmwebwx-bin/webwxnewloginpage'
+  }).toString()
   const text = await this.request(url, signal),
    codes = [...text.matchAll(/window\.QRLogin\.code\s*=\s*(\d+)\s*;/g)],
    uuids = [...text.matchAll(/window\.QRLogin\.uuid\s*=\s*"([A-Za-z0-9_-]{1,128}={0,2})"\s*;/g)]
@@ -170,7 +225,13 @@ export class NativeWeixinWebSession {
  async poll(signal: AbortSignal) {
   if (!this.uuid) throw new Error('请先开始微信扫码')
   const url = new URL('https://login.wx.qq.com/cgi-bin/mmwebwx-bin/login')
-  url.search = new URLSearchParams({uuid: this.uuid, tip: '0', loginicon: 'true', _: String(Math.floor(Date.now() / 1000)), r: String(Math.floor(Date.now() / 1000 / 1579))}).toString()
+  url.search = new URLSearchParams({
+   uuid: this.uuid,
+   tip: '0',
+   loginicon: 'true',
+   _: String(Math.floor(Date.now() / 1000)),
+   r: String(Math.floor(Date.now() / 1000 / 1579))
+  }).toString()
   const text = await this.request(url, signal),
    codes = [...text.matchAll(/window\.code\s*=\s*(\d+)\s*;/g)]
   if (codes.length !== 1) throw new Error('微信登录状态无效')
@@ -192,21 +253,58 @@ export class NativeWeixinWebSession {
   } else login = xmlLogin(raw)
   const numeric = Number(login.wxuin)
   if (!Number.isSafeInteger(numeric)) throw new Error('当前微信账号编号无法无损编码，请使用微信 Bot 连接')
-  this.session = sessionSchema.parse({domain: target.hostname, login, BaseRequest: {Uin: numeric, Sid: login.wxsid, Skey: login.skey, DeviceID: 'e' + [...randomBytes(15)].map(value => value % 10).join('')}})
+  this.session = sessionSchema.parse({
+   domain: target.hostname,
+   login,
+   BaseRequest: {
+    Uin: numeric,
+    Sid: login.wxsid,
+    Skey: login.skey,
+    DeviceID: 'e' + [...randomBytes(15)].map(value => value % 10).join('')
+   }
+  })
   this.qr = ''
   return {state: 'verifying', qr: ''}
  }
  async verify(signal: AbortSignal, expectedAccount?: string) {
-  if (!this.session || (expectedAccount && this.session.login.wxuin !== expectedAccount)) throw new Error('微信账号归属不符')
-  const data = await this.json('webwxinit', signal, {BaseRequest: this.session.BaseRequest}, {_: String(Math.floor(Date.now() / 1000))}),
+  if (!this.session || (expectedAccount && this.session.login.wxuin !== expectedAccount))
+   throw new Error('微信账号归属不符')
+  const data = await this.json(
+    'webwxinit',
+    signal,
+    {BaseRequest: this.session.BaseRequest},
+    {_: String(Math.floor(Date.now() / 1000))}
+   ),
    user = z.object({UserName: z.string().min(1).max(256), Uin: z.unknown().optional()}).parse(data.User)
-  if (user.Uin !== undefined && user.Uin !== null && user.Uin !== '' && user.Uin !== 0 && uin.parse(user.Uin) !== this.session.login.wxuin) throw new Error('微信初始化账号与扫码账号不一致')
+  if (
+   user.Uin !== undefined &&
+   user.Uin !== null &&
+   user.Uin !== '' &&
+   user.Uin !== 0 &&
+   uin.parse(user.Uin) !== this.session.login.wxuin
+  )
+   throw new Error('微信初始化账号与扫码账号不一致')
   if (this.session.user && this.session.user !== user.UserName) throw new Error('微信会话身份已改变')
   const skey = secret.parse(data.SKey ?? this.session.login.skey),
    key = keySchema.parse(data.SyncKey)
   // Rechecking identity must not move a previously committed receive cursor.
-  this.session = {...this.session, user: user.UserName, login: {...this.session.login, skey}, BaseRequest: {...this.session.BaseRequest, Skey: skey}, SyncKey: this.session.SyncKey || key}
-  return {account: this.session.login.wxuin, session: this.export(), capabilities: {identity: 'personal_weixin_web_experimental', history: 'local_since_connection', messages: 'new_events_only', send: 'explicit_confirmed_text'}}
+  this.session = {
+   ...this.session,
+   user: user.UserName,
+   login: {...this.session.login, skey},
+   BaseRequest: {...this.session.BaseRequest, Skey: skey},
+   SyncKey: this.session.SyncKey || key
+  }
+  return {
+   account: this.session.login.wxuin,
+   session: this.export(),
+   capabilities: {
+    identity: 'personal_weixin_web_experimental',
+    history: 'local_since_connection',
+    messages: 'new_events_only',
+    send: 'explicit_confirmed_text'
+   }
+  }
  }
  async directory(signal: AbortSignal) {
   const peers = new Map<string, {peer: string; name: string}>(),
@@ -214,7 +312,11 @@ export class NativeWeixinWebSession {
   let seq = 0,
    complete = false
   for (let page = 0; page < 20; page++) {
-   const data = await this.json('webwxgetcontact', signal, undefined, {r: String(Date.now()), skey: this.session!.login.skey, seq: String(seq)}),
+   const data = await this.json('webwxgetcontact', signal, undefined, {
+     r: String(Date.now()),
+     skey: this.session!.login.skey,
+     seq: String(seq)
+    }),
     members = z.array(record).max(10000).parse(data.MemberList),
     next = z.number().int().nonnegative().safe().parse(data.Seq)
    for (const item of members) {
@@ -233,12 +335,17 @@ export class NativeWeixinWebSession {
   return {peers: [...peers.values()], coverage: complete ? 'complete_current_directory' : 'partial_page_limit'}
  }
  async receive(selected: string, account: string, signal: AbortSignal) {
-  if (!this.session?.user || !this.session.SyncKey || this.session.login.wxuin !== account) throw new Error('微信所选会话尚未核验')
+  if (!this.session?.user || !this.session.SyncKey || this.session.login.wxuin !== account)
+   throw new Error('微信所选会话尚未核验')
   const data = await this.json(
     'webwxsync',
     signal,
     {BaseRequest: this.session.BaseRequest, SyncKey: this.session.SyncKey, rr: String(Math.floor(Date.now() / 1000))},
-    {sid: this.session.login.wxsid, skey: this.session.login.skey, ...(this.session.login.pass_ticket ? {pass_ticket: this.session.login.pass_ticket} : {})}
+    {
+     sid: this.session.login.wxsid,
+     skey: this.session.login.skey,
+     ...(this.session.login.pass_ticket ? {pass_ticket: this.session.login.pass_ticket} : {})
+    }
    ),
    key = keySchema.parse(data.SyncKey)
   const messages = z
@@ -253,7 +360,9 @@ export class NativeWeixinWebSession {
     if (peer !== selected) return []
     return [
      {
-      mid: z.union([z.string().min(1).max(200), z.number().int().safe().transform(String)]).parse(item.MsgId ?? item.NewMsgId),
+      mid: z
+       .union([z.string().min(1).max(200), z.number().int().safe().transform(String)])
+       .parse(item.MsgId ?? item.NewMsgId),
       sender,
       ts: z.number().nonnegative().finite().parse(item.CreateTime),
       kind: item.MsgType === 1 ? 'text' : 'unsupported_media',
@@ -265,13 +374,28 @@ export class NativeWeixinWebSession {
  }
  async send(peer: string, text: string, operationId: string, signal: AbortSignal) {
   if (!this.session?.user) throw new Error('微信尚未核验身份')
-  const id = String(BigInt('0x' + createHash('sha256').update(operationId).digest('hex').slice(0, 16)) & ((1n << 63n) - 1n)),
+  const id = String(
+    BigInt('0x' + createHash('sha256').update(operationId).digest('hex').slice(0, 16)) & ((1n << 63n) - 1n)
+   ),
    data = await this.json(
     'webwxsendmsg',
     signal,
-    {BaseRequest: this.session.BaseRequest, Msg: {Type: 1, Content: text, FromUserName: this.session.user, ToUserName: z.string().min(1).max(256).parse(peer), LocalID: id, ClientMsgId: id}, Scene: 0},
+    {
+     BaseRequest: this.session.BaseRequest,
+     Msg: {
+      Type: 1,
+      Content: text,
+      FromUserName: this.session.user,
+      ToUserName: z.string().min(1).max(256).parse(peer),
+      LocalID: id,
+      ClientMsgId: id
+     },
+     Scene: 0
+    },
     {lang: 'zh_CN', ...(this.session.login.pass_ticket ? {pass_ticket: this.session.login.pass_ticket} : {})}
    )
-  return data.MsgID === undefined ? null : z.union([z.string().min(1).max(200), z.number().int().safe().transform(String)]).parse(data.MsgID)
+  return data.MsgID === undefined
+   ? null
+   : z.union([z.string().min(1).max(200), z.number().int().safe().transform(String)]).parse(data.MsgID)
  }
 }

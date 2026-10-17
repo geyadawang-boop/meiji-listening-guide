@@ -38,7 +38,11 @@ export function speechRanges(probabilities: readonly number[], samples: number):
  return ranges
 }
 export async function detectSpeech(audio: Float32Array, model: string): Promise<SpeechRange[]> {
- const session = await InferenceSession.create(model, {executionProviders: ['cpu'], intraOpNumThreads: 1, interOpNumThreads: 1})
+ const session = await InferenceSession.create(model, {
+  executionProviders: ['cpu'],
+  intraOpNumThreads: 1,
+  interOpNumThreads: 1
+ })
  try {
   let h: Tensor = new Tensor('float32', new Float32Array(128), [1, 1, 128]),
    c: Tensor = new Tensor('float32', new Float32Array(128), [1, 1, 128])

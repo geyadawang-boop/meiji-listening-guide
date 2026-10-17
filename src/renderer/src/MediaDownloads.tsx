@@ -43,8 +43,16 @@ const labels: Record<string, string> = {
  folder_layout: '目录整理方式'
 }
 const active = (job: MediaJob) => ['queued', 'running'].includes(job.state)
-const sponsorHelp = 'YouTube 可填 sponsor、intro、outro 等，多个分类用逗号分隔；依据 SponsorBlock 社区标注移除，字幕与章节同步调整。与仅字幕、按章节拆分请分别建立任务。'
-const states: Record<string, string> = {queued: '排队中', running: '下载中', completed: '已完成', cancelled: '已取消', interrupted: '上次中断', error: '失败'}
+const sponsorHelp =
+ 'YouTube 可填 sponsor、intro、outro 等，多个分类用逗号分隔；依据 SponsorBlock 社区标注移除，字幕与章节同步调整。与仅字幕、按章节拆分请分别建立任务。'
+const states: Record<string, string> = {
+ queued: '排队中',
+ running: '下载中',
+ completed: '已完成',
+ cancelled: '已取消',
+ interrupted: '上次中断',
+ error: '失败'
+}
 export function MediaDownloads({visible}: {visible: boolean}) {
  const [profiles, setProfiles] = useState<LoginProfile[]>([]),
   [profileName, setProfileName] = useState(''),
@@ -102,7 +110,8 @@ export function MediaDownloads({visible}: {visible: boolean}) {
    setBusy(false)
   }
  }
- const set = (key: string, value: string | number | boolean | null) => setOptions(current => ({...current, [key]: value}))
+ const set = (key: string, value: string | number | boolean | null) =>
+  setOptions(current => ({...current, [key]: value}))
  async function enqueue() {
   if (!source) return
   const urls = source.playlist ? selected : [source.url]
@@ -133,21 +142,37 @@ export function MediaDownloads({visible}: {visible: boolean}) {
    </header>
    <details className="media-advanced">
     <summary>站点登录档案</summary>
-    <p className="hint">只读取你主动选择的 Netscape cookies.txt，不扫描浏览器。档案由 Windows 当前用户加密保存；仅发往所填站点域名，不发送给视频 CDN 或其它站点。这里不会显示凭据正文。</p>
+    <p className="hint">
+     只读取你主动选择的 Netscape cookies.txt，不扫描浏览器。档案由 Windows
+     当前用户加密保存；仅发往所填站点域名，不发送给视频 CDN 或其它站点。这里不会显示凭据正文。
+    </p>
     <div className="media-options">
      <label>
       档案名称
-      <input aria-label="登录档案名称" value={profileName} maxLength={80} onChange={event => setProfileName(event.target.value)} />
+      <input
+       aria-label="登录档案名称"
+       value={profileName}
+       maxLength={80}
+       onChange={event => setProfileName(event.target.value)}
+      />
      </label>
      <label>
       站点域名
-      <input aria-label="登录档案站点域名" placeholder="例如 youtube.com" value={profileSite} onChange={event => setProfileSite(event.target.value)} />
+      <input
+       aria-label="登录档案站点域名"
+       placeholder="例如 youtube.com"
+       value={profileSite}
+       onChange={event => setProfileSite(event.target.value)}
+      />
      </label>
      <button
       disabled={busy || !profileName.trim() || !profileSite.trim()}
       onClick={() =>
        void run(async () => {
-        const result = await invoke<LoginProfile | null>('media:auth-import', {name: profileName.trim(), site: profileSite.trim()})
+        const result = await invoke<LoginProfile | null>('media:auth-import', {
+         name: profileName.trim(),
+         site: profileSite.trim()
+        })
         if (result) {
          await refreshProfiles()
          setProfileName('')
@@ -161,7 +186,14 @@ export function MediaDownloads({visible}: {visible: boolean}) {
      </button>
      <label>
       下载使用的登录档案
-      <select aria-label="下载登录档案" disabled={busy} value={String(options.cookie_profile || '')} onChange={event => setOptions(current => ({...current, cookie_profile: event.target.value, use_cookies: !!event.target.value}))}>
+      <select
+       aria-label="下载登录档案"
+       disabled={busy}
+       value={String(options.cookie_profile || '')}
+       onChange={event =>
+        setOptions(current => ({...current, cookie_profile: event.target.value, use_cookies: !!event.target.value}))
+       }
+      >
        <option value="">应用内 B 站会话 / 其它站点公开访问</option>
        {profiles.map(profile => (
         <option key={profile.id} value={profile.id}>
@@ -171,7 +203,12 @@ export function MediaDownloads({visible}: {visible: boolean}) {
       </select>
      </label>
      <label className="media-check">
-      <input type="checkbox" disabled={busy} checked={!!options.privacy} onChange={event => set('privacy', event.target.checked)} />
+      <input
+       type="checkbox"
+       disabled={busy}
+       checked={!!options.privacy}
+       onChange={event => set('privacy', event.target.checked)}
+      />
       加密下载任务记录（媒体文件本身不加密）
      </label>
     </div>
@@ -186,7 +223,8 @@ export function MediaDownloads({visible}: {visible: boolean}) {
         void run(async () => {
          if (!window.confirm('删除本机保存的此登录档案？原导入文件不会删除。')) return
          await invoke('media:auth-remove', {id: profile.id, confirmed: true})
-         if (options.cookie_profile === profile.id) setOptions(current => ({...current, cookie_profile: '', use_cookies: false}))
+         if (options.cookie_profile === profile.id)
+          setOptions(current => ({...current, cookie_profile: '', use_cookies: false}))
          await refreshProfiles()
         })
        }
@@ -243,7 +281,14 @@ export function MediaDownloads({visible}: {visible: boolean}) {
        <div className="batch-options">
         {source.entries?.map(item => (
          <label key={item.url}>
-          <input type="checkbox" disabled={busy} checked={selected.includes(item.url)} onChange={e => setSelected(e.target.checked ? [...selected, item.url] : selected.filter(link => link !== item.url))} />
+          <input
+           type="checkbox"
+           disabled={busy}
+           checked={selected.includes(item.url)}
+           onChange={e =>
+            setSelected(e.target.checked ? [...selected, item.url] : selected.filter(link => link !== item.url))
+           }
+          />
           {item.title}
          </label>
         ))}
@@ -251,7 +296,8 @@ export function MediaDownloads({visible}: {visible: boolean}) {
       </>
      ) : (
       <p className="hint">
-       {source.duration && source.duration > 0 ? '时长 ' + Math.round(source.duration) + ' 秒' : '时长未提供'} · 可用字幕 {source.subtitles?.join('、') || '未提供'}
+       {source.duration && source.duration > 0 ? '时长 ' + Math.round(source.duration) + ' 秒' : '时长未提供'} ·
+       可用字幕 {source.subtitles?.join('、') || '未提供'}
       </p>
      )}
      <div className="media-options">
@@ -261,7 +307,11 @@ export function MediaDownloads({visible}: {visible: boolean}) {
         {typeof options[key] === 'boolean' ? (
          <input type="checkbox" checked={!!options[key]} disabled={busy} onChange={e => set(key, e.target.checked)} />
         ) : (
-         <select disabled={busy} value={String(options[key])} onChange={e => set(key, key === 'height' ? Number(e.target.value) : e.target.value)}>
+         <select
+          disabled={busy}
+          value={String(options[key])}
+          onChange={e => set(key, key === 'height' ? Number(e.target.value) : e.target.value)}
+         >
           {(enums[key] || []).map(value => (
            <option key={value} value={value}>
             {value === 0 ? '自动' : value === 'auto' ? '自动' : value === 'best' ? '最高质量' : value}
@@ -276,7 +326,9 @@ export function MediaDownloads({visible}: {visible: boolean}) {
       <summary>更多下载选项</summary>
       <div className="media-options">
        {Object.keys(labels)
-        .filter(key => !['height', 'audio_only', 'subtitle_only', 'subtitles', 'container', 'audio_format'].includes(key))
+        .filter(
+         key => !['height', 'audio_only', 'subtitle_only', 'subtitles', 'container', 'audio_format'].includes(key)
+        )
         .map(key => (
          <label key={key}>
           {labels[key]}
@@ -297,9 +349,26 @@ export function MediaDownloads({visible}: {visible: boolean}) {
             disabled={busy}
             type={typeof options[key] === 'number' || ['clip_start', 'clip_end'].includes(key) ? 'number' : 'text'}
             value={options[key] === null ? '' : String(options[key] ?? '')}
-            onChange={e => set(key, ['clip_start', 'clip_end'].includes(key) ? (e.target.value === '' ? null : Number(e.target.value)) : typeof options[key] === 'number' ? Number(e.target.value) : e.target.value)}
+            onChange={e =>
+             set(
+              key,
+              ['clip_start', 'clip_end'].includes(key)
+               ? e.target.value === ''
+                ? null
+                : Number(e.target.value)
+               : typeof options[key] === 'number'
+                 ? Number(e.target.value)
+                 : e.target.value
+             )
+            }
             title={key === 'sponsorblock' ? sponsorHelp : undefined}
-            placeholder={key === 'format_ids' ? '自动选择；可填下方编号' : key === 'sponsorblock' ? '留空不移除；例如 sponsor,intro' : undefined}
+            placeholder={
+             key === 'format_ids'
+              ? '自动选择；可填下方编号'
+              : key === 'sponsorblock'
+                ? '留空不移除；例如 sponsor,intro'
+                : undefined
+            }
            />
           )}
          </label>
@@ -318,7 +387,11 @@ export function MediaDownloads({visible}: {visible: boolean}) {
        </details>
       )}
      </details>
-     <button className="primary" disabled={busy || (source.playlist && !selected.length)} onClick={() => void run(enqueue)}>
+     <button
+      className="primary"
+      disabled={busy || (source.playlist && !selected.length)}
+      onClick={() => void run(enqueue)}
+     >
       下载所选媒体（{source.playlist ? selected.length : 1}）
      </button>
     </div>
@@ -340,7 +413,9 @@ export function MediaDownloads({visible}: {visible: boolean}) {
        <strong>{job.title}</strong>
        <p>
         {states[job.state] || job.state}
-        {job.progress.total ? ` · ${Math.min(100, Math.round(((job.progress.downloaded || 0) / job.progress.total) * 100))}%` : ''}
+        {job.progress.total
+         ? ` · ${Math.min(100, Math.round(((job.progress.downloaded || 0) / job.progress.total) * 100))}%`
+         : ''}
        </p>
        {job.error_message && (
         <p className="hint" role="alert">

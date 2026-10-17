@@ -1,5 +1,13 @@
 import {useEffect, useState} from 'react'
-type Candidate = {candidate_id: string; kind: string; title: string; body: string; basis: string; quote: string; status: string}
+type Candidate = {
+ candidate_id: string
+ kind: string
+ title: string
+ body: string
+ basis: string
+ quote: string
+ status: string
+}
 type Task = {task_id: string; question: string; memory_candidates: Candidate[]}
 const request = <T,>(action: string, args: unknown = {}) => window.assistant.invoke<T>('tools:request', {action, args})
 export function MemorySuggestions({saved}: {saved: () => Promise<void>}) {
@@ -11,7 +19,11 @@ export function MemorySuggestions({saved}: {saved: () => Promise<void>}) {
   [busy, setBusy] = useState(false),
   [error, setError] = useState(''),
   [notice, setNotice] = useState('')
- const suggestions = tasks.flatMap(task => (task.memory_candidates || []).filter(c => c.status === 'pending').map(candidate => ({task, candidate, key: task.task_id + ':' + candidate.candidate_id})))
+ const suggestions = tasks.flatMap(task =>
+  (task.memory_candidates || [])
+   .filter(c => c.status === 'pending')
+   .map(candidate => ({task, candidate, key: task.task_id + ':' + candidate.candidate_id}))
+ )
  const current = suggestions.find(item => item.key === selected)
  async function refresh() {
   setTasks((await request<{tasks: Task[]}>('overview')).tasks)
@@ -34,7 +46,9 @@ export function MemorySuggestions({saved}: {saved: () => Promise<void>}) {
  return (
   <section className="knowledge-card">
    <h3>待核对的记忆建议</h3>
-   <p className="hint">研究可建议下次要继续核对的内容。这里显示原句依据；仅在你检查、修改并确认后保存为学习记忆，不自动写入教材或账号聊天。</p>
+   <p className="hint">
+    研究可建议下次要继续核对的内容。这里显示原句依据；仅在你检查、修改并确认后保存为学习记忆，不自动写入教材或账号聊天。
+   </p>
    <div className="row">
     <select
      aria-label="选择记忆建议"
@@ -61,7 +75,14 @@ export function MemorySuggestions({saved}: {saved: () => Promise<void>}) {
    {current && (
     <>
      <blockquote>{current.candidate.quote}</blockquote>
-     <p className="hint">依据：{({question: '你的问题', note: '本次研究笔记', limitations: '研究范围与限制'} as Record<string, string>)[current.candidate.basis]}</p>
+     <p className="hint">
+      依据：
+      {
+       ({question: '你的问题', note: '本次研究笔记', limitations: '研究范围与限制'} as Record<string, string>)[
+        current.candidate.basis
+       ]
+      }
+     </p>
      <div className="row">
       <select aria-label="记忆建议类型" value={kind} onChange={e => setKind(e.target.value)}>
        <option value="preference">学习偏好</option>
@@ -76,7 +97,10 @@ export function MemorySuggestions({saved}: {saved: () => Promise<void>}) {
       disabled={busy || !title.trim() || !body.trim()}
       onClick={() =>
        void run(async () => {
-        await request('memory-accept', {id: current.task.task_id, value: {candidate_id: current.candidate.candidate_id, kind, title, body}})
+        await request('memory-accept', {
+         id: current.task.task_id,
+         value: {candidate_id: current.candidate.candidate_id, kind, title, body}
+        })
         setSelected('')
         await refresh()
         await saved()

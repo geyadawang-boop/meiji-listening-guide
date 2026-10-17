@@ -7,7 +7,13 @@ import type {NativeMediaSource} from './media-source'
 import {boundedMediaResponse} from './media-subtitle-download'
 import {removalTimeline} from './media-timeline'
 
-const segment = z.object({segment: z.tuple([z.number().finite().nonnegative(), z.number().finite().positive()]), category: z.string().max(50), actionType: z.string().max(20), videoDuration: z.number().finite().nonnegative(), UUID: z.string().max(100)})
+const segment = z.object({
+ segment: z.tuple([z.number().finite().nonnegative(), z.number().finite().positive()]),
+ category: z.string().max(50),
+ actionType: z.string().max(20),
+ videoDuration: z.number().finite().nonnegative(),
+ UUID: z.string().max(100)
+})
 const segments = z.array(segment).max(200)
 const receipt = z
  .object({
@@ -24,8 +30,15 @@ const receipt = z
  .strict()
 const hash = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex')
 /** Read-only hash-prefix lookup. This never sends a complete video ID, account cookies or submissions. */
-export async function sponsorBlockPlan(source: NativeMediaSource, options: NativeMediaOptions, directory: string, fetcher: (url: string, init?: RequestInit) => Promise<Response>, signal: AbortSignal) {
- if (source.platform !== 'youtube' || !source.sourceId || !/^[A-Za-z0-9_-]{11}$/.test(source.sourceId)) throw new Error('片段移除目前仅支持 YouTube；其它平台请使用时间片段')
+export async function sponsorBlockPlan(
+ source: NativeMediaSource,
+ options: NativeMediaOptions,
+ directory: string,
+ fetcher: (url: string, init?: RequestInit) => Promise<Response>,
+ signal: AbortSignal
+) {
+ if (source.platform !== 'youtube' || !source.sourceId || !/^[A-Za-z0-9_-]{11}$/.test(source.sourceId))
+  throw new Error('片段移除目前仅支持 YouTube；其它平台请使用时间片段')
  const categories = [...new Set(options.sponsorblock.split(','))].sort()
  if (!categories.length || categories.some(value => !mediaSponsors.includes(value))) throw new Error('片段移除分类无效')
  const duration = source.catalog.duration
@@ -37,18 +50,31 @@ export async function sponsorBlockPlan(source: NativeMediaSource, options: Nativ
   const info = await lstat(path)
   if (!info.isFile() || info.isSymbolicLink() || info.size > 1_000_000) throw new Error('片段移除恢复记录无效')
   const saved = receipt.parse(JSON.parse(await readFile(path, 'utf8')))
-  if (saved.sourceId !== source.sourceId || saved.duration !== duration || JSON.stringify(saved.categories) !== JSON.stringify(categories) || saved.sha256 !== hash([saved.sourceId, saved.duration, saved.categories, saved.segments])) throw new Error('片段移除恢复记录已改变，原文件保留')
+  if (
+   saved.sourceId !== source.sourceId ||
+   saved.duration !== duration ||
+   JSON.stringify(saved.categories) !== JSON.stringify(categories) ||
+   saved.sha256 !== hash([saved.sourceId, saved.duration, saved.categories, saved.segments])
+  )
+   throw new Error('片段移除恢复记录已改变，原文件保留')
   rows = saved.segments
  } catch (error) {
   if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
  }
  if (!rows) {
-  const url = new URL('https://sponsor.ajay.app/api/skipSegments/' + createHash('sha256').update(source.sourceId).digest('hex').slice(0, 4))
+  const url = new URL(
+   'https://sponsor.ajay.app/api/skipSegments/' + createHash('sha256').update(source.sourceId).digest('hex').slice(0, 4)
+  )
   url.searchParams.set('categories', JSON.stringify(categories))
   url.searchParams.set('actionTypes', '["skip"]')
   url.searchParams.set('service', 'YouTube')
   signal.throwIfAborted()
-  const response = await fetcher(url.href, {signal: AbortSignal.any([signal, AbortSignal.timeout(20000)]), redirect: 'error', credentials: 'omit', headers: {Accept: 'application/json'}})
+  const response = await fetcher(url.href, {
+   signal: AbortSignal.any([signal, AbortSignal.timeout(20000)]),
+   redirect: 'error',
+   credentials: 'omit',
+   headers: {Accept: 'application/json'}
+  })
   if (response.status === 404) {
    await response.body?.cancel()
    rows = []
@@ -59,10 +85,18 @@ export async function sponsorBlockPlan(source: NativeMediaSource, options: Nativ
      .parse(JSON.parse((await boundedMediaResponse(response, 1_000_000)).toString('utf8'))),
     matches = result.filter(row => row.videoID === source.sourceId)
    if (matches.length > 1) throw new Error('片段来源身份重复，未修改视频')
-   rows = segments.parse((matches[0]?.segments || []).filter(row => categories.includes(row.category) && row.actionType === 'skip'))
+   rows = segments.parse(
+    (matches[0]?.segments || []).filter(row => categories.includes(row.category) && row.actionType === 'skip')
+   )
   }
   // A stale crowd-sourced range must not cut the corresponding timestamp from a different edit.
-  for (const row of rows) if ((row.videoDuration > 0 && Math.abs(row.videoDuration - duration) > 1) || row.segment[1] > duration || row.segment[1] <= row.segment[0]) throw new Error('片段标注与当前视频时长不符，未执行裁剪')
+  for (const row of rows)
+   if (
+    (row.videoDuration > 0 && Math.abs(row.videoDuration - duration) > 1) ||
+    row.segment[1] > duration ||
+    row.segment[1] <= row.segment[0]
+   )
+    throw new Error('片段标注与当前视频时长不符，未执行裁剪')
   const value = receipt.parse({
    version: 1,
    sourceId: source.sourceId,
@@ -77,7 +111,13 @@ export async function sponsorBlockPlan(source: NativeMediaSource, options: Nativ
   signal.throwIfAborted()
   await writeFile(path, JSON.stringify(value, null, 2), {flag: 'wx'})
  }
- for (const row of rows) if ((row.videoDuration > 0 && Math.abs(row.videoDuration - duration) > 1) || row.segment[1] > duration || row.segment[1] <= row.segment[0]) throw new Error('片段标注与当前视频时长不符，未执行裁剪')
+ for (const row of rows)
+  if (
+   (row.videoDuration > 0 && Math.abs(row.videoDuration - duration) > 1) ||
+   row.segment[1] > duration ||
+   row.segment[1] <= row.segment[0]
+  )
+   throw new Error('片段标注与当前视频时长不符，未执行裁剪')
  const plan = removalTimeline(
   duration,
   rows.map(row => ({start: row.segment[0], end: row.segment[1]})),

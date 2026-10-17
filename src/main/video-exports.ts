@@ -10,8 +10,22 @@ import {reserveFile} from './library'
 export function subtitleText(srt: string, format: 'txt' | 'md' | 'vtt') {
  const cues = parseSrt(srt)
  if (!cues.length) throw new Error('没有可导出的字幕')
- if (format === 'vtt') return 'WEBVTT\n\n' + cues.map((cue, i) => `${i + 1}\n${time(cue.start).replace(',', '.')} --> ${time(cue.end).replace(',', '.')}\n${cue.text.replace(/-->/g, '→')}`).join('\n\n') + '\n'
- return (format === 'md' ? '# 视频字幕\n\n' : '') + cues.map(cue => `[${time(cue.start, false)}] ${cue.text}`).join(format === 'md' ? '\n\n' : '\n') + '\n'
+ if (format === 'vtt')
+  return (
+   'WEBVTT\n\n' +
+   cues
+    .map(
+     (cue, i) =>
+      `${i + 1}\n${time(cue.start).replace(',', '.')} --> ${time(cue.end).replace(',', '.')}\n${cue.text.replace(/-->/g, '→')}`
+    )
+    .join('\n\n') +
+   '\n'
+  )
+ return (
+  (format === 'md' ? '# 视频字幕\n\n' : '') +
+  cues.map(cue => `[${time(cue.start, false)}] ${cue.text}`).join(format === 'md' ? '\n\n' : '\n') +
+  '\n'
+ )
 }
 export async function saveTextExport(directory: string, title: string, srt: string, format: 'txt' | 'md' | 'vtt') {
  const text = subtitleText(srt, format),
@@ -32,17 +46,48 @@ export async function exportVideoNotes(source: string, directory: string, format
  try {
   let bytes: Buffer
   if (format === 'docx') {
-   const doc = new Document({sections: [{children: text.split('\n').map(line => new Paragraph({children: [new TextRun({text: line.replace(/^#{1,3} /, '').replace(/\*\*/g, ''), bold: line.startsWith('#'), size: line.startsWith('# ') ? 32 : 22})], spacing: {after: 120}}))}]})
+   const doc = new Document({
+    sections: [
+     {
+      children: text
+       .split('\n')
+       .map(
+        line =>
+         new Paragraph({
+          children: [
+           new TextRun({
+            text: line.replace(/^#{1,3} /, '').replace(/\*\*/g, ''),
+            bold: line.startsWith('#'),
+            size: line.startsWith('# ') ? 32 : 22
+           })
+          ],
+          spacing: {after: 120}
+         })
+       )
+     }
+    ]
+   })
    bytes = await Packer.toBuffer(doc)
   } else if (format === 'svg') {
    const records = z
-    .array(z.object({cue: z.number(), quote: z.string(), point: z.string().max(600), topic: z.string().max(80), timestamp: z.string()}))
+    .array(
+     z.object({
+      cue: z.number(),
+      quote: z.string(),
+      point: z.string().max(600),
+      topic: z.string().max(80),
+      timestamp: z.string()
+     })
+    )
     .max(20000)
     .parse(JSON.parse(await readFile(source.replace(/\.md$/i, '.json'), 'utf8')))
    bytes = Buffer.from(notesSvg(title, records), 'utf8')
   } else {
    const escape = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-   const print = new BrowserWindow({show: false, webPreferences: {nodeIntegration: false, contextIsolation: true, sandbox: true}})
+   const print = new BrowserWindow({
+    show: false,
+    webPreferences: {nodeIntegration: false, contextIsolation: true, sandbox: true}
+   })
    try {
     await print.loadURL(
      'data:text/html;charset=utf-8,' +

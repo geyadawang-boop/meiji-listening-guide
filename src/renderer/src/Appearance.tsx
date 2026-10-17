@@ -6,7 +6,10 @@ const colors = {default: 'var(--blue)', lavender: '#9279c7', rose: '#ca809c', mi
 export function chatStyle(value: Appearance) {
  return {
   '--appearance-accent': colors[value.accent],
-  '--appearance-user-bg': value.accent === 'default' ? 'var(--bubble-blue)' : 'color-mix(in srgb,' + colors[value.accent] + ' 18%,var(--surface-raised))',
+  '--appearance-user-bg':
+   value.accent === 'default'
+    ? 'var(--bubble-blue)'
+    : 'color-mix(in srgb,' + colors[value.accent] + ' 18%,var(--surface-raised))',
   '--chat-font': value.fontSize + 'px',
   '--chat-line': value.lineHeight,
   '--chat-avatar-size': value.avatarSize + 'px',
@@ -27,12 +30,26 @@ export function Wallpaper({value}: {value: Appearance}) {
  }
  return (
   <div className="chat-wallpaper" aria-hidden="true">
-   <div style={{backgroundImage: backgrounds[value.background], opacity: value.opacity, filter: `blur(${value.blur}px)`}} />
+   <div
+    style={{backgroundImage: backgrounds[value.background], opacity: value.opacity, filter: `blur(${value.blur}px)`}}
+   />
    <span style={{opacity: value.scrim}} />
   </div>
  )
 }
-export function AppearanceEditor({initial, courseId, courses, close, saved}: {initial: AppearanceState; courseId: string; courses: Course[]; close: () => void; saved: (state: AppearanceState) => void}) {
+export function AppearanceEditor({
+ initial,
+ courseId,
+ courses,
+ close,
+ saved
+}: {
+ initial: AppearanceState
+ courseId: string
+ courses: Course[]
+ close: () => void
+ saved: (state: AppearanceState) => void
+}) {
  const [editingCourseId, setEditingCourseId] = useState(courseId || courses[0]?.id || ''),
   [state, setState] = useState(initial),
   [scope, setScope] = useState<'global' | 'course'>('global'),
@@ -67,7 +84,8 @@ export function AppearanceEditor({initial, courseId, courses, close, saved}: {in
    .then(async () => {
     let result: AppearanceState | undefined
     try {
-     for (const [id, value] of batch) result = await window.assistant.invoke<AppearanceState>('appearance:save', {value, courseId: id || undefined})
+     for (const [id, value] of batch)
+      result = await window.assistant.invoke<AppearanceState>('appearance:save', {value, courseId: id || undefined})
      if (result && rev === revision.current) commit(result)
     } catch (e) {
      for (const [id, value] of batch) if (!pending.current.has(id)) pending.current.set(id, value)
@@ -95,7 +113,9 @@ export function AppearanceEditor({initial, courseId, courses, close, saved}: {in
   setError('')
   setStatus('正在保存…')
   const current = stateRef.current,
-   staged: AppearanceState = id ? {...current, courses: {...current.courses, [id]: merged}} : {...current, global: merged}
+   staged: AppearanceState = id
+    ? {...current, courses: {...current.courses, [id]: merged}}
+    : {...current, global: merged}
   stateRef.current = staged
   setState(staged)
   saved(staged)
@@ -121,11 +141,34 @@ export function AppearanceEditor({initial, courseId, courses, close, saved}: {in
    setBusy(false)
   }
  }
- const slider = (label: string, key: 'opacity' | 'blur' | 'scrim' | 'fontSize' | 'lineHeight' | 'avatarSize' | 'bubbleRadius' | 'messageGap' | 'contentWidth', min: number, max: number, step = 1) => (
+ const slider = (
+  label: string,
+  key:
+   | 'opacity'
+   | 'blur'
+   | 'scrim'
+   | 'fontSize'
+   | 'lineHeight'
+   | 'avatarSize'
+   | 'bubbleRadius'
+   | 'messageGap'
+   | 'contentWidth',
+  min: number,
+  max: number,
+  step = 1
+ ) => (
   <label className="appearance-slider">
    {label}
    <output>{Math.round(value[key] * 100) / 100}</output>
-   <input type="range" aria-label={label} min={min} max={max} step={step} value={value[key]} onChange={e => update({[key]: Number(e.target.value)})} />
+   <input
+    type="range"
+    aria-label={label}
+    min={min}
+    max={max}
+    step={step}
+    value={value[key]}
+    onChange={e => update({[key]: Number(e.target.value)})}
+   />
   </label>
  )
  return (
@@ -136,7 +179,20 @@ export function AppearanceEditor({initial, courseId, courses, close, saved}: {in
      <button disabled={busy} onClick={() => void run(async () => close())}>
       关闭
      </button>
-     <button className="primary" disabled={busy} onClick={() => void run(async () => commit(await window.assistant.invoke<AppearanceState>('appearance:save', {value, courseId: scope === 'course' ? editingCourseId : undefined})))}>
+     <button
+      className="primary"
+      disabled={busy}
+      onClick={() =>
+       void run(async () =>
+        commit(
+         await window.assistant.invoke<AppearanceState>('appearance:save', {
+          value,
+          courseId: scope === 'course' ? editingCourseId : undefined
+         })
+        )
+       )
+      }
+     >
       保存
      </button>
     </div>
@@ -147,14 +203,23 @@ export function AppearanceEditor({initial, courseId, courses, close, saved}: {in
       <button disabled={busy} className={scope === 'global' ? 'selected' : ''} onClick={() => changeScope('global')}>
        全局
       </button>
-      <button disabled={busy || !courses.length} className={scope === 'course' ? 'selected' : ''} onClick={() => changeScope('course')}>
+      <button
+       disabled={busy || !courses.length}
+       className={scope === 'course' ? 'selected' : ''}
+       onClick={() => changeScope('course')}
+      >
        课程
       </button>
      </div>
      {scope === 'global' && courseId && state.courses[courseId] && (
       <div className="appearance-notice">
        {courses.find(c => c.id === courseId)?.name} 使用独立外观。
-       <button disabled={busy} onClick={() => void run(async () => commit(await window.assistant.invoke<AppearanceState>('appearance:clear', {courseId})))}>
+       <button
+        disabled={busy}
+        onClick={() =>
+         void run(async () => commit(await window.assistant.invoke<AppearanceState>('appearance:clear', {courseId})))
+        }
+       >
         让当前课程跟随全局
        </button>
       </div>
@@ -199,7 +264,11 @@ export function AppearanceEditor({initial, courseId, courses, close, saved}: {in
       <h3>聊天背景</h3>
       <label>
        背景
-       <select aria-label="聊天背景" value={value.background} onChange={e => update({background: e.target.value as Appearance['background']})}>
+       <select
+        aria-label="聊天背景"
+        value={value.background}
+        onChange={e => update({background: e.target.value as Appearance['background']})}
+       >
         <option value="none">无背景</option>
         <option value="lavender">薰衣草</option>
         <option value="rose">樱花</option>
@@ -231,12 +300,18 @@ export function AppearanceEditor({initial, courseId, courses, close, saved}: {in
       <h3>头像与消息</h3>
       <label>
        主题色
-       <select aria-label="聊天主题色" value={value.accent} onChange={e => update({accent: e.target.value as Appearance['accent']})}>
-        {Object.entries({default: '默认', lavender: '浅紫', rose: '粉樱', mint: '薄荷', blue: '雾蓝'}).map(([id, name]) => (
-         <option key={id} value={id}>
-          {name}
-         </option>
-        ))}
+       <select
+        aria-label="聊天主题色"
+        value={value.accent}
+        onChange={e => update({accent: e.target.value as Appearance['accent']})}
+       >
+        {Object.entries({default: '默认', lavender: '浅紫', rose: '粉樱', mint: '薄荷', blue: '雾蓝'}).map(
+         ([id, name]) => (
+          <option key={id} value={id}>
+           {name}
+          </option>
+         )
+        )}
        </select>
       </label>
       <button
@@ -245,7 +320,12 @@ export function AppearanceEditor({initial, courseId, courses, close, saved}: {in
         void run(async () => {
          const next = {...value, accent: 'default' as const}
          setValue(next)
-         commit(await window.assistant.invoke<AppearanceState>('appearance:save', {value: next, courseId: scope === 'course' ? editingCourseId : undefined}))
+         commit(
+          await window.assistant.invoke<AppearanceState>('appearance:save', {
+           value: next,
+           courseId: scope === 'course' ? editingCourseId : undefined
+          })
+         )
         })
        }
       >
@@ -253,7 +333,11 @@ export function AppearanceEditor({initial, courseId, courses, close, saved}: {in
       </button>
       <label>
        头像形状
-       <select aria-label="头像形状" value={value.avatarShape} onChange={e => update({avatarShape: e.target.value as Appearance['avatarShape']})}>
+       <select
+        aria-label="头像形状"
+        value={value.avatarShape}
+        onChange={e => update({avatarShape: e.target.value as Appearance['avatarShape']})}
+       >
         <option value="round">圆形</option>
         <option value="rounded">圆角方形</option>
        </select>
@@ -269,7 +353,11 @@ export function AppearanceEditor({initial, courseId, courses, close, saved}: {in
        显示名字
       </label>
       <label className="appearance-check">
-       <input type="checkbox" checked={value.assistantBubble} onChange={e => update({assistantBubble: e.target.checked})} />
+       <input
+        type="checkbox"
+        checked={value.assistantBubble}
+        onChange={e => update({assistantBubble: e.target.checked})}
+       />
        助手消息使用气泡
       </label>
      </section>
@@ -279,7 +367,12 @@ export function AppearanceEditor({initial, courseId, courses, close, saved}: {in
        void run(async () => {
         const next = {...defaultAppearance}
         setValue(next)
-        commit(await window.assistant.invoke<AppearanceState>('appearance:save', {value: next, courseId: scope === 'course' ? editingCourseId : undefined}))
+        commit(
+         await window.assistant.invoke<AppearanceState>('appearance:save', {
+          value: next,
+          courseId: scope === 'course' ? editingCourseId : undefined
+         })
+        )
        })
       }
      >
@@ -294,7 +387,12 @@ export function AppearanceEditor({initial, courseId, courses, close, saved}: {in
     </fieldset>
     <aside>
      <h3>实时预览</h3>
-     <div className="appearance-preview chat-styled" style={chatStyle(value)} data-names={value.showNames} data-bubbles={value.assistantBubble}>
+     <div
+      className="appearance-preview chat-styled"
+      style={chatStyle(value)}
+      data-names={value.showNames}
+      data-bubbles={value.assistantBubble}
+     >
       <Wallpaper value={value} />
       <div className="agent-thread">
        <ChatMessage role="user" content="梅酱，今天一起学习吧。">

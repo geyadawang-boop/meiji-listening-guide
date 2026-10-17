@@ -1,12 +1,55 @@
 import {useEffect, useState} from 'react'
-type Scope = {connection_id: string; revision: string; platform: string; account: string; login_epoch: string; peer: string}
-type Policy = {identity: string; mode: 'draft' | 'auto_reply'; interval_seconds: number; reply_limit_hour: number; profile_id: string; knowledge_ids: string[]; [key: string]: unknown}
+type Scope = {
+ connection_id: string
+ revision: string
+ platform: string
+ account: string
+ login_epoch: string
+ peer: string
+}
+type Policy = {
+ identity: string
+ mode: 'draft' | 'auto_reply'
+ interval_seconds: number
+ reply_limit_hour: number
+ profile_id: string
+ knowledge_ids: string[]
+ [key: string]: unknown
+}
 type Rules = {conversation: {revision: string; value: Partial<Policy>}; effective: Policy}
 type Run = {peer: string; state: string}
-type Job = {id: string; state: string; revision: number; output?: {text: string}; error?: string; allowed_actions: string[]}
-const request = <T,>(action: string, value: unknown = {}) => window.assistant.invoke<T>('tools:request', {action: 'im', args: {action, value}})
-const labels: Record<string, string> = {pending: '等待生成', running: '正在处理', draft: '草稿待核对', ready: '等待发送', sending: '正在发送', unknown: '结果未知，需要核对', failed: '处理失败', blocked: '条件改变，已暂停', reconcile: '等待核对回执', completed: '已确认发送', waiting_external: '等待外部处理'}
-export function ImAutomation({scope, visible, onDraft}: {scope: Scope; visible: boolean; onDraft: (text: string) => void}) {
+type Job = {
+ id: string
+ state: string
+ revision: number
+ output?: {text: string}
+ error?: string
+ allowed_actions: string[]
+}
+const request = <T,>(action: string, value: unknown = {}) =>
+ window.assistant.invoke<T>('tools:request', {action: 'im', args: {action, value}})
+const labels: Record<string, string> = {
+ pending: '等待生成',
+ running: '正在处理',
+ draft: '草稿待核对',
+ ready: '等待发送',
+ sending: '正在发送',
+ unknown: '结果未知，需要核对',
+ failed: '处理失败',
+ blocked: '条件改变，已暂停',
+ reconcile: '等待核对回执',
+ completed: '已确认发送',
+ waiting_external: '等待外部处理'
+}
+export function ImAutomation({
+ scope,
+ visible,
+ onDraft
+}: {
+ scope: Scope
+ visible: boolean
+ onDraft: (text: string) => void
+}) {
  const [rules, setRules] = useState<Rules>(),
   [identity, setIdentity] = useState(''),
   [mode, setMode] = useState<'draft' | 'auto_reply'>('draft'),
@@ -21,14 +64,26 @@ export function ImAutomation({scope, visible, onDraft}: {scope: Scope; visible: 
   [busy, setBusy] = useState(false),
   [error, setError] = useState(''),
   [notice, setNotice] = useState(''),
-  [cleanup, setCleanup] = useState<{preview_id: string; count: number; images: number; bytes: number; reason?: string}>()
+  [cleanup, setCleanup] = useState<{
+   preview_id: string
+   count: number
+   images: number
+   bytes: number
+   reason?: string
+  }>()
  const active = runs.some(r => r.peer === scope.peer && r.state === 'running'),
   supported = ['qq_napcat', 'weixin_local'].includes(scope.platform)
  async function status() {
   setRuns((await request<{runs: Run[]}>('runs', {...scope, action: 'status'})).runs)
  }
  async function list(start = 0) {
-  const value = await request<{jobs: Job[]; next_offset: number | null}>('reply-jobs', {...scope, action: 'list', limit: 25, offset: start, status: 'all'})
+  const value = await request<{jobs: Job[]; next_offset: number | null}>('reply-jobs', {
+   ...scope,
+   action: 'list',
+   limit: 25,
+   offset: start,
+   status: 'all'
+  })
   setJobs(start ? old => [...old, ...value.jobs] : value.jobs)
   setOffset(value.next_offset)
  }
@@ -40,7 +95,9 @@ export function ImAutomation({scope, visible, onDraft}: {scope: Scope; visible: 
   setInterval(next.effective.interval_seconds)
   setLimit(next.effective.reply_limit_hour)
   setChosen(next.effective.knowledge_ids)
-  setLibraries((await request<{libraries: {library_id: string; label: string; available: boolean}[]}>('libraries')).libraries)
+  setLibraries(
+   (await request<{libraries: {library_id: string; label: string; available: boolean}[]}>('libraries')).libraries
+  )
   if (supported) await status()
   await list()
  }
@@ -76,7 +133,8 @@ export function ImAutomation({scope, visible, onDraft}: {scope: Scope; visible: 
   <section className="knowledge-card" aria-label="会话助手设置">
    <h3>会话助手设置</h3>
    <p className="hint">
-    仅对账号 {scope.account} 的会话 {scope.peer} 生效。默认不运行；首次取得的历史消息建立基线，新消息才登记回复待办。关闭软件会暂停，重启后需要再次手动开启。
+    仅对账号 {scope.account} 的会话 {scope.peer}{' '}
+    生效。默认不运行；首次取得的历史消息建立基线，新消息才登记回复待办。关闭软件会暂停，重启后需要再次手动开启。
    </p>
    <label>
     会话角色与回复方式
@@ -148,14 +206,31 @@ export function ImAutomation({scope, visible, onDraft}: {scope: Scope; visible: 
      允许本会话查询 {library.label}
     </label>
    ))}
-   <p className="hint">使用梅酱当前模型连接。改变模型连接或会话规则会阻止旧任务继续发送；学习记忆不会自动共享到聊天账号。</p>
+   <p className="hint">
+    使用梅酱当前模型连接。改变模型连接或会话规则会阻止旧任务继续发送；学习记忆不会自动共享到聊天账号。
+   </p>
    <div className="row">
     <button
      disabled={busy || !rules || interval < 5 || interval > 3600 || limit < 1 || limit > 120}
      onClick={() =>
       void run(async () => {
        const model = await request<{profile_id: string}>('model')
-       await request('rules', {...scope, level: 'conversation', expected_revision: rules!.conversation.revision, value: {...rules!.conversation.value, identity, mode, interval_seconds: interval, reply_limit_hour: limit, profile_id: model.profile_id, knowledge_ids: chosen, images: false, agent_enabled: false}})
+       await request('rules', {
+        ...scope,
+        level: 'conversation',
+        expected_revision: rules!.conversation.revision,
+        value: {
+         ...rules!.conversation.value,
+         identity,
+         mode,
+         interval_seconds: interval,
+         reply_limit_hour: limit,
+         profile_id: model.profile_id,
+         knowledge_ids: chosen,
+         images: false,
+         agent_enabled: false
+        }
+       })
        setConfirmed(false)
        await refresh()
        setNotice('会话规则已保存；后台运行需单独开启')
@@ -179,7 +254,15 @@ export function ImAutomation({scope, visible, onDraft}: {scope: Scope; visible: 
       <button
        className="primary"
        disabled={
-        busy || !confirmed || active || !rules?.effective.profile_id || identity !== rules.effective.identity || mode !== rules.effective.mode || interval !== rules.effective.interval_seconds || limit !== rules.effective.reply_limit_hour || JSON.stringify(chosen) !== JSON.stringify(rules.effective.knowledge_ids)
+        busy ||
+        !confirmed ||
+        active ||
+        !rules?.effective.profile_id ||
+        identity !== rules.effective.identity ||
+        mode !== rules.effective.mode ||
+        interval !== rules.effective.interval_seconds ||
+        limit !== rules.effective.reply_limit_hour ||
+        JSON.stringify(chosen) !== JSON.stringify(rules.effective.knowledge_ids)
        }
        onClick={() =>
         void run(async () => {
@@ -246,7 +329,12 @@ export function ImAutomation({scope, visible, onDraft}: {scope: Scope; visible: 
          disabled={busy || !active}
          onClick={() =>
           void run(async () => {
-           await request('reply-jobs', {...scope, action: 'retry_generation', job_id: job.id, expected_revision: job.revision})
+           await request('reply-jobs', {
+            ...scope,
+            action: 'retry_generation',
+            job_id: job.id,
+            expected_revision: job.revision
+           })
            await list()
           })
          }
@@ -265,7 +353,9 @@ export function ImAutomation({scope, visible, onDraft}: {scope: Scope; visible: 
    )}
    <details>
     <summary>清理本会话的本地消息记录</summary>
-    <p className="hint">只清理本软件保存的当前会话记录；不会删除 QQ / 微信原始聊天、教材或课程资料。未完成回复待办需要的证据保留。</p>
+    <p className="hint">
+     只清理本软件保存的当前会话记录；不会删除 QQ / 微信原始聊天、教材或课程资料。未完成回复待办需要的证据保留。
+    </p>
     <button disabled={busy} onClick={() => void run(async () => setCleanup(await request('cleanup', scope)))}>
      预览可清理记录
     </button>

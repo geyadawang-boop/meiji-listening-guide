@@ -11,13 +11,33 @@ type Video = {id: number; bvid: string; title: string; duration: number; availab
 type User = {loggedIn: boolean; name?: string; mid?: number}
 export function ResourceIcon() {
  return (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+  <svg
+   viewBox="0 0 24 24"
+   fill="none"
+   stroke="currentColor"
+   strokeWidth="1.7"
+   strokeLinecap="round"
+   strokeLinejoin="round"
+   aria-hidden="true"
+  >
    <path d="M5 4h14v17l-7-4-7 4z" />
    <path d="m10 8 4 2-4 2z" />
   </svg>
  )
 }
-export function BiliResources({visible, close, useVideo, courseId, courseName}: {visible: boolean; close: () => void; useVideo: (url: string, kind: 'videoPpt' | 'videoSubtitles') => void; courseId: string; courseName?: string}) {
+export function BiliResources({
+ visible,
+ close,
+ useVideo,
+ courseId,
+ courseName
+}: {
+ visible: boolean
+ close: () => void
+ useVideo: (url: string, kind: 'videoPpt' | 'videoSubtitles') => void
+ courseId: string
+ courseName?: string
+}) {
  const [user, setUser] = useState<User>({loggedIn: false}),
   [folders, setFolders] = useState<Folder[]>([]),
   [folder, setFolder] = useState<Folder | null>(null)
@@ -117,14 +137,22 @@ export function BiliResources({visible, close, useVideo, courseId, courseName}: 
   }
  }, [visible, qr, login, pollTick])
  async function load(selected: Folder, nextPage: number) {
-  const result = await invoke<{videos: Video[]; hasMore: boolean; page: number}>('bili-resources:videos', {id: selected.id, page: nextPage})
+  const result = await invoke<{videos: Video[]; hasMore: boolean; page: number}>('bili-resources:videos', {
+   id: selected.id,
+   page: nextPage
+  })
   setFolder(selected)
   setVideos(result.videos)
   setPage(result.page)
   setHasMore(result.hasMore)
  }
  return (
-  <section className="learning-window ppt-extract-page" aria-label="视频资源" hidden={!visible} style={!visible ? {display: 'none'} : undefined}>
+  <section
+   className="learning-window ppt-extract-page"
+   aria-label="视频资源"
+   hidden={!visible}
+   style={!visible ? {display: 'none'} : undefined}
+  >
    <aside className="learning-menu">
     <h2>视频资源</h2>
     <p>
@@ -137,7 +165,13 @@ export function BiliResources({visible, close, useVideo, courseId, courseName}: 
      <span>刷新收藏夹</span>
     </button>
     {folders.map(item => (
-     <button key={item.id} title={item.title} className={folder?.id === item.id ? 'active' : ''} disabled={busy} onClick={() => void run(() => load(item, 1))}>
+     <button
+      key={item.id}
+      title={item.title}
+      className={folder?.id === item.id ? 'active' : ''}
+      disabled={busy}
+      onClick={() => void run(() => load(item, 1))}
+     >
       <span>
        {item.title} · {item.media_count}
       </span>
@@ -153,7 +187,9 @@ export function BiliResources({visible, close, useVideo, courseId, courseName}: 
       <h2>视频资源</h2>
       <p>扫码登录 B 站，读取自己的收藏夹。</p>
      </div>
-     <span className="learning-course">{user.loggedIn ? user.name || '已登录' : checked ? '未登录' : '未检查账号'}</span>
+     <span className="learning-course">
+      {user.loggedIn ? user.name || '已登录' : checked ? '未登录' : '未检查账号'}
+     </span>
     </header>
     <BiliBrowse useVideo={useVideo} />
     <MediaDownloads visible={visible} />
@@ -197,11 +233,21 @@ export function BiliResources({visible, close, useVideo, courseId, courseName}: 
        )}
       </div>
      </header>
-     <p className="hint">登录保存在本应用的独立 B 站会话中，不读取 Chrome 或 BiliSum 的账号；只读取收藏列表，不修改 B 站收藏。</p>
+     <p className="hint">
+      登录保存在本应用的独立 B 站会话中，不读取 Chrome 或 BiliSum 的账号；只读取收藏列表，不修改 B 站收藏。
+     </p>
      {qr && (
       <div className="resource-qr">
        <img src={qr} alt="B 站官方登录二维码" />
-       <p>{login === 'scanning' ? '已扫码，请在手机上确认' : login === 'expired' ? '二维码已过期，请重新生成' : login === 'failed' ? '检查失败，请重试' : '请使用 B 站手机应用扫码'}</p>
+       <p>
+        {login === 'scanning'
+         ? '已扫码，请在手机上确认'
+         : login === 'expired'
+           ? '二维码已过期，请重新生成'
+           : login === 'failed'
+             ? '检查失败，请重试'
+             : '请使用 B 站手机应用扫码'}
+       </p>
       </div>
      )}
     </section>
@@ -221,7 +267,12 @@ export function BiliResources({visible, close, useVideo, courseId, courseName}: 
      <section>
       <div className="row">
        <h3>{folder.title}</h3>
-       <input aria-label="搜索当前页收藏视频" placeholder="搜索当前页视频" value={filter} onChange={event => setFilter(event.target.value)} />
+       <input
+        aria-label="搜索当前页收藏视频"
+        placeholder="搜索当前页视频"
+        value={filter}
+        onChange={event => setFilter(event.target.value)}
+       />
       </div>
       {videos
        .filter(video => video.title.includes(filter))
@@ -242,7 +293,11 @@ export function BiliResources({visible, close, useVideo, courseId, courseName}: 
           <button disabled={busy || !video.available} onClick={() => useVideo(video.url, 'videoSubtitles')}>
            同步知识库
           </button>
-          <button className="primary" disabled={busy || !video.available || basket.some(item => item.url === video.url)} onClick={() => void run(() => choose(video))}>
+          <button
+           className="primary"
+           disabled={busy || !video.available || basket.some(item => item.url === video.url)}
+           onClick={() => void run(() => choose(video))}
+          >
            {basket.some(item => item.url === video.url) ? '已加入选择' : '选择分集'}
           </button>
          </div>
@@ -281,10 +336,22 @@ export function BiliResources({visible, close, useVideo, courseId, courseName}: 
          {item.title} · 已选 {item.pages.length} / {item.series.episodes.length}
         </summary>
         <div className="row">
-         <button disabled={busy} onClick={() => setBasket(current => current.map(row => (row.url === item.url ? {...row, pages: row.series.episodes.map(part => part.page)} : row)))}>
+         <button
+          disabled={busy}
+          onClick={() =>
+           setBasket(current =>
+            current.map(row =>
+             row.url === item.url ? {...row, pages: row.series.episodes.map(part => part.page)} : row
+            )
+           )
+          }
+         >
           选择本视频全部分集
          </button>
-         <button disabled={busy} onClick={() => setBasket(current => current.map(row => (row.url === item.url ? {...row, pages: []} : row)))}>
+         <button
+          disabled={busy}
+          onClick={() => setBasket(current => current.map(row => (row.url === item.url ? {...row, pages: []} : row)))}
+         >
           清空本视频选择
          </button>
          <button disabled={busy} onClick={() => setBasket(current => current.filter(row => row.url !== item.url))}>
@@ -299,7 +366,20 @@ export function BiliResources({visible, close, useVideo, courseId, courseName}: 
             disabled={busy}
             aria-label={`同步 ${item.title} P${part.page} ${part.title}`}
             checked={item.pages.includes(part.page)}
-            onChange={event => setBasket(current => current.map(row => (row.url === item.url ? {...row, pages: event.target.checked ? [...row.pages, part.page] : row.pages.filter(page => page !== part.page)} : row)))}
+            onChange={event =>
+             setBasket(current =>
+              current.map(row =>
+               row.url === item.url
+                ? {
+                   ...row,
+                   pages: event.target.checked
+                    ? [...row.pages, part.page]
+                    : row.pages.filter(page => page !== part.page)
+                  }
+                : row
+              )
+             )
+            }
            />
            <span>
             P{part.page} · {part.title}
@@ -312,16 +392,31 @@ export function BiliResources({visible, close, useVideo, courseId, courseName}: 
       <div className="row">
        <label>
         知识库分类
-        <input aria-label="批量字幕知识库分类" maxLength={100} value={category} placeholder={courseName || '未分类'} disabled={busy} onChange={event => setCategory(event.target.value)} />
+        <input
+         aria-label="批量字幕知识库分类"
+         maxLength={100}
+         value={category}
+         placeholder={courseName || '未分类'}
+         disabled={busy}
+         onChange={event => setCategory(event.target.value)}
+        />
        </label>
        <button
         className="primary"
         disabled={busy || !selectedCount}
         onClick={() =>
          void run(async () => {
-          const task = await invoke<SubtitleSyncTask>('subtitle-sync:mixed', {selections: basket.filter(item => item.pages.length).map(item => ({url: item.url, title: item.title, pages: item.pages})), category: category.trim() || courseName || '', courseId: courseId || undefined})
+          const task = await invoke<SubtitleSyncTask>('subtitle-sync:mixed', {
+           selections: basket
+            .filter(item => item.pages.length)
+            .map(item => ({url: item.url, title: item.title, pages: item.pages})),
+           category: category.trim() || courseName || '',
+           courseId: courseId || undefined
+          })
           setTasks(current => [task, ...current.filter(item => item.id !== task.id)])
-          setProgress(`批量同步结束：完成 ${task.items.filter(item => item.status === '已完成').length}，失败 ${task.items.filter(item => item.status === '失败').length}`)
+          setProgress(
+           `批量同步结束：完成 ${task.items.filter(item => item.status === '已完成').length}，失败 ${task.items.filter(item => item.status === '失败').length}`
+          )
          })
         }
        >
@@ -330,7 +425,14 @@ export function BiliResources({visible, close, useVideo, courseId, courseName}: 
       </div>
      </section>
     )}
-    <SubtitleBatchRecords visible={visible} tasks={tasks} busy={busy} run={run} refresh={loadTasks} courseName={courseName} />
+    <SubtitleBatchRecords
+     visible={visible}
+     tasks={tasks}
+     busy={busy}
+     run={run}
+     refresh={loadTasks}
+     courseName={courseName}
+    />
    </main>
   </section>
  )

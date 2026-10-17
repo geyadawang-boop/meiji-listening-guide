@@ -7,7 +7,9 @@ export class AppearanceStore {
   this.path = join(root, 'appearance.json')
  }
  get(): AppearanceState {
-  return existsSync(this.path) ? appearanceStateSchema.parse(JSON.parse(readFileSync(this.path, 'utf8'))) : {global: {...defaultAppearance}, courses: {}}
+  return existsSync(this.path)
+   ? appearanceStateSchema.parse(JSON.parse(readFileSync(this.path, 'utf8')))
+   : {global: {...defaultAppearance}, courses: {}}
  }
  save(value: unknown, courseId?: string) {
   const parsed = appearanceSchema.parse(value),

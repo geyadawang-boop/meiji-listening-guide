@@ -27,7 +27,21 @@ export function weixinBootstrap(html: string) {
      if (name === inert && inert === 'template') depth++
      return
     }
-    if (['template', 'noscript', 'textarea', 'style', 'xmp', 'iframe', 'noembed', 'noframes', 'plaintext', 'svg', 'math'].includes(name)) {
+    if (
+     [
+      'template',
+      'noscript',
+      'textarea',
+      'style',
+      'xmp',
+      'iframe',
+      'noembed',
+      'noframes',
+      'plaintext',
+      'svg',
+      'math'
+     ].includes(name)
+    ) {
      inert = name
      depth = 1
      return
@@ -41,7 +55,15 @@ export function weixinBootstrap(html: string) {
      if (attrs.src) {
       try {
        const url = new URL(attrs.src.startsWith('//') ? 'https:' + attrs.src : attrs.src)
-       if (url.protocol === 'https:' && url.hostname === 'res.wx.qq.com' && !url.port && !url.username && !url.password && /^\/t\/wx_fed\/webwx\/res\/static\/js\/index_[a-f0-9]+\.js$/.test(url.pathname)) asset = true
+       if (
+        url.protocol === 'https:' &&
+        url.hostname === 'res.wx.qq.com' &&
+        !url.port &&
+        !url.username &&
+        !url.password &&
+        /^\/t\/wx_fed\/webwx\/res\/static\/js\/index_[a-f0-9]+\.js$/.test(url.pathname)
+       )
+        asset = true
       } catch {}
      } else if (!attrs.type || ['text/javascript', 'application/javascript'].includes(attrs.type)) script = ''
     }
@@ -82,9 +104,14 @@ export function weixinBootstrap(html: string) {
   {decodeEntities: true}
  )
  parser.end(html)
- if (limited || title.trim() !== '微信网页版' || !app || !login || !asset || rets.some(value => value !== '0')) return false
+ if (limited || title.trim() !== '微信网页版' || !app || !login || !asset || rets.some(value => value !== '0'))
+  return false
  const markers = scripts.flatMap(value => {
-  const tokens = (value.match(/\s+|\/\/[^\n]*(?:\n|$)|\/\*[\s\S]*?\*\/|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[A-Za-z_$][\w$]*|[0-9]+|[^\s]/g) || []).filter(token => token.trim() && !token.startsWith('//') && !token.startsWith('/*'))
+  const tokens = (
+   value.match(
+    /\s+|\/\/[^\n]*(?:\n|$)|\/\*[\s\S]*?\*\/|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[A-Za-z_$][\w$]*|[0-9]+|[^\s]/g
+   ) || []
+  ).filter(token => token.trim() && !token.startsWith('//') && !token.startsWith('/*'))
   if (!tokens.some(token => ['MMCgi', '"MMCgi"', "'MMCgi'"].includes(token))) return []
   const prefix = ['(', 'function', '(', ')', '{', 'window', '.', 'MMCgi', '=', '{', 'isLogin', ':']
   if (JSON.stringify(tokens.slice(0, prefix.length)) !== JSON.stringify(prefix)) return [false]
@@ -100,7 +127,12 @@ export function weixinBootstrap(html: string) {
   if (rest[0] !== '}' || rest[1] !== ';') return [false]
   rest = rest.slice(2)
   const dev = ['window', '.', 'MMDEV', '=', 'location', '.', 'host', '.', 'indexOf', '(']
-  if (JSON.stringify(rest.slice(0, 10)) === JSON.stringify(dev) && ['"dev"', "'dev'"].includes(rest[10]) && JSON.stringify(rest.slice(11, 16)) === JSON.stringify([')', '>', '-', '1', ';'])) rest = rest.slice(16)
+  if (
+   JSON.stringify(rest.slice(0, 10)) === JSON.stringify(dev) &&
+   ['"dev"', "'dev'"].includes(rest[10]) &&
+   JSON.stringify(rest.slice(11, 16)) === JSON.stringify([')', '>', '-', '1', ';'])
+  )
+   rest = rest.slice(16)
   return [authenticated && ['} ) ( )', '} ) ( ) ;'].includes(rest.join(' '))]
  })
  return markers.length === 1 && markers[0] === true

@@ -3,7 +3,8 @@ import {lstat, realpath} from 'node:fs/promises'
 import {join, resolve} from 'node:path'
 import {z} from 'zod'
 const [resources, name] = process.argv.slice(2)
-if (!process.send || !resources || !['ffmpeg.exe', 'ffprobe.exe'].includes(name)) throw new Error('媒体守护进程启动参数无效')
+if (!process.send || !resources || !['ffmpeg.exe', 'ffprobe.exe'].includes(name))
+ throw new Error('媒体守护进程启动参数无效')
 let child: ChildProcessWithoutNullStreams | undefined,
  stopped = false,
  started = false
@@ -18,7 +19,12 @@ function stop() {
 process.on('disconnect', stop)
 process.on('message', raw => {
  void (async () => {
-  const value = z.discriminatedUnion('kind', [z.object({kind: z.literal('start'), args: z.array(z.string().max(32768)).max(500)}), z.object({kind: z.literal('cancel')})]).parse(raw)
+  const value = z
+   .discriminatedUnion('kind', [
+    z.object({kind: z.literal('start'), args: z.array(z.string().max(32768)).max(500)}),
+    z.object({kind: z.literal('cancel')})
+   ])
+   .parse(raw)
   if (value.kind === 'cancel') {
    stop()
    return
@@ -27,7 +33,8 @@ process.on('message', raw => {
   started = true
   const path = resolve(resources, 'video', name),
    item = await lstat(path)
-  if (!item.isFile() || item.isSymbolicLink() || resolve(await realpath(path)).toLowerCase() !== path.toLowerCase()) throw new Error('媒体执行文件路径无效')
+  if (!item.isFile() || item.isSymbolicLink() || resolve(await realpath(path)).toLowerCase() !== path.toLowerCase())
+   throw new Error('媒体执行文件路径无效')
   if (stopped) return
   child = spawn(join(resources, 'video', name), value.args, {windowsHide: true, stdio: 'pipe'})
   child.once('spawn', () => {

@@ -6,7 +6,16 @@ import {z} from 'zod'
 import {windowsProtect} from './windows-native'
 import type {NativeMediaOptions} from './media-options'
 const key = z.string().regex(/^[a-f0-9]{32}$/)
-const profile = z.object({id: key, name: z.string().min(1).max(80), site: z.string().max(253), cookies: z.string().max(1_048_576), count: z.number().int().positive().max(2000), updated_at: z.number().int().nonnegative()}).strict()
+const profile = z
+ .object({
+  id: key,
+  name: z.string().min(1).max(80),
+  site: z.string().max(253),
+  cookies: z.string().max(1_048_576),
+  count: z.number().int().positive().max(2000),
+  updated_at: z.number().int().nonnegative()
+ })
+ .strict()
 type Profile = z.infer<typeof profile>
 type Fetcher = (url: string, init?: RequestInit) => Promise<Response>
 export function mediaCookieScope(value: string) {
@@ -14,7 +23,11 @@ export function mediaCookieScope(value: string) {
   .trim()
   .toLowerCase()
   .replace(/^\.+|\.+$/g, '')
- if (!/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(site) || ['co.uk', 'com.cn', 'com.au'].includes(site)) throw new Error('请填写具体站点域名，不含协议、端口或路径')
+ if (
+  !/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(site) ||
+  ['co.uk', 'com.cn', 'com.au'].includes(site)
+ )
+  throw new Error('请填写具体站点域名，不含协议、端口或路径')
  return site
 }
 const belongs = (host: string, site: string) => host === site || host.endsWith('.' + site)
@@ -33,16 +46,46 @@ export function parseMediaCookies(text: string, scope: string) {
   const [rawDomain, subs, path, secure, expires, name, value] = cells,
    domain = rawDomain.replace(/^\./, '').toLowerCase()
   if (!belongs(domain, site)) continue
-  if (!['TRUE', 'FALSE'].includes(subs) || !['TRUE', 'FALSE'].includes(secure) || !/^\d{1,13}$/.test(expires) || !path.startsWith('/') || /[\x00-\x20\x7f;,=]/.test(name) || !name || name.length > 256 || value.length > 16384 || /[\x00-\x1f\x7f;]/.test(value) || /[\x00-\x20\x7f;]/.test(path))
+  if (
+   !['TRUE', 'FALSE'].includes(subs) ||
+   !['TRUE', 'FALSE'].includes(secure) ||
+   !/^\d{1,13}$/.test(expires) ||
+   !path.startsWith('/') ||
+   /[\x00-\x20\x7f;,=]/.test(name) ||
+   !name ||
+   name.length > 256 ||
+   value.length > 16384 ||
+   /[\x00-\x1f\x7f;]/.test(value) ||
+   /[\x00-\x20\x7f;]/.test(path)
+  )
    throw new Error('Cookie 字段格式无效')
   const seconds = Number(expires)
   if (seconds && seconds <= Date.now() / 1000) continue
   const id = domain + '\n' + path + '\n' + name
   if (seen.has(id)) continue
   seen.add(id)
-  const cookie = new Cookie({key: name, value, domain, path, secure: secure === 'TRUE', httpOnly, hostOnly: subs === 'FALSE', expires: seconds ? new Date(seconds * 1000) : 'Infinity'})
+  const cookie = new Cookie({
+   key: name,
+   value,
+   domain,
+   path,
+   secure: secure === 'TRUE',
+   httpOnly,
+   hostOnly: subs === 'FALSE',
+   expires: seconds ? new Date(seconds * 1000) : 'Infinity'
+  })
   jar.setCookieSync(cookie, 'https://' + domain + path, {ignoreError: false})
-  rows.push([httpOnly ? '#HttpOnly_' + rawDomain.toLowerCase() : rawDomain.toLowerCase(), subs, path, secure, expires, name, value].join('\t'))
+  rows.push(
+   [
+    httpOnly ? '#HttpOnly_' + rawDomain.toLowerCase() : rawDomain.toLowerCase(),
+    subs,
+    path,
+    secure,
+    expires,
+    name,
+    value
+   ].join('\t')
+  )
  }
  if (!rows.length || rows.length > 2000) throw new Error('没有匹配该域名且未过期的 Cookie')
  return {jar, count: rows.length, text: '# Netscape HTTP Cookie File\n' + rows.join('\n') + '\n'}
@@ -54,7 +97,8 @@ export class NativeMediaAuth {
  private async path() {
   const folder = resolve(this.root, 'download-auth')
   await mkdir(folder, {recursive: true})
-  if ((await lstat(folder)).isSymbolicLink() || resolve(await realpath(folder)).toLowerCase() !== folder.toLowerCase()) throw new Error('登录档案目录无效')
+  if ((await lstat(folder)).isSymbolicLink() || resolve(await realpath(folder)).toLowerCase() !== folder.toLowerCase())
+   throw new Error('登录档案目录无效')
   return join(folder, 'profiles.dpapi')
  }
  private async read() {
@@ -109,7 +153,14 @@ export class NativeMediaAuth {
    if (request.id && !rows[request.id]) throw new Error('所选登录档案不存在')
    if (!request.id && Object.keys(rows).length >= 50) throw new Error('最多保存 50 个站点档案')
    const id = request.id || randomUUID().replaceAll('-', ''),
-    row = {id, name: request.name, site, cookies: parsed.text, count: parsed.count, updated_at: Math.floor(Date.now() / 1000)}
+    row = {
+     id,
+     name: request.name,
+     site,
+     cookies: parsed.text,
+     count: parsed.count,
+     updated_at: Math.floor(Date.now() / 1000)
+    }
    rows[id] = row
    return this.public(row)
   })
@@ -133,7 +184,13 @@ export class NativeMediaAuth {
     headers = new Headers(init.headers)
    headers.delete('cookie')
    headers.delete('authorization')
-   if (target.protocol === 'https:' && !target.username && !target.password && !target.port && belongs(target.hostname, selected.site)) {
+   if (
+    target.protocol === 'https:' &&
+    !target.username &&
+    !target.password &&
+    !target.port &&
+    belongs(target.hostname, selected.site)
+   ) {
     const cookies = jar.getCookieStringSync(target.href)
     if (cookies) headers.set('cookie', cookies)
    }

@@ -32,12 +32,22 @@ export async function codexCourseware(path: string): Promise<CoursewarePage[]> {
   if (rel) {
    const rels = await rel.async('string')
    for (const embed of new Set(Array.from(xml.matchAll(/r:embed="([^"]+)"/g), m => m[1]))) {
-    const tag = Array.from(rels.matchAll(/<Relationship\b[^>]*\/?>/g), m => m[0]).find(t => new RegExp(`\\bId="${embed}"`).test(t)),
+    const tag = Array.from(rels.matchAll(/<Relationship\b[^>]*\/?>/g), m => m[0]).find(t =>
+      new RegExp(`\\bId="${embed}"`).test(t)
+     ),
      target = tag && /\bTarget="([^"]+)"/.exec(tag)?.[1]
     if (!target || /\bTargetMode="External"/.test(tag!)) continue
     const image = zip.file(posix.normalize(posix.join(posix.dirname(name), target))),
      ext = extname(target).toLowerCase(),
-     mime = ({'.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif'} as Record<string, string>)[ext]
+     mime = (
+      {
+       '.png': 'image/png',
+       '.jpg': 'image/jpeg',
+       '.jpeg': 'image/jpeg',
+       '.webp': 'image/webp',
+       '.gif': 'image/gif'
+      } as Record<string, string>
+     )[ext]
     if (image && mime) images.push(`data:${mime};base64,${await image.async('base64')}`)
    }
   }

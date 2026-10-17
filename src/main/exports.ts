@@ -15,7 +15,17 @@ export function markdown(detail: LectureDetail, kind: 'notes' | 'practice'): str
   ] as const
   for (const [title, points] of groups) {
    out.push(`## ${title}`, '')
-   for (const p of points) out.push(`### ${'level' in p ? `[${p.level}] ` : ''}${p.topic}`, `${p.timestamp} · ${p.verified ? '原话已核验' : '⚠ 疑似编造或时间不符'}`, '', `> ${p.quote}`, '', 'detail' in p ? p.detail : '', 'pptRef' in p && p.pptRef ? `课件：${p.pptRef}` : '', '')
+   for (const p of points)
+    out.push(
+     `### ${'level' in p ? `[${p.level}] ` : ''}${p.topic}`,
+     `${p.timestamp} · ${p.verified ? '原话已核验' : '⚠ 疑似编造或时间不符'}`,
+     '',
+     `> ${p.quote}`,
+     '',
+     'detail' in p ? p.detail : '',
+     'pptRef' in p && p.pptRef ? `课件：${p.pptRef}` : '',
+     ''
+    )
   }
  } else {
   if (!detail.practice) throw new Error('还没有练习题')
@@ -37,7 +47,9 @@ export function markdown(detail: LectureDetail, kind: 'notes' | 'practice'): str
      q.answer ? `${q.aiAnswer ? 'AI 生成，仅供参考' : '参考答案'}：\n${q.answer}` : '暂无答案',
      q.answerSourceUrl ? `答案来源：${q.answerSourceUrl}` : '',
      q.explanation ? `详解（AI 辅助整理）：\n${q.explanation}` : '',
-     q.attempt ? `我的回答：${q.attempt.response}\n判定：${q.attempt.verdict === 'correct' ? '正确' : q.attempt.verdict === 'incorrect' ? '需要再练习' : '待自查'}\n${q.attempt.feedback}` : '',
+     q.attempt
+      ? `我的回答：${q.attempt.response}\n判定：${q.attempt.verdict === 'correct' ? '正确' : q.attempt.verdict === 'incorrect' ? '需要再练习' : '待自查'}\n${q.attempt.feedback}`
+      : '',
      ''
     )
    )
@@ -46,7 +58,12 @@ export function markdown(detail: LectureDetail, kind: 'notes' | 'practice'): str
  }
  return out.join('\n')
 }
-export async function exportFile(detail: LectureDetail, kind: 'subtitles' | 'notes' | 'practice', format: string, directory: string) {
+export async function exportFile(
+ detail: LectureDetail,
+ kind: 'subtitles' | 'notes' | 'practice',
+ format: string,
+ directory: string
+) {
  const allowed = kind === 'subtitles' ? ['srt', 'txt'] : kind === 'notes' ? ['md', 'docx'] : ['md', 'docx', 'pdf']
  if (!allowed.includes(format)) throw new Error('不支持的导出格式')
  const filename = detail.lecture.title.replace(/[<>:"/\\|?*]/g, '_')
@@ -55,16 +72,44 @@ export async function exportFile(detail: LectureDetail, kind: 'subtitles' | 'not
  const path = await reserveFile(directory, `${filename}-${kind}.${format}`)
  try {
   if (kind === 'subtitles') {
-   await writeFile(path, format === 'srt' ? detail.srt : detail.segments.map(s => `[${time(s.start, false)}] ${s.text}`).join('\n'), 'utf8')
+   await writeFile(
+    path,
+    format === 'srt' ? detail.srt : detail.segments.map(s => `[${time(s.start, false)}] ${s.text}`).join('\n'),
+    'utf8'
+   )
    return path
   }
   if (format === 'md') await writeFile(path, text, 'utf8')
   else if (format === 'docx') {
-   const doc = new Document({sections: [{properties: {}, children: text.split('\n').map(line => new Paragraph({children: [new TextRun({text: line.replace(/^#{1,3} /, ''), bold: line.startsWith('#'), size: line.startsWith('# ') ? 32 : 22})], spacing: {after: 120}}))}]})
+   const doc = new Document({
+    sections: [
+     {
+      properties: {},
+      children: text
+       .split('\n')
+       .map(
+        line =>
+         new Paragraph({
+          children: [
+           new TextRun({
+            text: line.replace(/^#{1,3} /, ''),
+            bold: line.startsWith('#'),
+            size: line.startsWith('# ') ? 32 : 22
+           })
+          ],
+          spacing: {after: 120}
+         })
+       )
+     }
+    ]
+   })
    await writeFile(path, await Packer.toBuffer(doc))
   } else {
    const escape = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-   const print = new BrowserWindow({show: false, webPreferences: {nodeIntegration: false, contextIsolation: true, sandbox: true}})
+   const print = new BrowserWindow({
+    show: false,
+    webPreferences: {nodeIntegration: false, contextIsolation: true, sandbox: true}
+   })
    try {
     await print.loadURL(
      'data:text/html;charset=utf-8,' +

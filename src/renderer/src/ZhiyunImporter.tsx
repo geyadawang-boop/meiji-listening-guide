@@ -1,7 +1,19 @@
 import {useEffect, useState} from 'react'
 import type {ZhiyunCourse, ZhiyunLesson} from '../../shared/types'
 const invoke = <T,>(action: string, args?: unknown) => window.assistant.invoke<T>(action, args)
-export function ZhiyunImporter({visible, close, login, localCourseId, imported}: {visible: boolean; close: () => void; login: () => void; localCourseId: string; imported: (lectureId: string, courseId: string) => Promise<void>}) {
+export function ZhiyunImporter({
+ visible,
+ close,
+ login,
+ localCourseId,
+ imported
+}: {
+ visible: boolean
+ close: () => void
+ login: () => void
+ localCourseId: string
+ imported: (lectureId: string, courseId: string) => Promise<void>
+}) {
  const [keyword, setKeyword] = useState(''),
   [courses, setCourses] = useState<ZhiyunCourse[]>([]),
   [course, setCourse] = useState<ZhiyunCourse | null>(null),
@@ -51,7 +63,12 @@ export function ZhiyunImporter({visible, close, login, localCourseId, imported}:
     url = new URL(keyword)
    } catch {}
    if (url && /(^|\.)cmc\.zju\.edu\.cn$/.test(url.hostname) && /^\d+$/.test(url.searchParams.get('course_id') || '')) {
-    const value = {id: url.searchParams.get('course_id')!, title: '智云课程 ' + url.searchParams.get('course_id'), teacher: '', term: ''}
+    const value = {
+     id: url.searchParams.get('course_id')!,
+     title: '智云课程 ' + url.searchParams.get('course_id'),
+     teacher: '',
+     term: ''
+    }
     setCourses([value])
     setHasMore(false)
     await select(value)
@@ -60,7 +77,9 @@ export function ZhiyunImporter({visible, close, login, localCourseId, imported}:
     return
    }
    const result = await invoke<{courses: ZhiyunCourse[]; hasMore: boolean}>('zhiyun:search', {keyword, page: next})
-   setCourses(next === 1 ? result.courses : rows => [...new Map([...rows, ...result.courses].map(c => [c.id, c])).values()])
+   setCourses(
+    next === 1 ? result.courses : rows => [...new Map([...rows, ...result.courses].map(c => [c.id, c])).values()]
+   )
    setPage(next)
    setHasMore(result.hasMore)
    if (!result.courses.length && next === 1) setProgress('没有找到课程，请换一个名称搜索')
@@ -70,7 +89,13 @@ export function ZhiyunImporter({visible, close, login, localCourseId, imported}:
   if (!course || !subId) return
   await run(async () => {
    setProgress(kind === 'transcript' ? '正在准备语音识别原文…' : '正在准备 PPT…')
-   const result = await invoke<{path: string; lectureId: string; courseId: string}>('zhiyun:export', {courseId: course.id, courseName: course.title, subId, kind, localCourseId: localCourseId || undefined})
+   const result = await invoke<{path: string; lectureId: string; courseId: string}>('zhiyun:export', {
+    courseId: course.id,
+    courseName: course.title,
+    subId,
+    kind,
+    localCourseId: localCourseId || undefined
+   })
    if (result) {
     setSaved(result.path)
     await imported(result.lectureId, result.courseId)
@@ -80,7 +105,12 @@ export function ZhiyunImporter({visible, close, login, localCourseId, imported}:
  }
  const lesson = lessons.find(row => row.id === subId)
  return (
-  <section className="zhiyun-dialog zhiyun-page" aria-label="智云课堂" hidden={!visible} style={!visible ? {display: 'none'} : undefined}>
+  <section
+   className="zhiyun-dialog zhiyun-page"
+   aria-label="智云课堂"
+   hidden={!visible}
+   style={!visible ? {display: 'none'} : undefined}
+  >
    <header>
     <div>
      <h2>智云课堂</h2>
@@ -101,7 +131,13 @@ export function ZhiyunImporter({visible, close, login, localCourseId, imported}:
      void search()
     }}
    >
-    <input aria-label="搜索智云课程" placeholder="搜索课程名称，或粘贴智云课程链接" value={keyword} disabled={busy} onChange={e => setKeyword(e.target.value)} />
+    <input
+     aria-label="搜索智云课程"
+     placeholder="搜索课程名称，或粘贴智云课程链接"
+     value={keyword}
+     disabled={busy}
+     onChange={e => setKeyword(e.target.value)}
+    />
     <button className="primary" disabled={busy || !keyword.trim()}>
      搜索
     </button>
@@ -115,7 +151,12 @@ export function ZhiyunImporter({visible, close, login, localCourseId, imported}:
     <div className="zhiyun-courses">
      <h3>课程</h3>
      {courses.map(c => (
-      <button key={c.id} className={course?.id === c.id ? 'selected' : ''} disabled={busy} onClick={() => void run(() => select(c))}>
+      <button
+       key={c.id}
+       className={course?.id === c.id ? 'selected' : ''}
+       disabled={busy}
+       onClick={() => void run(() => select(c))}
+      >
        <strong>{c.title}</strong>
        <small>{[c.teacher, c.term].filter(Boolean).join(' · ')}</small>
       </button>
@@ -131,7 +172,12 @@ export function ZhiyunImporter({visible, close, login, localCourseId, imported}:
      <h3>{course?.title || '课次'}</h3>
      <label>
       选择课次
-      <select aria-label="选择智云课次" value={subId} disabled={busy || !lessons.length} onChange={e => setSubId(e.target.value)}>
+      <select
+       aria-label="选择智云课次"
+       value={subId}
+       disabled={busy || !lessons.length}
+       onChange={e => setSubId(e.target.value)}
+      >
        <option value="">选择具体课次</option>
        {lessons.map(row => (
         <option key={row.id} value={row.id}>
