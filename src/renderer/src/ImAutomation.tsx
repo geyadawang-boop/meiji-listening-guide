@@ -44,10 +44,12 @@ const labels: Record<string, string> = {
 export function ImAutomation({
  scope,
  visible,
+ liveAvailable,
  onDraft
 }: {
  scope: Scope
  visible: boolean
+ liveAvailable: boolean
  onDraft: (text: string) => void
 }) {
  const [rules, setRules] = useState<Rules>(),
@@ -255,6 +257,7 @@ export function ImAutomation({
        className="primary"
        disabled={
         busy ||
+        !liveAvailable ||
         !confirmed ||
         active ||
         !rules?.effective.profile_id ||

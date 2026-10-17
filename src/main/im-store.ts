@@ -155,17 +155,22 @@ export class NativeImStore {
      }
     } else throw new Error('QQ 连接模式无效')
    } else if (Object.keys(fields).length || Object.keys(secrets).length) throw new Error('微信连接不预填第三方凭据')
-   const prior =
-    old && JSON.stringify(old.fields) === JSON.stringify(fields)
-     ? (await this.privateState(old.id, old.revision)).secrets
-     : {}
-   sealed = Object.keys({...prior, ...secrets}).length
-    ? await this.crypt(Buffer.from(JSON.stringify({...prior, ...secrets})))
-    : Buffer.alloc(0)
-   unchanged =
-    !!old &&
-    JSON.stringify(old.fields) === JSON.stringify(fields) &&
-    Object.entries(secrets).every(([key, value]) => prior[key] === value)
+   if (old && JSON.stringify(old.fields) === JSON.stringify(fields) && !Object.keys(secrets).length) {
+    // Renaming an existing connection does not need access to its encrypted session.
+    unchanged = true
+   } else {
+    const prior =
+     old && JSON.stringify(old.fields) === JSON.stringify(fields)
+      ? (await this.privateState(old.id, old.revision)).secrets
+      : {}
+    sealed = Object.keys({...prior, ...secrets}).length
+     ? await this.crypt(Buffer.from(JSON.stringify({...prior, ...secrets})))
+     : Buffer.alloc(0)
+    unchanged =
+     !!old &&
+     JSON.stringify(old.fields) === JSON.stringify(fields) &&
+     Object.entries(secrets).every(([key, value]) => prior[key] === value)
+   }
   }
   // All asynchronous work has completed. Revalidate ownership inside the synchronous transaction.
   return this.db
@@ -343,6 +348,16 @@ export class NativeImStore {
     return result
    })
    .immediate()
+ }
+ savedDirectory(input: unknown) {
+  const {scope} = this.checkScope(input)
+  this.requireRead(scope)
+  const peers = this.db
+   .prepare(
+    'SELECT peer,COUNT(*) AS count FROM messages WHERE platform=? AND account=? AND login_epoch=? GROUP BY peer ORDER BY MAX(ts) DESC,peer LIMIT 500'
+   )
+   .all(scope.platform, scope.account, scope.login_epoch) as {peer: string; count: number}[]
+  return {peers: peers.map(row => ({...row, name: row.peer})), coverage: '当前账号登录代际最近 500 个已保存会话'}
  }
  readMessages(input: unknown) {
   this.requireRead(input)

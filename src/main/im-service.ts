@@ -2,7 +2,7 @@ import encodeQR from 'qr'
 import {randomUUID} from 'node:crypto'
 import {join} from 'node:path'
 import {z} from 'zod'
-import {NativeImStore, imId, imScope} from './im-store'
+import {NativeImStore, imId, imScope, type NativeImConnection} from './im-store'
 import {NativeNapcatRuntime} from './im-napcat-runtime'
 import {NativeNapcatLogin, NativeQqSession, onebotConfig} from './im-qq'
 import {NativeILinkSession} from './im-ilink'
@@ -12,6 +12,22 @@ import {NativeImAutomation, type NativeImKnowledge} from './im-automation'
 import type {ResearchModel} from './research-engine'
 import {NativeImCleanup} from './im-cleanup'
 import type {MediaCrypt} from './media-encryption'
+function availability(row: Pick<NativeImConnection, 'platform' | 'fields'>) {
+ const native = row.platform === 'weixin_local' || (row.platform === 'qq_napcat' && row.fields.mode !== 'manual'),
+  available = !native || (process.platform === 'win32' && process.arch === 'x64')
+ return {
+  available,
+  reason: available
+   ? ''
+   : row.platform === 'weixin_local'
+     ? '本机微信读取暂仅支持 Windows x64；仍可查看已保存消息。'
+     : '内置 QQ 后台暂仅支持 Windows x64；手工连接已有 QQ 服务不受此限制。'
+ }
+}
+function requireAvailable(row: Pick<NativeImConnection, 'platform' | 'fields'>) {
+ const capability = availability(row)
+ if (!capability.available) throw new Error(capability.reason)
+}
 type Projection = {
  operation_id: string
  connection_id: string
@@ -109,20 +125,29 @@ export class NativeImService {
  async execute(action: string, input: unknown = {}, profile?: string) {
   if (this.controller.signal.aborted) throw new Error('通讯后台已关闭')
   if (profile !== undefined) this.configure(profile)
-  if (action === 'status')
+  if (action === 'status') {
+   const listing = this.store.listing()
    return {
-    ...this.store.listing(),
+    ...listing,
+    connections: listing.connections.map(row => ({...row, live: availability(row)})),
     platforms: {
-     qq_napcat: {label: '个人 QQ · 后台组件'},
-     weixin_local: {label: '个人微信 · 本机只读'},
-     weixin_web: {label: '微信 Web · 实验'},
-     weixin_ilink: {label: '微信 Bot · iLink'}
+     qq_napcat: {label: '个人 QQ · 内置后台', ...availability({platform: 'qq_napcat', fields: {mode: 'managed'}})},
+     weixin_local: {label: '个人微信 · 本机只读', ...availability({platform: 'weixin_local', fields: {}})},
+     weixin_web: {label: '微信 Web · 实验', available: true, reason: ''},
+     weixin_ilink: {label: '微信 Bot · iLink', available: true, reason: ''}
     },
     qq_component: this.runtime.status()
    }
+  }
+  if (action.startsWith('personal-')) requireAvailable({platform: 'weixin_local', fields: {}})
   if (action === 'change') {
-   const result = await this.store.change(input),
-    value = z.record(z.string(), z.unknown()).parse(input)
+   const value = z.record(z.string(), z.unknown()).parse(input)
+   if (value.action === 'create')
+    requireAvailable({
+     platform: z.enum(['qq_napcat', 'weixin_local', 'weixin_web', 'weixin_ilink']).parse(value.platform),
+     fields: z.record(z.string(), z.string()).parse(value.fields || {})
+    })
+   const result = await this.store.change(input)
    if (value.action === 'delete' && typeof value.id === 'string') await this.local.invalidate(value.id)
    return result
   }
@@ -177,12 +202,17 @@ export class NativeImService {
   if (action === 'libraries')
    return {libraries: this.knowledge ? [{library_id: this.knowledge.id, label: '当前知识库', available: true}] : []}
   if (action === 'rules') return this.automation.rules(input)
-  if (action === 'runs') return this.automation.runs(input)
+  if (action === 'runs') {
+   if (z.record(z.string(), z.unknown()).parse(input).action === 'start')
+    requireAvailable(this.store.checkScope(input).row)
+   return this.automation.runs(input)
+  }
   if (action === 'reply-jobs') return this.automation.jobs(input)
   if (action === 'cleanup') return new NativeImCleanup(this.store).execute(input)
   if (action === 'start') {
    const value = z.object({operation_id: imId, connection_id: imId, expected_revision: imId}).parse(input),
     row = this.store.capture(value.connection_id, value.expected_revision)
+   requireAvailable(row)
    const old = this.store.db
     .prepare('SELECT projection FROM login_operations WHERE operation_id=?')
     .get(value.operation_id) as {projection: string} | undefined
@@ -278,6 +308,7 @@ export class NativeImService {
     if (action === 'qr') throw new Error('中断后的二维码不恢复，请重新开始登录')
     return {...operation.saved, has_qr: false, state: operation.saved.state === 'online' ? 'online' : 'unknown'}
    }
+   if (action !== 'cancel') requireAvailable(this.store.capture(operation.value.connection_id))
    if (action === 'cancel') {
     if (login.projection.state !== 'online') {
      login.controller.abort()
@@ -327,10 +358,12 @@ export class NativeImService {
    login.projection = {...login.projection, state: 'online', has_qr: false, boundRevision: bound.revision}
    return {login: this.persist(login)}
   }
+  if (action === 'saved-directory') return this.store.savedDirectory(input)
   if (action === 'read') return this.store.readMessages(input)
   if (action === 'send-status') return this.store.sendStatus(input)
   if (['directory', 'sync', 'send'].includes(action)) {
    const localScope = this.store.checkScope(input)
+   requireAvailable(localScope.row)
    if (localScope.row.platform === 'weixin_local') {
     if (action === 'send') throw new Error('本机个人微信仅支持只读和草稿')
     this.store.requireRead(localScope.scope)
@@ -403,6 +436,7 @@ export class NativeImService {
  }
  private async syncSelected(input: unknown, signal: AbortSignal) {
   const {scope, row} = this.store.checkScope(input)
+  requireAvailable(row)
   this.store.requireRead(scope)
   if (!this.store.accountLimits(scope).archive_enabled) throw new Error('此账号已停用消息保存，未请求同步')
   const privateRow = await this.store.privateState(scope.connection_id, scope.revision)

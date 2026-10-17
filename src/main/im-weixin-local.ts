@@ -25,6 +25,7 @@ export class NativeWeixinLocal {
   this.pending.clear()
  }
  private start() {
+  if (process.platform !== 'win32' || process.arch !== 'x64') throw new Error('本机微信读取暂仅支持 Windows x64')
   if (this.closed) throw new Error('本机微信读取后台已关闭')
   if (this.worker) return this.worker
   const job = new NativeWindowsJob(),
