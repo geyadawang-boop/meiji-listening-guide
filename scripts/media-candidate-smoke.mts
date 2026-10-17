@@ -189,6 +189,31 @@ async function guardian(
  )
 }
 
+type Diagnostic = Awaited<ReturnType<typeof command>>
+type ToolMetadata = {
+ version: Diagnostic
+ buildconf: Diagnostic
+ dependencies: Diagnostic
+ signatureDetails?: Diagnostic
+ signatureVerification?: Diagnostic
+ gatekeeperAssessment?: Diagnostic
+ loader?: Diagnostic
+}
+function distributionFindings(metadata: Record<string, ToolMetadata>, lockedReasons: readonly string[]) {
+ const reasons = new Set(lockedReasons)
+ for (const info of Object.values(metadata)) {
+  if (/(?:^|\s)--enable-nonfree(?:\s|$)/.test(info.buildconf.stdout + '\n' + info.buildconf.stderr))
+   reasons.add('nonfree_build')
+  if (
+   info.signatureDetails &&
+   /Signature=adhoc/i.test(info.signatureDetails.stdout + '\n' + info.signatureDetails.stderr)
+  )
+   reasons.add('ad_hoc_signature')
+  if (info.gatekeeperAssessment && info.gatekeeperAssessment.code !== 0) reasons.add('gatekeeper_not_accepted')
+ }
+ return {distribution_status: reasons.size ? 'blocked' : 'pending', distribution_reasons: [...reasons]}
+}
+
 const outputArg = process.argv.indexOf('--output'),
  sourceArg = process.argv.indexOf('--source')
 check(
@@ -213,6 +238,10 @@ const work = await mkdtemp(join(temp, 'meiji-media-candidate-')),
 await mkdir(input)
 const report: Record<string, unknown> = {
  status: 'running',
+ runtime_status: 'running',
+ distribution_status: source.distribution.status,
+ distribution_reasons: source.distribution.reasons,
+ source_distribution: source.distribution,
  sourceId: source.id,
  platform: process.platform,
  arch: process.arch,
@@ -265,7 +294,7 @@ try {
   platform: 'node',
   format: 'esm'
  })
- const metadata: Record<string, unknown> = {}
+ const metadata: Record<string, ToolMetadata> = {}
  for (const tool of ['ffmpeg', 'ffprobe'] as const) {
   const path = join(video, tool)
   metadata[tool] = {
@@ -291,6 +320,7 @@ try {
   }
  }
  report.metadata = metadata
+ Object.assign(report, distributionFindings(metadata, source.distribution.reasons))
  const generated = join(work, 'generated.mkv'),
   transcoded = join(work, 'transcoded.avi')
  report.generate = await guardian(entry, resources, 'ffmpeg', [
@@ -339,13 +369,22 @@ try {
  ]
  report.cancel = await guardian(entry, resources, 'ffmpeg', infinite, 'cancel')
  report.disconnect = await guardian(entry, resources, 'ffmpeg', infinite, 'disconnect')
- report.status = 'passed'
+ report.status = 'runtime_checks_passed'
+ report.runtime_status = 'passed'
 } catch (error) {
  report.status = 'failed'
+ report.runtime_status = 'failed'
  report.error = error instanceof Error ? error.message : 'Unknown candidate failure'
  if (error instanceof Error && error.cause instanceof Error) report.cause = error.cause.message
  process.exitCode = 1
 } finally {
  await writeFile(join(results, 'candidate.json'), JSON.stringify(report, null, 2) + '\n')
- console.log(JSON.stringify({status: report.status, results}))
+ console.log(
+  JSON.stringify({
+   status: report.status,
+   runtime_status: report.runtime_status,
+   distribution_status: report.distribution_status,
+   results
+  })
+ )
 }

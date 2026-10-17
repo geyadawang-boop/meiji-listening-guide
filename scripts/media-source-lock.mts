@@ -6,6 +6,13 @@ export const mediaSources = [
   arch: 'arm64',
   repository: 'eugeneware/ffmpeg-static',
   tag: 'b6.1.1',
+  distribution: {
+   status: 'blocked',
+   usage: 'research-only',
+   observedToolVersion: '6.0',
+   reasons: ['nonfree_build', 'ad_hoc_signature', 'gatekeeper_rejected'],
+   evidence: 'https://github.com/mikudeshuo/meiji-listening-guide/actions/runs/39038682153'
+  },
   evidence: 'https://api.github.com/repos/eugeneware/ffmpeg-static/releases/tags/b6.1.1',
   allowedRedirectHosts: ['github.com', 'release-assets.githubusercontent.com'],
   files: [
@@ -53,6 +60,7 @@ export const mediaSources = [
  },
  {
   id: 'eugeneware-b6.1.1-linux-x64',
+  distribution: {status: 'pending', usage: 'research-only', reasons: []},
   platform: 'linux',
   arch: 'x64',
   repository: 'eugeneware/ffmpeg-static',

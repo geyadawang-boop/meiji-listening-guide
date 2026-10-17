@@ -37,6 +37,8 @@ node scripts/audit-language-migration.mts --check
 
 CI 手动运行时可选 `media_candidate`，在匹配的 macOS arm64/Linux x64 runner 下载并核验锁定候选，检查真实生成、转码、探测、取消和 IPC 断开退出。仅上传结果 JSON；许可、对应源码与分发签名仍待审核，不代表组件已可安装或分发。
 
+当前 Mac 候选实测包含 `--enable-nonfree`、ad-hoc 签名且 Gatekeeper 拒绝，已标记仅供研究、禁止分发；运行检查通过不改变此结论。Linux 候选的分发审核仍待完成，两者均未接入安装或发布。
+
 ```sh
 pnpm build
 pnpm release portable
