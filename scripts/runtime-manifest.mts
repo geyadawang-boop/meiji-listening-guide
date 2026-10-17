@@ -8,7 +8,6 @@ import type {RuntimeFile, RuntimeManifest} from '../src/shared/runtime.ts'
 const catalog = [
  ['knowledge', '知识库、研究与通讯后台', 'knowledge'],
  ['asr', '离线字幕模型', 'asr'],
- ['codex', 'Codex 与 DeepSeek 连接', 'codex'],
  ['video', '视频下载与处理工具', 'video']
 ] as const
 function included(id: string, path: string) {

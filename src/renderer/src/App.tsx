@@ -222,17 +222,8 @@ export default function App() {
    node?.scrollIntoView({block: 'center', behavior: 'smooth'})
   })
  }
- const activeProfile =
-  settings?.connection === 'deepseek'
-   ? settings.profiles.find(p => p.id === settings.activeProfile)
-   : settings?.codex
-     ? {model: settings.codex.model}
-     : undefined
- const modelBrand = activeProfile?.model.toLowerCase().startsWith('deepseek')
-  ? 'deepseek'
-  : /^(gpt|o[134](?:-|$)|chatgpt)/i.test(activeProfile?.model || '')
-    ? 'openai'
-    : 'custom'
+ const activeProfile = settings?.profiles.find(p => p.id === settings.activeProfile) || settings?.profiles[0]
+ const modelBrand = 'custom'
  const exportResult = (kind: string, format: string) =>
   void task(async () => {
    const path = await invoke<string>('export', {id: lectureId, kind, format})
@@ -954,7 +945,7 @@ export default function App() {
                 <p>
                  先添加语音识别原文和 PPT，
                  <br />
-                 再交给 Codex 识别与校订。原文保留，疑点明确标注。
+                 再交给千问识别与校订。原文保留，疑点明确标注。
                 </p>
                </div>
               )}

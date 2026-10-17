@@ -1,6 +1,5 @@
 import {StudyIcon} from './StudyIcon'
-import {CodexSettings} from './CodexSettings'
-import {DeepSeekSettings} from './DeepSeekSettings'
+import {QwenSettings} from './QwenSettings'
 import {useEffect, useState} from 'react'
 import type {CourseFile, Detail, LectureNotes, PastQuestion, Settings} from '../../shared/types'
 import {invoke, Modal, FilePicker} from './UiParts'
@@ -82,8 +81,8 @@ export function NewLecture({
     />
     <FilePicker courseId={courseId} courseware label="PPT/课件" paths={ppt} set={p => setPpt(p.slice(-1))} />
     <p className="hint">
-     支持智云原文 Word、TXT、Markdown、SRT。导入 PPTX 后，由 Codex
-     按需读取页面文字与原始图片，结合语音原文校订，无需单独逐页识别。
+     支持智云原文 Word、TXT、Markdown、SRT。导入 PPTX
+     后，软件先在本地提取页面文字与嵌入图片，再交给千问结合语音原文分批校订。
     </p>
     <footer>
      <button type="button" onClick={close}>
@@ -169,8 +168,8 @@ export function AddCourseware({
      set={p => setPaths(p.slice(-1))}
     />
     <p className="hint">
-     课件保存到 PPT 文件夹并关联当前课次。每个课次保留一份当前课件，新添加会替换关联，旧文件仍保留。Codex 按需读取 PPTX
-     的页面文字和原始图片，与语音原文一起校订。旧 PPT 请另存为 PPTX；PDF 目前读取文字内容。
+     课件保存到 PPT 文件夹并关联当前课次。每个课次保留一份当前课件，新添加会替换关联，旧文件仍保留。软件先在本地提取
+     PPTX 页面文字与嵌入图片，再交给千问结合语音原文分批校订。旧 PPT 请另存为 PPTX；PDF 目前读取文字内容。
     </p>
     <footer>
      <button type="button" onClick={close}>
@@ -514,7 +513,7 @@ export function SettingsPanel({
 }) {
  const [value, setValue] = useState(initial),
   [prompt, setPrompt] = useState('correction'),
-  [section, setSection] = useState(initial.connection === 'deepseek' ? 'deepseek' : 'api'),
+  [section, setSection] = useState('qwen'),
   [saved, setSaved] = useState(false)
  const update = (patch: Partial<Settings>) => {
   setValue(v => ({...v, ...patch}))
@@ -523,53 +522,18 @@ export function SettingsPanel({
  useEffect(() => {
   setValue(initial)
  }, [initial])
- useEffect(() => onApiVisible(section === 'api' || section === 'deepseek'), [section, onApiVisible])
- const navigation = (
-  <>
-   {[
-    ['api', 'ChatGPT 账号'],
-    ['deepseek', 'DeepSeek API'],
-    ['search', '搜索与主题'],
-    ['prompts', '提示词']
-   ].map(([id, name]) => (
-    <button className={section === id ? 'active' : ''} key={id} onClick={() => setSection(id)}>
-     {name}
-    </button>
-   ))}
-  </>
- )
- if (section === 'api' || section === 'deepseek')
+ useEffect(() => onApiVisible(section === 'qwen'), [section, onApiVisible])
+ if (section === 'qwen')
   return (
    <div className="model-settings-window" style={{right: rightWidth}} role="dialog" aria-modal="true" aria-label="设置">
-    {section === 'deepseek' ? (
-     <DeepSeekSettings
-      value={value}
-      update={update}
-      busy={busy}
-      close={close}
-      save={() =>
-       void save({
-        ...value,
-        connection: 'deepseek',
-        activeProfile:
-         (
-          value.profiles.find(p => p.id === value.activeProfile && p.provider === 'deepseek') ||
-          value.profiles.find(p => p.provider === 'deepseek')
-         )?.id || ''
-       }).then(ok => setSaved(ok))
-      }
-      navigation={navigation}
-     />
-    ) : (
-     <CodexSettings
-      value={value}
-      update={update}
-      busy={busy}
-      close={close}
-      save={() => void save({...value, connection: 'codex'}).then(ok => setSaved(ok))}
-      navigation={navigation}
-     />
-    )}{' '}
+    <QwenSettings
+     value={value}
+     update={update}
+     busy={busy}
+     close={close}
+     onSection={setSection}
+     save={() => void save({...value, connection: 'qwen'}).then(ok => setSaved(ok))}
+    />
     {error && <p className="alert">{error}</p>}
     {saved && <p role="status">已保存</p>}
    </div>
@@ -578,8 +542,7 @@ export function SettingsPanel({
   <Modal title="设置" close={close}>
    <div className="tabs">
     {[
-     ['api', 'Codex 账号'],
-     ['deepseek', 'DeepSeek API'],
+     ['qwen', '通义千问'],
      ['search', '搜索与主题'],
      ['prompts', '提示词']
     ].map(([id, name]) => (

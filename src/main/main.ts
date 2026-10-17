@@ -38,9 +38,7 @@ import {openPortableLibrary} from './portable-library'
 import {searchAnswers} from './practice-answer'
 import {SettingsStore} from './settings'
 import {Api} from './api'
-import {CodexClient} from './codex'
 import {modelRouter} from './model-router'
-import {validateDeepSeek} from './deepseek'
 import {Workflows} from './workflows'
 import {type EventPayload} from '../shared/types'
 import {parseSrt} from '../shared/srt'
@@ -159,50 +157,16 @@ async function startApplication() {
   },
   message => emit({kind: 'progress', data: {stage: '智云课堂', message}})
  )
- const codex = new CodexClient(
-  process.env.LISTENING_ASSISTANT_CODEX_FIXTURE && process.env.LISTENING_ASSISTANT_DATA
-   ? process.execPath
-   : join(app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'resources'), 'codex', 'bin', 'codex.exe'),
-  join(root, 'codex-account'),
-  join(root, 'codex-workspace'),
-  settings,
-  message => emit({kind: 'progress', data: {stage: 'Codex', message}}),
-  process.env.LISTENING_ASSISTANT_CODEX_FIXTURE && process.env.LISTENING_ASSISTANT_DATA
-   ? [process.env.LISTENING_ASSISTANT_CODEX_FIXTURE]
-   : []
- )
- const deepseek = new CodexClient(
-  process.env.LISTENING_ASSISTANT_CODEX_FIXTURE && process.env.LISTENING_ASSISTANT_DATA
-   ? process.execPath
-   : join(app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'resources'), 'codex', 'bin', 'codex.exe'),
-  join(root, 'deepseek-account'),
-  join(root, 'deepseek-workspace'),
-  settings,
-  message => emit({kind: 'progress', data: {stage: 'DeepSeek', message: message.replace(/Codex/g, 'DeepSeek')}}),
-  process.env.LISTENING_ASSISTANT_CODEX_FIXTURE && process.env.LISTENING_ASSISTANT_DATA
-   ? [process.env.LISTENING_ASSISTANT_CODEX_FIXTURE]
-   : [],
-  () => validateDeepSeek(settings.profile())
- )
- const routed = modelRouter(() => (settings.get().connection === 'deepseek' ? deepseek : codex))
+ const api = new Api(settings, net.fetch.bind(net))
+ const routed = modelRouter(() => api)
  const testApi =
-  process.env.LISTENING_ASSISTANT_TEST_API === '1' && process.env.LISTENING_ASSISTANT_DATA
-   ? new Api(settings, net.fetch.bind(net))
-   : undefined
- const api = testApi || routed
+  process.env.LISTENING_ASSISTANT_TEST_API === '1' && process.env.LISTENING_ASSISTANT_DATA ? api : undefined
  const knowledge = new KnowledgeBase(
   app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'resources'),
   join(libraryRoot, '知识库数据'),
   message => emit({kind: 'progress', data: {stage: '知识库', message}})
  )
- const visualConnection = () => {
-  const value = settings.get(),
-   connection = value.connection || 'codex',
-   profile = value.profiles.some(item => item.id === value.activeProfile) ? settings.profile() : null
-  return createHash('sha256')
-   .update(JSON.stringify([connection, !testApi && connection === 'codex' ? value.codex : profile]))
-   .digest('hex')
- }
+ const visualConnection = () => settings.connectionFingerprint()
  const toolsBackend = new NativeResearchBackend(
   join(libraryRoot, '知识库数据'),
   async (request, signal) => {
@@ -262,7 +226,7 @@ async function startApplication() {
   json: api.json.bind(api),
   progress: (message: string) => emit({kind: 'progress', data: {stage: '题目答案', message}})
  }
- const flows = new Workflows(db, settings, api, p => emit({kind: 'progress', data: p}), answerDependencies, !!testApi)
+ const flows = new Workflows(db, settings, api, p => emit({kind: 'progress', data: p}), answerDependencies)
  const highlighter = new TextbookHighlighter(api, (input, url, signal) =>
   routed.chat(
    [
@@ -271,7 +235,6 @@ async function startApplication() {
    ],
    undefined,
    signal,
-   undefined,
    undefined,
    {images: [{label: '教材原页', url}]}
   )
@@ -500,9 +463,7 @@ async function startApplication() {
   biliDiscussion,
   biliResources,
   biliSession,
-  codex,
   db,
-  deepseek,
   derivedDependencies,
   directory,
   emit,
@@ -572,8 +533,6 @@ async function startApplication() {
   knowledge.dispose()
   zhiyunBrowser.dispose()
   await Promise.allSettled([media.dispose(), toolsBackend.dispose()])
-  codex.dispose()
-  deepseek.dispose()
  }
  return context
 }
