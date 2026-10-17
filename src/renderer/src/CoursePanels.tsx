@@ -539,7 +539,7 @@ export function SettingsPanel({
      {saved && <p role="status">已保存</p>}
     </>
    ) : (
-    <div className="codex-settings">
+    <div className="settings-layout">
      <SettingsNavigation section={section} onSection={setSection} />
      <section>
       <header>

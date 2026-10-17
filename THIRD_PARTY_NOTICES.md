@@ -6843,16 +6843,20 @@ SOFTWARE.
 
 ElecKoi MessageNavIcon / ModelNavIcon paths are retained from src/renderer/src/ui/icons/navIcons.jsx under the included AGPL-3.0-only license and upstream NOTICE.
 
-## OpenAI Codex 0.160.0
+## 历史资源来源记录
+
+以下 OpenAI Codex、PDF Python 环境及 BiliSum 融合资源条目保留早期来源、署名与许可索引；其中“附带”“Bundled”和资源路径描述历史版本，不表示当前发行仍包含这些文件。当前版本已移除 Codex runtime、Python PDF/后台环境与 yt-dlp；仍使用的 FFmpeg/FFprobe、NapCat、原生模块和模型以当前依赖与组件清单为准。下列历史许可信息保留，不能据此推断缺失资源随包发布。
+
+### OpenAI Codex 0.160.0（历史）
 Bundled Codex runtime: Apache-2.0. Source: https://github.com/openai/codex . License included as resources/codex/LICENSE-APACHE-2.0.txt.
 
 
-## PDF 教材批注运行环境
+### PDF 教材批注运行环境（历史）
 Python 3.12: PSF License，许可见 resources/pdf/python/LICENSE.txt。
 pypdf 6.10.0: BSD-3-Clause，许可见 resources/pdf/PYPDF-LICENSE.txt。
 
 
-## BiliSum 融合后台及媒体、通讯运行资源
+### BiliSum 融合后台及媒体、通讯运行资源（历史来源与部分延续组件）
 来源为用户指定的 BiliSum-1.0-clean/app/backend 与随附运行资源。保留上游源码中的署名、zcode Apache-2.0 许可（resources/knowledge/BiliSum-LICENSE）、Python 许可和各依赖 dist-info 许可证。梅酱新增标准输入输出适配、原生界面、独立数据目录和版本校验，不附带上游用户账号或知识库。
 多平台下载附带 yt-dlp 2026.07.04 和 FFprobe n8.1.2，许可随 resources/video 保留。PyAV、psutil、cryptography、cffi、pycparser 的版本、许可与运行清单保存在 resources/knowledge/python/Lib/site-packages 和 knowledge-extra-dependency-manifest.json。
 QQ 后台组件为用户提供发行包的 NapCat.Shell.Windows.Node.zip（4.18.37），只在用户明确启动通讯连接时解压运行；随附声明保留在原归档中。个人微信读取组件 SQLCipher 许可位于 resources/knowledge/backend/_im_reader_vendor/sqlcipher3_wheels-0.5.7.dist-info/licenses。
