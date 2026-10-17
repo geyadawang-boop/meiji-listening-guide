@@ -345,16 +345,14 @@ export class NativeImAutomation {
     .filter(job => job.scope_key === key)
     .sort((a, b) => b.createdAt - a.createdAt)
    return {
-    jobs: rows
-     .slice(args.offset, args.offset + args.limit)
-     .map(job => ({
-      ...job,
-      allowed_actions: job.send_op
-       ? ['reconcile']
-       : ['failed', 'unknown', 'blocked'].includes(job.state)
-         ? ['retry_generation']
-         : []
-     })),
+    jobs: rows.slice(args.offset, args.offset + args.limit).map(job => ({
+     ...job,
+     allowed_actions: job.send_op
+      ? ['reconcile']
+      : ['failed', 'unknown', 'blocked'].includes(job.state)
+        ? ['retry_generation']
+        : []
+    })),
     next_offset: args.offset + args.limit < rows.length ? args.offset + args.limit : null
    }
   }

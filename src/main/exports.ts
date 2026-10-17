@@ -85,21 +85,19 @@ export async function exportFile(
     sections: [
      {
       properties: {},
-      children: text
-       .split('\n')
-       .map(
-        line =>
-         new Paragraph({
-          children: [
-           new TextRun({
-            text: line.replace(/^#{1,3} /, ''),
-            bold: line.startsWith('#'),
-            size: line.startsWith('# ') ? 32 : 22
-           })
-          ],
-          spacing: {after: 120}
-         })
-       )
+      children: text.split('\n').map(
+       line =>
+        new Paragraph({
+         children: [
+          new TextRun({
+           text: line.replace(/^#{1,3} /, ''),
+           bold: line.startsWith('#'),
+           size: line.startsWith('# ') ? 32 : 22
+          })
+         ],
+         spacing: {after: 120}
+        })
+      )
      }
     ]
    })

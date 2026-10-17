@@ -515,17 +515,15 @@ export class NativeResearchStore {
      throw new Error('旧笔记编号与新笔记冲突，两个版本保留待确认')
     if (!existing) this.put('note', id, note.lifecycle.revision, note)
    }
-   this.db
-    .prepare('INSERT INTO research_baselines VALUES(?,?)')
-    .run(
-     'legacy-notes-v1',
-     JSON.stringify({
-      count: notes.length,
-      digest: digest(notes),
-      legacyReadOnly: true,
-      sourceCurrentness: 'not_revalidated'
-     })
-    )
+   this.db.prepare('INSERT INTO research_baselines VALUES(?,?)').run(
+    'legacy-notes-v1',
+    JSON.stringify({
+     count: notes.length,
+     digest: digest(notes),
+     legacyReadOnly: true,
+     sourceCurrentness: 'not_revalidated'
+    })
+   )
   })()
  }
 }
