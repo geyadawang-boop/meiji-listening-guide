@@ -35,6 +35,8 @@ node scripts/audit-language-migration.mts --check
 
 ## 发布和恢复组件
 
+视频候选工具 `node scripts/video-candidate-package.mts <request.json>` 仅接受显式 `darwin-arm64` 源码构建归档及调用方核准的归档/构建报告 SHA256、提交和 run 身份，生成独立临时候选清单与 descriptor v2。仅复制选中的普通成员并绑定来源/许可/配置；不执行二进制、不接安装或发布，输出不属于可信安装授权。
+
 手动 CI 的 `source_build` 只在 macOS arm64 隔离构建七份锁定源码并验证应用所需编码路径。工件包含来源、构建配置/日志和候选工具，标记为 candidate-only；不发布或安装，GPL 对应源码审阅、Developer ID 签名与公证仍待完成。
 
 源码准备工具 `node scripts/media-source-prepare.mts` 只下载、核验并安全解包七份固定媒体源码；可用 `--offline <归档目录>` 验证已有源包。它要求 BSD tar，仅写新的系统临时目录，不编译或安装。CI 手动选项 `source_prepare` 在 macOS 检查真实下载与解包，仅上传准备报告；源码来源/构建/许可审核与可分发结论仍分开。
