@@ -3,6 +3,7 @@ import type {ParentPort} from 'electron'
 import {z} from 'zod'
 import {NativeDownloadService} from './media-download-service'
 import {BACKEND_PROTOCOL} from '../shared/backend-protocol'
+import {MediaEncryptionClient} from './media-encryption'
 const port = (process as NodeJS.Process & {parentPort: ParentPort}).parentPort
 const [resources, root] = process.argv.slice(2)
 if (!port || !resources || !root) throw new Error('下载工作进程参数无效')
@@ -36,10 +37,16 @@ const api = {
   })
  }
 }
-const service = new NativeDownloadService(resources, root, api, fetch)
+const encryption = new MediaEncryptionClient(message => port.postMessage(message))
+const service = new NativeDownloadService(resources, root, api, fetch, encryption.protect)
+process.once('exit', () => encryption.close())
 port.on('message', event => {
  void (async () => {
   const raw = event.data as {kind?: unknown}
+  if (raw.kind === 'crypt-result') {
+   encryption.receive(raw)
+   return
+  }
   if (raw.kind === 'bili-result') {
    const reply = z
     .object({
@@ -67,7 +74,11 @@ port.on('message', event => {
    id = request.id
    const owner = await ownerReady
    if (request.action === 'shutdown') {
-    await service.dispose()
+    try {
+     await service.dispose()
+    } finally {
+     encryption.close()
+    }
     owner.close()
     port.postMessage({protocol: BACKEND_PROTOCOL, kind: 'result', id, ok: true, result: true})
     return

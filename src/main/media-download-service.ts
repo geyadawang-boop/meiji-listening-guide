@@ -11,6 +11,7 @@ import type {BiliResources} from './bili-resources'
 import type {MediaCatalog, MediaJob} from '../shared/media'
 import {z} from 'zod'
 import {NativeMediaAuth} from './media-auth'
+import type {MediaCrypt} from './media-encryption'
 const idSchema = z.string().regex(/^[a-f0-9]{32}$/)
 type Fetcher = (url: string, init?: RequestInit) => Promise<Response>
 /** Queue control remains responsive while one native download runs in the background. */
@@ -32,11 +33,12 @@ export class NativeDownloadService {
   resources: string,
   private root: string,
   api: Pick<BiliResources, 'readMedia'>,
-  fetcher: Fetcher
+  fetcher: Fetcher,
+  crypt?: MediaCrypt
  ) {
-  this.jobs = new NativeDownloadJobs(root)
+  this.jobs = new NativeDownloadJobs(root, crypt)
   this.legacy = new LegacyDownloads(root)
-  this.auth = new NativeMediaAuth(root)
+  this.auth = new NativeMediaAuth(root, crypt)
   this.catalog = new NativePlatformCatalog(api, fetcher, this.auth)
   this.runner = new NativeBiliDownloadRunner(
    this.jobs,

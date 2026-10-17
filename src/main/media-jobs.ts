@@ -6,6 +6,7 @@ import {isAbsolute, join, relative, resolve, sep} from 'node:path'
 import {z} from 'zod'
 import {mediaOptions} from './media-options'
 import {windowsProtect} from './windows-native'
+import type {MediaCrypt} from './media-encryption'
 
 const idSchema = z.string().regex(/^[a-f0-9]{32}$/)
 const receipt = z
@@ -58,7 +59,10 @@ export class NativeDownloadJobs {
  private serial: Promise<unknown> = Promise.resolve()
  private records = new Map<string, NativeDownloadJob>()
  private initialized: Promise<void> | undefined
- constructor(private root: string) {}
+ constructor(
+  private root: string,
+  private crypt: MediaCrypt = windowsProtect
+ ) {}
  private exclusive<T>(run: () => Promise<T>): Promise<T> {
   const operation = this.serial.then(run)
   this.serial = operation.catch(() => {})
@@ -94,7 +98,7 @@ export class NativeDownloadJobs {
    }
   }
   const serialized = Buffer.from(JSON.stringify(job))
-  await writeFile(tmp, encrypted ? windowsProtect(serialized) : serialized)
+  await writeFile(tmp, encrypted ? await this.crypt(serialized) : serialized)
   await rename(tmp, path)
   this.records.set(job.id, job)
  }
@@ -125,7 +129,7 @@ export class NativeDownloadJobs {
     const item = await lstat(path)
     if (item.isSymbolicLink() || !item.isFile()) throw new Error('下载恢复记录文件无效')
     const bytes = await readFile(path),
-     row = schema.parse(JSON.parse((encrypted ? windowsProtect(bytes, true) : bytes).toString('utf8')))
+     row = schema.parse(JSON.parse((encrypted ? await this.crypt(bytes, true) : bytes).toString('utf8')))
     if (encrypted !== (row.recipe.privacy === true)) throw new Error('下载记录加密方式与任务设置不一致')
     if (row.id !== entry.name || row.recipeHash !== hashRecipe(row.identity, row.source_url, mediaOptions(row.recipe)))
      throw new Error('下载恢复记录与任务不一致')
