@@ -1,9 +1,10 @@
 import {createHash, randomUUID} from 'node:crypto'
-import {createReadStream, existsSync} from 'node:fs'
-import {readFile, mkdir, lstat, copyFile, rename, rm} from 'node:fs/promises'
+import {createReadStream, existsSync, constants} from 'node:fs'
+import {readFile, mkdir, lstat, copyFile, rename, rm, open, realpath} from 'node:fs/promises'
 import {join, resolve, sep, dirname} from 'node:path'
 import {z} from 'zod'
 import type {RuntimeManifest, RuntimeStatus} from '../shared/runtime'
+import {runtimeManifestV2Schema} from '../shared/runtime-manifest-v2'
 const file = z.object({
  path: z.string().min(1).max(500),
  size: z.number().int().nonnegative(),
@@ -54,23 +55,164 @@ export async function hashFile(path: string) {
  return hash.digest('hex')
 }
 export class RuntimeComponents {
+ private statusRequest?: Promise<RuntimeStatus>
  constructor(
   private resources: string,
   private version: string
  ) {}
  private async manifest(): Promise<RuntimeManifest> {
-  const result = manifest.parse(JSON.parse(await readFile(join(this.resources, 'runtime-manifest.json'), 'utf8')))
+  const raw = JSON.parse(await readFile(join(this.resources, 'runtime-manifest.json'), 'utf8'))
+  if (raw?.schema === 2) throw new Error('v2 组件仅支持只读校验，尚未开放安装')
+  const result = manifest.parse(raw)
   if (result.productVersion !== this.version) throw new Error('组件清单与应用版本不一致')
   return result
  }
- async status(): Promise<RuntimeStatus> {
-  const data = await this.manifest()
+ status(): Promise<RuntimeStatus> {
+  if (!this.statusRequest) {
+   const request = this.readStatus()
+   this.statusRequest = request
+   void request
+    .finally(() => {
+     if (this.statusRequest === request) this.statusRequest = undefined
+    })
+    .catch(() => {})
+  }
+  return this.statusRequest
+ }
+ private async readStatus(): Promise<RuntimeStatus> {
+  let raw: unknown
+  try {
+   const path = join(this.resources, 'runtime-manifest.json'),
+    item = await lstat(path)
+   if (!item.isFile() || item.isSymbolicLink() || item.nlink !== 1 || item.size > 16 * 1024 * 1024)
+    throw new Error('invalid')
+   for (let parent = dirname(path); ; parent = dirname(parent)) {
+    const directory = await lstat(parent)
+    if (!directory.isDirectory() || directory.isSymbolicLink()) throw new Error('invalid')
+    if (dirname(parent) === parent) break
+   }
+   const handle = await open(path, constants.O_RDONLY | (constants.O_NOFOLLOW || 0)),
+    chunks: Buffer[] = []
+   let size = 0
+   try {
+    const before = await handle.stat()
+    if (before.dev !== item.dev || before.ino !== item.ino) throw new Error('invalid')
+    for await (const bytes of handle.createReadStream({autoClose: false})) {
+     size += bytes.length
+     if (size > 16 * 1024 * 1024) throw new Error('invalid')
+     chunks.push(bytes)
+    }
+    const after = await handle.stat(),
+     current = await lstat(path)
+    if (
+     before.mtimeMs !== after.mtimeMs ||
+     before.ctimeMs !== after.ctimeMs ||
+     before.size !== size ||
+     current.dev !== before.dev ||
+     current.ino !== before.ino
+    )
+     throw new Error('invalid')
+   } finally {
+    await handle.close()
+   }
+   raw = JSON.parse(Buffer.concat(chunks).toString('utf8'))
+  } catch {
+   return {version: this.version, validation: 'invalid', reason: '组件清单无法读取或格式无效', components: []}
+  }
+  if ((raw as {schema?: unknown})?.schema === 2) {
+   const parsed = runtimeManifestV2Schema.safeParse(raw)
+   if (!parsed.success || parsed.data.productVersion !== this.version)
+    return {version: this.version, validation: 'invalid', reason: 'v2 组件清单格式或应用版本不符', components: []}
+   const data = parsed.data,
+    compatible = data.target.platform === process.platform && data.target.arch === process.arch
+   const components: RuntimeStatus['components'] = []
+   for (const component of data.components) {
+    let validation: 'verified' | 'missing' | 'invalid' | 'unsupported_target' = compatible
+     ? 'verified'
+     : 'unsupported_target'
+    let reason = compatible ? '文件完整性与权限已校验；v2 安装尚未开放' : '组件目标与当前系统或架构不符'
+    if (compatible)
+     try {
+      for (const file of component.files) {
+       const path = contained(contained(this.resources, component.directory), file.path)
+       for (let parent = dirname(path); ; parent = dirname(parent)) {
+        const directory = await lstat(parent)
+        if (!directory.isDirectory() || directory.isSymbolicLink()) throw new Error('invalid')
+        if (dirname(parent) === parent) break
+       }
+       const item = await lstat(path)
+       if (
+        !item.isFile() ||
+        item.isSymbolicLink() ||
+        item.nlink !== 1 ||
+        item.size !== file.size ||
+        resolve(await realpath(path)) !== resolve(path)
+       )
+        throw new Error('invalid')
+       if (process.platform !== 'win32' && (item.mode & 0o7777) !== (file.mode === '0755' ? 0o755 : 0o644))
+        throw new Error('invalid')
+       const handle = await open(path, constants.O_RDONLY | (constants.O_NOFOLLOW || 0)),
+        hash = createHash('sha256')
+       let size = 0
+       try {
+        const before = await handle.stat()
+        if (before.dev !== item.dev || before.ino !== item.ino) throw new Error('invalid')
+        for await (const bytes of handle.createReadStream({autoClose: false})) {
+         size += bytes.length
+         if (size > file.size) throw new Error('invalid')
+         hash.update(bytes)
+        }
+        const after = await handle.stat(),
+         current = await lstat(path)
+        if (
+         before.mtimeMs !== after.mtimeMs ||
+         before.ctimeMs !== after.ctimeMs ||
+         after.size !== file.size ||
+         before.dev !== current.dev ||
+         before.ino !== current.ino ||
+         !current.isFile() ||
+         current.isSymbolicLink() ||
+         current.nlink !== 1 ||
+         (process.platform !== 'win32' && (current.mode & 0o7777) !== (file.mode === '0755' ? 0o755 : 0o644))
+        )
+         throw new Error('invalid')
+       } finally {
+        await handle.close()
+       }
+       if (size !== file.size || hash.digest('hex') !== file.sha256) throw new Error('invalid')
+      }
+     } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code
+      validation = code === 'ENOENT' || code === 'ENOTDIR' ? 'missing' : 'invalid'
+      reason = validation === 'missing' ? '组件文件缺失；v2 安装尚未开放' : '组件文件类型、摘要、大小或权限校验失败'
+     }
+    components.push({
+     id: component.id,
+     label: component.label,
+     bytes: component.bytes,
+     installed: validation === 'verified',
+     validation,
+     installable: false,
+     reason
+    })
+   }
+   return {version: this.version, components}
+  }
+  let data: RuntimeManifest
+  try {
+   data = manifest.parse(raw)
+   if (data.productVersion !== this.version) throw new Error('version')
+  } catch {
+   return {version: this.version, validation: 'invalid', reason: '组件清单格式或应用版本不符', components: []}
+  }
   return {
    version: this.version,
+   validation: 'legacy',
    components: data.components.map(c => ({
     id: c.id,
     label: c.label,
     bytes: c.bytes,
+    validation: 'legacy',
     installed:
      c.files.length > 0 && c.files.every(f => existsSync(contained(join(this.resources, c.directory), f.path)))
    }))

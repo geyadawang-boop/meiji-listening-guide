@@ -1,14 +1,33 @@
-import {useEffect, useState} from 'react'
+import {useEffect, useState, useRef} from 'react'
 import type {RuntimeStatus} from '@shared/runtime'
 export function RuntimePanel() {
  const [data, setData] = useState<RuntimeStatus>(),
   [error, setError] = useState(''),
   [busy, setBusy] = useState(false),
   [notice, setNotice] = useState('')
+ const [refreshing, setRefreshing] = useState(false),
+  generation = useRef(0)
  const isWindows = navigator.platform.toLowerCase().startsWith('win')
- const refresh = () => window.assistant.invoke<RuntimeStatus>('runtime:status').then(setData)
+ const refresh = async () => {
+  const current = ++generation.current
+  setRefreshing(true)
+  try {
+   const result = await window.assistant.invoke<RuntimeStatus>('runtime:status')
+   if (current === generation.current) {
+    setData(result)
+    setError('')
+   }
+  } catch (error) {
+   if (current === generation.current) setError(String(error))
+  } finally {
+   if (current === generation.current) setRefreshing(false)
+  }
+ }
  useEffect(() => {
-  void refresh().catch(e => setError(String(e)))
+  void refresh()
+  return () => {
+   generation.current++
+  }
  }, [])
  async function install(id: string) {
   if (!isWindows) {
@@ -44,21 +63,41 @@ export function RuntimePanel() {
      {error}
     </p>
    )}
+   {data?.reason && (
+    <p className="hint" role="status">
+     {data.reason}
+    </p>
+   )}
    {notice && <p role="status">{notice}</p>}
    {data?.components.map(c => (
     <article className="knowledge-item" key={c.id}>
      <strong>{c.label}</strong>
      <span>
       {' '}
-      · {(c.bytes / 1048576).toFixed(1)} MiB · {c.installed ? '已安装' : '未安装'}
+      · {(c.bytes / 1048576).toFixed(1)} MiB ·{' '}
+      {c.validation === 'verified'
+       ? '已校验'
+       : c.validation === 'invalid'
+         ? '校验失败'
+         : c.validation === 'unsupported_target'
+           ? '目标不支持'
+           : c.validation === 'missing'
+             ? '文件缺失'
+             : c.installed
+               ? '已安装'
+               : '未安装'}
      </span>
-     <button disabled={busy || c.installed || !isWindows} onClick={() => void install(c.id)}>
+     {c.reason && <p className="hint">{c.reason}</p>}
+     <button
+      disabled={busy || refreshing || c.installed || c.installable === false || !isWindows}
+      onClick={() => void install(c.id)}
+     >
       选择组件文件夹安装
      </button>
     </article>
    ))}
-   <button disabled={busy} onClick={() => void refresh().catch(e => setError(String(e)))}>
-    刷新组件状态
+   <button disabled={busy || refreshing} onClick={() => void refresh()}>
+    {refreshing ? '正在校验组件…' : '刷新组件状态'}
    </button>
   </section>
  )
