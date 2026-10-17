@@ -1,5 +1,6 @@
 import {nativeImage} from 'electron'
 import {mediaCommand} from './media-command'
+import type {MediaTool} from './media-executable'
 import {createHash} from 'node:crypto'
 import {createReadStream} from 'node:fs'
 import {mkdir, lstat, readFile, realpath, rm, writeFile} from 'node:fs/promises'
@@ -41,12 +42,7 @@ export class NativeVisualFrames {
  get started() {
   return this.cancels.size > 0
  }
- private command(
-  executable: 'ffmpeg.exe' | 'ffprobe.exe',
-  args: string[],
-  signal: AbortSignal,
-  stream?: (bytes: Buffer) => void
- ) {
+ private command(executable: MediaTool, args: string[], signal: AbortSignal, stream?: (bytes: Buffer) => void) {
   return mediaCommand(this.resources, executable, args, signal, stream)
  }
  dispose() {
@@ -115,7 +111,7 @@ export class NativeVisualFrames {
    } else {
     const metadata = JSON.parse(
      await this.command(
-      'ffprobe.exe',
+      'ffprobe',
       ['-v', 'error', '-show_entries', 'format=duration:stream=codec_type,duration', '-of', 'json', source],
       controller.signal
      )
@@ -133,7 +129,7 @@ export class NativeVisualFrames {
       previous: Buffer | undefined,
       index = 0
      await this.command(
-      'ffmpeg.exe',
+      'ffmpeg',
       [
        '-hide_banner',
        '-loglevel',
@@ -176,7 +172,7 @@ export class NativeVisualFrames {
     for (const [index, time] of times.entries()) {
      const path = join(directory, `frame-${index + 1}.png`)
      await this.command(
-      'ffmpeg.exe',
+      'ffmpeg',
       [
        '-hide_banner',
        '-loglevel',

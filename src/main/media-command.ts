@@ -1,15 +1,17 @@
 import {spawn} from 'node:child_process'
 import {fileURLToPath} from 'node:url'
+import {mediaExecutablePath, type MediaTool} from './media-executable'
 /** The guardian owns the OS child handle; IPC disconnect kills FFmpeg even if the caller is terminated. */
 export function mediaCommand(
  resources: string,
- name: 'ffmpeg.exe' | 'ffprobe.exe',
+ name: MediaTool,
  args: string[],
  signal: AbortSignal,
  stream?: (bytes: Buffer) => void,
  onStarted?: (pid: number) => void
 ) {
  signal.throwIfAborted()
+ mediaExecutablePath(resources, name)
  return new Promise<string>((resolve, reject) => {
   const guardian = spawn(
    process.execPath,
