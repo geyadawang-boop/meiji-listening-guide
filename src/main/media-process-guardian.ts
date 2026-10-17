@@ -1,10 +1,9 @@
 import {spawn, type ChildProcessWithoutNullStreams} from 'node:child_process'
-import {lstat, realpath} from 'node:fs/promises'
-import {join, resolve} from 'node:path'
 import {z} from 'zod'
+import {checkedMediaExecutable, mediaTool} from './media-executable'
 const [resources, name] = process.argv.slice(2)
-if (!process.send || !resources || !['ffmpeg.exe', 'ffprobe.exe'].includes(name))
- throw new Error('媒体守护进程启动参数无效')
+if (!process.send || !resources) throw new Error('媒体守护进程启动参数无效')
+const tool = mediaTool(name)
 let child: ChildProcessWithoutNullStreams | undefined,
  stopped = false,
  started = false
@@ -31,12 +30,9 @@ process.on('message', raw => {
   }
   if (started || stopped) throw new Error('媒体守护进程重复启动或已停止')
   started = true
-  const path = resolve(resources, 'video', name),
-   item = await lstat(path)
-  if (!item.isFile() || item.isSymbolicLink() || resolve(await realpath(path)).toLowerCase() !== path.toLowerCase())
-   throw new Error('媒体执行文件路径无效')
+  const path = await checkedMediaExecutable(resources, tool)
   if (stopped) return
-  child = spawn(join(resources, 'video', name), value.args, {windowsHide: true, stdio: 'pipe'})
+  child = spawn(path, value.args, {windowsHide: true, stdio: 'pipe'})
   child.once('spawn', () => {
    if (process.connected) process.send!({kind: 'media-started', pid: child!.pid})
   })

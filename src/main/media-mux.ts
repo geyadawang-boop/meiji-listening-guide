@@ -1,4 +1,5 @@
 import {mediaCommand} from './media-command'
+import type {MediaTool} from './media-executable'
 import {lstat, realpath, writeFile, readFile} from 'node:fs/promises'
 import {basename, dirname, extname, join, resolve} from 'node:path'
 import {z} from 'zod'
@@ -37,13 +38,13 @@ async function localFile(path: string) {
 /** No remote URL is ever passed to FFmpeg. All downloaded tracks are local owned files. */
 export class NativeMediaMux {
  constructor(private resources: string) {}
- private command(name: 'ffmpeg.exe' | 'ffprobe.exe', args: string[], signal: AbortSignal) {
+ private command(name: MediaTool, args: string[], signal: AbortSignal) {
   return mediaCommand(this.resources, name, args, signal)
  }
  async probe(path: string, signal: AbortSignal): Promise<MediaProbe> {
   const source = await localFile(path),
    raw = await this.command(
-    'ffprobe.exe',
+    'ffprobe',
     [
      '-v',
      'error',
@@ -101,7 +102,7 @@ export class NativeMediaMux {
    if (!bytes.equals(await readFile(source))) throw new Error('封面恢复文件已改变')
   }
   const raw = await this.command(
-   'ffprobe.exe',
+   'ffprobe',
    [
     '-v',
     'error',
@@ -129,7 +130,7 @@ export class NativeMediaMux {
   const prepared = await artifact.prepare()
   if (!prepared.reused)
    await this.command(
-    'ffmpeg.exe',
+    'ffmpeg',
     [
      '-hide_banner',
      '-loglevel',
@@ -191,7 +192,7 @@ export class NativeMediaMux {
   const prepared = await artifact.prepare()
   if (!prepared.reused)
    await this.command(
-    'ffmpeg.exe',
+    'ffmpeg',
     [
      '-hide_banner',
      '-loglevel',
@@ -435,7 +436,7 @@ export class NativeMediaMux {
      .digest('hex')
    ),
    prepared = await artifact.prepare()
-  if (!prepared.reused) await this.command('ffmpeg.exe', args, input.signal)
+  if (!prepared.reused) await this.command('ffmpeg', args, input.signal)
   const proof = await this.probe(output, input.signal),
    expected = kept
     ? kept.reduce((sum, range) => sum + range.end - range.start, 0)
