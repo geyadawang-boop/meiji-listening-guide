@@ -53,6 +53,8 @@ if (profile === 'components') {
 } else {
  if (profile === 'full' && platform !== Platform.WINDOWS)
   throw new Error('完整发布仅支持 Windows；macOS/Linux 请使用 lite')
+ // Current optional component payloads target Windows, including local portable builds.
+ const omitOptional = profile === 'lite' || platform !== Platform.WINDOWS
  const optional = new Set(manifest.components.map(component => component.directory))
  const entries = pkg.build.extraResources
  if (!Array.isArray(entries)) throw new Error('发布资源配置必须为数组')
@@ -65,7 +67,7 @@ if (profile === 'components') {
  const resources = entries.filter(entry => {
   if (typeof entry === 'string' || !entry.from) return true
   if (entry.to && optional.has(entry.to)) {
-   if (profile === 'lite') return false
+   if (omitOptional) return false
    if (missing.has(entry.to)) {
     console.warn('缺少组件目录，已跳过：' + entry.to)
     return false
@@ -106,7 +108,7 @@ if (profile === 'components') {
     electronVersion: pkg.devDependencies.electron,
     profile,
     platform: active,
-    optionalComponents: profile === 'lite' ? manifest.components.map(component => component.id) : [],
+    optionalComponents: omitOptional ? manifest.components.map(component => component.id) : [],
     artifacts: files.filter(file => /\.(?:exe|dmg|zip|AppImage|deb)$/.test(file))
    },
    null,
