@@ -47,7 +47,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y gnome-keyring libsecret-1-0 dbus-x11 xvfb
+          sudo apt-get install -y gnome-keyring libsecret-1-0 dbus-x11 xvfb fonts-noto-cjk
       - name: Verify Linux runtime with a real secret service
         if: runner.os == 'Linux'
         shell: bash
