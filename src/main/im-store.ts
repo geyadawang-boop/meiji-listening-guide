@@ -4,6 +4,7 @@ import {mkdirSync, lstatSync, existsSync, realpathSync} from 'node:fs'
 import {join, resolve} from 'node:path'
 import {z} from 'zod'
 import {windowsProtect} from './windows-native'
+import type {MediaCrypt} from './media-encryption'
 import {imLoopback} from './im-loopback'
 export const imId = z.string().regex(/^[a-f0-9]{32}$/)
 const platforms = ['qq_napcat', 'weixin_local', 'weixin_web', 'weixin_ilink'] as const
@@ -37,7 +38,7 @@ export class NativeImStore {
  readonly db: Database.Database
  constructor(
   root: string,
-  private crypt = windowsProtect
+  private crypt: MediaCrypt = windowsProtect
  ) {
   mkdirSync(root, {recursive: true})
   if (lstatSync(root).isSymbolicLink() || realpathSync(root).toLowerCase() !== resolve(root).toLowerCase())
@@ -88,23 +89,34 @@ export class NativeImStore {
   if (revision && row.revision !== revision) throw new Error('通讯连接已改变，请刷新')
   return this.public(row)
  }
- privateState(key: string, revision: string) {
-  const publicRow = this.capture(key, revision),
-   row = this.db.prepare('SELECT sealed,session FROM connections WHERE id=?').get(key) as {
-    sealed: Buffer
-    session: Buffer | null
-   }
-  return {
-   ...publicRow,
-   secrets: row.sealed?.length
-    ? (JSON.parse(this.crypt(row.sealed, true).toString('utf8')) as Record<string, string>)
-    : {},
-   session: row.session?.length
-    ? (JSON.parse(this.crypt(row.session, true).toString('utf8')) as Record<string, unknown>)
-    : null
+ private sealedState(key: string, revision: string) {
+  this.capture(key, revision)
+  return this.db.prepare('SELECT sealed,session FROM connections WHERE id=?').get(key) as {
+   sealed: Buffer
+   session: Buffer | null
   }
  }
- change(input: unknown) {
+ privateSnapshot(key: string, revision: string) {
+  const row = this.sealedState(key, revision)
+  return hash([row.sealed?.toString('base64') || '', row.session?.toString('base64') || ''])
+ }
+ private checkSnapshot(key: string, revision: string, snapshot: string) {
+  if (this.privateSnapshot(key, revision) !== snapshot) throw new Error('通讯凭据或会话已改变，请重新读取')
+ }
+ async privateState(key: string, revision: string) {
+  const publicRow = this.capture(key, revision),
+   row = this.sealedState(key, revision),
+   snapshot = this.privateSnapshot(key, revision),
+   secrets = row.sealed?.length
+    ? (JSON.parse((await this.crypt(row.sealed, true)).toString('utf8')) as Record<string, string>)
+    : {},
+   session = row.session?.length
+    ? (JSON.parse((await this.crypt(row.session, true)).toString('utf8')) as Record<string, unknown>)
+    : null
+  this.checkSnapshot(key, revision, snapshot)
+  return {...publicRow, secrets, session, snapshot}
+ }
+ async change(input: unknown) {
   const value = z
    .object({
     action: z.enum(['create', 'update', 'delete']),
@@ -117,45 +129,52 @@ export class NativeImStore {
    })
    .strict()
    .parse(input)
+  if (this.revision() !== value.expected_revision) throw new Error('通讯连接列表已改变，请刷新')
+  const old = value.action === 'create' ? undefined : this.capture(imId.parse(value.id)),
+   snapshot = old ? this.privateSnapshot(old.id, old.revision) : undefined
+  let fields = value.fields,
+   secrets = value.secrets,
+   sealed: Buffer = Buffer.alloc(0),
+   unchanged = false
+  if (value.action !== 'delete') {
+   if (!value.name || !value.platform || (old && value.platform !== old.platform)) throw new Error('连接名称或平台无效')
+   if (
+    Object.keys(fields).some(key => !['mode', 'webui_url', 'onebot_url'].includes(key)) ||
+    Object.keys(secrets).some(key => !['webui_token', 'onebot_token'].includes(key))
+   )
+    throw new Error('通讯连接字段无效')
+   if (value.platform === 'qq_napcat') {
+    if ((fields.mode || 'managed') === 'managed') {
+     fields = {mode: 'managed'}
+     secrets = {}
+    } else if (fields.mode === 'manual') {
+     fields = {
+      mode: 'manual',
+      webui_url: imLoopback(fields.webui_url),
+      ...(fields.onebot_url ? {onebot_url: imLoopback(fields.onebot_url)} : {})
+     }
+    } else throw new Error('QQ 连接模式无效')
+   } else if (Object.keys(fields).length || Object.keys(secrets).length) throw new Error('微信连接不预填第三方凭据')
+   const prior =
+    old && JSON.stringify(old.fields) === JSON.stringify(fields)
+     ? (await this.privateState(old.id, old.revision)).secrets
+     : {}
+   sealed = Object.keys({...prior, ...secrets}).length
+    ? await this.crypt(Buffer.from(JSON.stringify({...prior, ...secrets})))
+    : Buffer.alloc(0)
+   unchanged =
+    !!old &&
+    JSON.stringify(old.fields) === JSON.stringify(fields) &&
+    Object.entries(secrets).every(([key, value]) => prior[key] === value)
+  }
+  // All asynchronous work has completed. Revalidate ownership inside the synchronous transaction.
   return this.db
    .transaction(() => {
     if (this.revision() !== value.expected_revision) throw new Error('通讯连接列表已改变，请刷新')
-    const old = value.action === 'create' ? undefined : this.capture(imId.parse(value.id))
+    if (old) this.checkSnapshot(old.id, old.revision, snapshot!)
     if (value.action === 'delete') this.db.prepare('DELETE FROM connections WHERE id=?').run(old!.id)
     else {
-     if (!value.name || !value.platform || (old && value.platform !== old.platform))
-      throw new Error('连接名称或平台无效')
      if (!old && this.listing().connections.length >= 20) throw new Error('最多保存20个通讯连接')
-     if (
-      Object.keys(value.fields).some(key => !['mode', 'webui_url', 'onebot_url'].includes(key)) ||
-      Object.keys(value.secrets).some(key => !['webui_token', 'onebot_token'].includes(key))
-     )
-      throw new Error('通讯连接字段无效')
-     let fields = value.fields,
-      secrets = value.secrets
-     if (value.platform === 'qq_napcat') {
-      if ((fields.mode || 'managed') === 'managed') {
-       fields = {mode: 'managed'}
-       secrets = {}
-      } else if (fields.mode === 'manual') {
-       fields = {
-        mode: 'manual',
-        webui_url: imLoopback(fields.webui_url),
-        ...(fields.onebot_url ? {onebot_url: imLoopback(fields.onebot_url)} : {})
-       }
-      } else throw new Error('QQ 连接模式无效')
-     } else if (Object.keys(fields).length || Object.keys(secrets).length) throw new Error('微信连接不预填第三方凭据')
-     const prior =
-      old && JSON.stringify(old.fields) === JSON.stringify(fields)
-       ? this.privateState(old.id, old.revision).secrets
-       : {}
-     const sealed = Object.keys({...prior, ...secrets}).length
-      ? this.crypt(Buffer.from(JSON.stringify({...prior, ...secrets})))
-      : Buffer.alloc(0)
-     const unchanged =
-      old &&
-      JSON.stringify(old.fields) === JSON.stringify(fields) &&
-      Object.entries(secrets).every(([key, value]) => prior[key] === value)
      if (old && unchanged)
       this.db.prepare('UPDATE connections SET name=?,revision=? WHERE id=?').run(value.name, id(), old.id)
      else if (old)
@@ -174,11 +193,21 @@ export class NativeImStore {
    })
    .immediate()
  }
- bind(key: string, revision: string, account: string, session: unknown, capabilities: unknown) {
+ async bind(
+  key: string,
+  revision: string,
+  account: string,
+  session: unknown,
+  capabilities: unknown,
+  beforeCommit: () => void = () => {}
+ ) {
   z.string().min(1).max(200).parse(account)
-  const sealed = this.crypt(Buffer.from(JSON.stringify(session)))
+  const snapshot = this.privateSnapshot(key, revision),
+   sealed = await this.crypt(Buffer.from(JSON.stringify(session)))
   return this.db
    .transaction(() => {
+    this.checkSnapshot(key, revision, snapshot)
+    beforeCommit()
     const row = this.capture(key, revision)
     if (row.account && row.account !== account) throw new Error('账号与此连接原绑定不一致，请新建连接')
     this.db
@@ -191,6 +220,7 @@ export class NativeImStore {
    })
    .immediate()
  }
+
  checkScope(input: unknown) {
   const scope = imScope.parse(input),
    row = this.capture(scope.connection_id, scope.revision)
@@ -291,12 +321,22 @@ export class NativeImStore {
    })
    .immediate()
  }
- saveSessionAndMessages(input: unknown, session: unknown, messages: unknown) {
-  const encrypted = this.crypt(Buffer.from(JSON.stringify(session)))
+ async saveSessionAndMessages(
+  input: unknown,
+  session: unknown,
+  messages: unknown,
+  snapshot: string,
+  beforeCommit: () => void = () => {}
+ ) {
+  const {scope: original} = this.checkScope(input)
+  this.checkSnapshot(original.connection_id, original.revision, snapshot)
+  const encrypted = await this.crypt(Buffer.from(JSON.stringify(session)))
   return this.db
    .transaction(() => {
-    const {scope} = this.checkScope(input),
-     result = this.saveMessages(scope, messages)
+    const {scope} = this.checkScope(input)
+    this.checkSnapshot(scope.connection_id, scope.revision, snapshot)
+    beforeCommit()
+    const result = this.saveMessages(scope, messages)
     this.db
      .prepare('UPDATE connections SET session=?,checked_at=? WHERE id=? AND revision=?')
      .run(encrypted, Date.now() / 1000, scope.connection_id, scope.revision)

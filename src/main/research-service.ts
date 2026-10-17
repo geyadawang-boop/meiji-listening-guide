@@ -11,6 +11,7 @@ import {NativeResearchNotes} from './research-notes'
 import {NativeResearchWorkflows} from './research-workflow'
 import {NativeResearchMcp} from './research-mcp'
 import {NativeImService} from './im-service'
+import type {MediaCrypt} from './media-encryption'
 const op = z.string().regex(/^[a-f0-9]{32}$/)
 /** Staged native tools dispatcher. Unimplemented channels are errors, never empty success receipts. */
 export class NativeResearchService {
@@ -29,7 +30,8 @@ export class NativeResearchService {
  constructor(
   private root: string,
   private model: ResearchModel,
-  private resources?: string
+  private resources?: string,
+  private crypt?: MediaCrypt
  ) {
   this.store = new NativeResearchStore(root)
   this.knowledge = new NativeKnowledgeStore(root)
@@ -54,11 +56,18 @@ export class NativeResearchService {
   switch (action) {
    case 'im': {
     if (!this.resources) throw new Error('通讯组件资源路径缺失')
-    this.im ??= new NativeImService(this.root, this.resources, undefined, this.model, {
-     id: this.store.rootId,
-     search: query => this.sources.search(query),
-     verify: sources => this.sources.verify(sources)
-    })
+    this.im ??= new NativeImService(
+     this.root,
+     this.resources,
+     undefined,
+     this.model,
+     {
+      id: this.store.rootId,
+      search: query => this.sources.search(query),
+      verify: sources => this.sources.verify(sources)
+     },
+     this.crypt
+    )
     return this.im.execute(z.string().parse(args.action), args.value || {}, this.connection)
    }
    case 'configure': {
