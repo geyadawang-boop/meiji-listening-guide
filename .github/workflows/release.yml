@@ -41,6 +41,8 @@ jobs:
         run: test "v$(node -p "require('./package.json').version")" = "$GITHUB_REF_NAME"
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: Ensure Electron binary
+        run: node node_modules/electron/install.js
       - name: Typecheck and build
         run: pnpm build
       - name: Package lite installers
