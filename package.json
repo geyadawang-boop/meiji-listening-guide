@@ -102,7 +102,7 @@
     ]
    },
    {
-    "from": "prompts",
+    "from": "src/prompts",
     "to": "prompts",
     "filter": [
      "**/*",
