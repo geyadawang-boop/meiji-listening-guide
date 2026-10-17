@@ -1,9 +1,12 @@
 import {utilityProcess, type UtilityProcess} from 'electron'
 import {fileURLToPath} from 'node:url'
 import {z} from 'zod'
+import {mediaCryptRequest, decodeMediaCrypt} from './media-encryption'
+import {systemProtect} from './system-encryption'
 import {BACKEND_PROTOCOL, backendRequest} from '../shared/backend-protocol'
 import type {ResearchModel} from './research-engine'
 const messageSchema = z.discriminatedUnion('kind', [
+ mediaCryptRequest,
  z.object({
   protocol: z.literal(BACKEND_PROTOCOL),
   kind: z.literal('result'),
@@ -62,10 +65,29 @@ export class NativeResearchBackend {
    }
    this.pending.clear()
   }
+  let lastCryptKey = 0
   worker.once('exit', fail)
   worker.on('message', (raw: unknown) => {
    void (async () => {
+    if (this.worker !== worker) return
     const reply = messageSchema.parse(raw)
+    if (reply.kind === 'crypt') {
+     if (reply.key <= lastCryptKey) throw new Error('系统加密请求编号无效')
+     lastCryptKey = reply.key
+     try {
+      const data = systemProtect(decodeMediaCrypt(reply.data), reply.decrypt, 'im').toString('base64')
+      if (this.worker === worker) worker.postMessage({kind: 'crypt-result', key: reply.key, ok: true, data})
+     } catch {
+      if (this.worker === worker)
+       worker.postMessage({
+        kind: 'crypt-result',
+        key: reply.key,
+        ok: false,
+        error: '系统密钥库不可用或凭据格式无效，未写入凭据'
+       })
+     }
+     return
+    }
     if (reply.kind === 'result') {
      const item = this.pending.get(reply.id)
      if (!item) return

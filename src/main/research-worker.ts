@@ -3,6 +3,7 @@ import {z} from 'zod'
 import {NativeResearchService} from './research-service'
 import {BACKEND_PROTOCOL} from '../shared/backend-protocol'
 import {acquireDownloadQueue} from './media-queue-lease'
+import {MediaEncryptionClient} from './media-encryption'
 const port = (process as NodeJS.Process & {parentPort: ParentPort}).parentPort
 const [root, resources] = process.argv.slice(2)
 if (!port || !root) throw new Error('研究工作进程参数无效')
@@ -11,6 +12,8 @@ let key = 0,
 const ownerReady = acquireDownloadQueue(root, 'native-research-owner.sqlite')
 void ownerReady.catch(() => {})
 const pending = new Map<number, {resolve: (text: string) => void; reject: (error: Error) => void; cancel: () => void}>()
+const encryption = new MediaEncryptionClient(message => port.postMessage(message))
+process.once('exit', () => encryption.close())
 const service = new NativeResearchService(
  root,
  (input, signal) =>
@@ -34,10 +37,20 @@ const service = new NativeResearchService(
    port.postMessage({protocol: BACKEND_PROTOCOL, kind: 'model', key: id, ...input})
    if (signal.aborted) cancel()
   }),
- resources
+ resources,
+ encryption.protect
 )
 port.on('message', event => {
  const raw = event.data as {kind?: string}
+ if (raw.kind === 'crypt-result') {
+  try {
+   encryption.receive(raw)
+  } catch {
+   encryption.close()
+   process.exit(1)
+  }
+  return
+ }
  if (raw.kind === 'model-result') {
   try {
    const reply = z
@@ -76,7 +89,11 @@ port.on('message', event => {
    if (closed) throw new Error('研究后台已关闭')
    if (request.action === 'shutdown') {
     closed = true
-    await service.dispose()
+    try {
+     await service.dispose()
+    } finally {
+     encryption.close()
+    }
     owner.close()
     port.postMessage({protocol: BACKEND_PROTOCOL, kind: 'result', id, ok: true, result: true})
     return

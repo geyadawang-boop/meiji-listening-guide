@@ -6,6 +6,7 @@ import {join, resolve, dirname, sep} from 'node:path'
 import {NativeWindowsJob, windowsProtect} from './windows-native'
 import {imLocalJson} from './im-loopback'
 import {z} from 'zod'
+import type {MediaCrypt} from './media-encryption'
 const version = '4.18.37',
  archiveSha = '05c79761361321f6af4358aef92f80a7f8e319b6459c260ebf9a159615e96fe4'
 const secretsSchema = z.object({
@@ -37,7 +38,8 @@ export class NativeNapcatRuntime {
  private closed = false
  constructor(
   private resources: string,
-  private root: string
+  private root: string,
+  private crypt: MediaCrypt = windowsProtect
  ) {}
  status() {
   return {version, state: this.state, code: this.code, owned_running: !!this.child && this.child.poll() === null}
@@ -136,7 +138,7 @@ export class NativeNapcatRuntime {
   const privatePath = await this.owned(join(this.root, 'native-owner.dpapi'))
   let value: NativeNapcatSecrets
   try {
-   value = secretsSchema.parse(JSON.parse(windowsProtect(await readFile(privatePath), true).toString('utf8')))
+   value = secretsSchema.parse(JSON.parse((await this.crypt(await readFile(privatePath), true)).toString('utf8')))
   } catch (error) {
    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
    value = {
@@ -146,7 +148,7 @@ export class NativeNapcatRuntime {
     onebot_token: randomBytes(32).toString('hex')
    }
    if (value.webui_port === value.onebot_port) throw new Error('通讯端口冲突，请重试')
-   await writeFile(privatePath, windowsProtect(Buffer.from(JSON.stringify(value))), {flag: 'wx'})
+   await writeFile(privatePath, await this.crypt(Buffer.from(JSON.stringify(value))), {flag: 'wx'})
   }
   const config = await this.owned(join(target, 'napcat/config'))
   await mkdir(config, {recursive: true})

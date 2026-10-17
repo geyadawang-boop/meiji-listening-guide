@@ -11,6 +11,7 @@ export class NativeWeixinLocal {
   {resolve: (value: unknown) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout>}
  >()
  private sequence = 0
+ private bindings = new Map<string, number>()
  private closed = false
  private fail = () => {
   this.job?.close()
@@ -76,6 +77,10 @@ export class NativeWeixinLocal {
   signal?.throwIfAborted()
   const worker = this.start(),
    id = ++this.sequence
+  if (['probe', 'confirm', 'invalidate'].includes(action)) {
+   const connection = z.object({connection_id: z.string()}).parse(input).connection_id
+   this.bindings.set(connection, (this.bindings.get(connection) || 0) + 1)
+  }
   return new Promise<T>((resolve, reject) => {
    const aborted = () => this.fail(),
     finish = () => signal?.removeEventListener('abort', aborted),
@@ -100,6 +105,34 @@ export class NativeWeixinLocal {
     if (error) this.fail()
    })
   })
+ }
+ captureOwner(connection: string) {
+  const worker = this.worker,
+   generation = this.bindings.get(connection)
+  if (!worker || this.closed) throw new Error('本机微信读取后台已中断')
+  return () => {
+   if (this.closed || this.worker !== worker || this.bindings.get(connection) !== generation)
+    throw new Error('本机微信读取绑定已改变，请重新核验')
+  }
+ }
+ async confirm<T>(connection: string, input: unknown, signal?: AbortSignal) {
+  const pending = this.request<T>('confirm', input, signal)
+  let owner: () => void
+  try {
+   owner = this.captureOwner(connection)
+  } catch (error) {
+   await pending.catch(() => {})
+   throw error
+  }
+  return {result: await pending, owner}
+ }
+ async invalidateOwned(connection: string, owner: () => void) {
+  try {
+   owner()
+  } catch {
+   return
+  }
+  await this.invalidate(connection)
  }
  async invalidate(connection_id: string) {
   if (this.worker) await this.request('invalidate', {connection_id})
