@@ -66,7 +66,7 @@ export class SettingsStore {
   for (const name of ['correction', 'notes', 'past-exam', 'match', 'search', 'answer', 'chat']) {
    if (this.value.prompts[name] === undefined)
     this.value.prompts[name] = readFileSync(
-     join(app.isPackaged ? process.resourcesPath : app.getAppPath(), 'prompts', name + '.txt'),
+     join(app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'src'), 'prompts', name + '.txt'),
      'utf8'
     )
   }

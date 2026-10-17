@@ -22,7 +22,7 @@ async function walk(folder: string) {
   }
  }
 }
-for (const folder of ['src', 'prompts']) await walk(join(root, folder))
+await walk(join(root, 'src'))
 for (const item of await readdir(join(root, 'scripts'), {withFileTypes: true}))
  if (
   item.isFile() &&
