@@ -1,0 +1,113 @@
+// Independently hashed source archives, researched 2026-10-17. No binary/distribution approval.
+export const buildSources = [
+ {
+  id: 'ffmpeg',
+  version: '8.1.3',
+  root: 'ffmpeg-8.1.3',
+  archive: 'ffmpeg-8.1.3.tar.xz',
+  url: 'https://ffmpeg.org/releases/ffmpeg-8.1.3.tar.xz',
+  hosts: ['ffmpeg.org'],
+  size: 11732036,
+  sha256: '7138d28c96d9d3e3af4ee3d8cad72741f8ffb40da90c1112235dea3ecd3178a3',
+  identity: 'n8.1.3; commit 1041abdc962f4cc4f394aa8de9dc5236c0c3b9e7',
+  evidence: 'https://github.com/FFmpeg/FFmpeg/tree/n8.1.3',
+  licenseFiles: ['COPYING.GPLv2', 'COPYING.LGPLv2.1', 'LICENSE.md'],
+  license: 'GPL route when linked with x264',
+  digestEvidence: 'Complete source archive locally hashed; signed Git tag identity checked separately'
+ },
+ {
+  id: 'x264',
+  version: 'b35605ace3ddf7c1a5d67a2eb553f034aef41d55',
+  root: 'x264-b35605ace3ddf7c1a5d67a2eb553f034aef41d55',
+  archive: 'x264-b35605ac.tar.bz2',
+  url: 'https://distfiles.macports.org/x264/x264-b35605ace3ddf7c1a5d67a2eb553f034aef41d55.tar.bz2',
+  originalSource:
+   'https://code.videolan.org/videolan/x264/-/archive/b35605ace3ddf7c1a5d67a2eb553f034aef41d55/x264-b35605ace3ddf7c1a5d67a2eb553f034aef41d55.tar.bz2',
+  hosts: ['distfiles.macports.org'],
+  size: 848719,
+  sha256: '6eeb82934e69fd51e043bd8c5b0d152839638d1ce7aa4eea65a3fedcf83ff224',
+  identity: 'Official VideoLAN commit b35605ace3ddf7c1a5d67a2eb553f034aef41d55',
+  evidence: 'https://code.videolan.org/videolan/x264/-/tree/b35605ace3ddf7c1a5d67a2eb553f034aef41d55',
+  licenseFiles: ['COPYING'],
+  license: 'GPL-2.0-or-later',
+  digestEvidence:
+   'Complete MacPorts mirror archive matches independently obtained official archive size and SHA256; official endpoint returns HTTP 406 to Node fetch'
+ },
+ {
+  id: 'vpx',
+  version: '1.17.0',
+  root: 'libvpx-1.17.0',
+  archive: 'libvpx-1.17.0.tar.gz',
+  url: 'https://storage.googleapis.com/downloads.webmproject.org/releases/webm/libvpx-1.17.0.tar.gz',
+  hosts: ['storage.googleapis.com'],
+  size: 5662999,
+  sha256: '7f98aae5c52c46e85b7b26feabcab9b1554605e771bd1df1d6e6a00ee22fa8ed',
+  identity: 'v1.17.0; commit 6df3ec34557879fff673706f4a1d9fbd0f3a6f0e',
+  evidence: 'https://github.com/webmproject/libvpx/tree/v1.17.0',
+  licenseFiles: ['LICENSE', 'PATENTS'],
+  license: 'BSD-3-Clause plus PATENTS',
+  digestEvidence: 'Official release archive locally hashed; not the different GitHub auto-archive'
+ },
+ {
+  id: 'lame',
+  version: '3.100',
+  root: 'lame-3.100',
+  archive: 'lame-3.100.tar.gz',
+  url: 'https://distfiles.macports.org/lame/lame-3.100.tar.gz',
+  hosts: ['distfiles.macports.org'],
+  size: 1524133,
+  sha256: 'ddfe36cab873794038ae2c1210557ad34857a4b6bdc515785d1da9e175b1da1e',
+  identity: '3.100 original-source mirror; official SourceForge download returned HTML during research',
+  evidence: 'https://lame.sourceforge.io/',
+  originalSource: 'https://sourceforge.net/projects/lame/files/lame/3.100/lame-3.100.tar.gz',
+  licenseFiles: ['COPYING'],
+  license: 'LGPL-2.0-or-later',
+  digestEvidence:
+   'Complete MacPorts archive matches independently fetched sources.buildroot.net/lame/lame-3.100.tar.gz size and SHA256; official PGP signature not verified'
+ },
+ {
+  id: 'opus',
+  version: '1.5.2',
+  root: 'opus-1.5.2',
+  archive: 'opus-1.5.2.tar.gz',
+  url: 'https://github.com/xiph/opus/releases/download/v1.5.2/opus-1.5.2.tar.gz',
+  hosts: ['github.com', 'release-assets.githubusercontent.com'],
+  size: 7839412,
+  sha256: '65c1d2f78b9f2fb20082c38cbe47c951ad5839345876e46941612ee87f9a7ce1',
+  identity: 'asset 191986664; v1.5.2 commit ddbe48383984d56acd9e1ab6a090c54ca6b735a6',
+  evidence: 'https://github.com/xiph/opus/releases/tag/v1.5.2',
+  licenseFiles: ['COPYING'],
+  license: 'BSD-3-Clause plus patent terms',
+  digestEvidence: 'Complete official release archive locally hashed'
+ },
+ {
+  id: 'ogg',
+  version: '1.3.6',
+  root: 'libogg-1.3.6',
+  archive: 'libogg-1.3.6.tar.xz',
+  url: 'https://github.com/xiph/ogg/releases/download/v1.3.6/libogg-1.3.6.tar.xz',
+  hosts: ['github.com', 'release-assets.githubusercontent.com'],
+  size: 439952,
+  sha256: '5c8253428e181840cd20d41f3ca16557a9cc04bad4a3d04cce84808677fa1061',
+  identity: 'asset 264452077; v1.3.6 commit be05b13e98b048f0b5a0f5fa8ce514d56db5f822',
+  evidence: 'https://github.com/xiph/ogg/releases/tag/v1.3.6',
+  licenseFiles: ['COPYING'],
+  license: 'BSD-3-Clause',
+  digestEvidence: 'Complete archive locally hashed and matched GitHub asset digest'
+ },
+ {
+  id: 'vorbis',
+  version: '1.3.7',
+  root: 'libvorbis-1.3.7',
+  archive: 'libvorbis-1.3.7.tar.xz',
+  url: 'https://downloads.xiph.org/releases/vorbis/libvorbis-1.3.7.tar.xz',
+  hosts: ['downloads.xiph.org', 'ftp.osuosl.org'],
+  size: 1203792,
+  sha256: 'b33cc4934322bcbf6efcbacf49e3ca01aadbea4114ec9589d1b1e9d20f72954b',
+  identity: 'v1.3.7; commit 0657aee69dec8508a0011f47f3b69d7538e9d262; same-name official asset 22548563',
+  evidence: 'https://github.com/xiph/vorbis/releases/tag/v1.3.7',
+  licenseFiles: ['COPYING'],
+  license: 'BSD-3-Clause',
+  digestEvidence: 'Complete official source archive locally hashed; asset API digest unavailable'
+ }
+] as const
