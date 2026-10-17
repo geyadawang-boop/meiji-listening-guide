@@ -1,5 +1,6 @@
 import {app, nativeImage} from 'electron'
 import {spawn} from 'node:child_process'
+import {mediaExecutablePath, checkedMediaExecutable} from './media-executable'
 import {mkdir, readFile, writeFile, readdir, copyFile, realpath, lstat, unlink, rmdir, rename} from 'node:fs/promises'
 import {join, basename, resolve, dirname} from 'node:path'
 import {randomUUID, createHash} from 'node:crypto'
@@ -12,12 +13,14 @@ import {verifyGeneratedPdf} from './pdf-ppt-cleanup'
 import {StableSlides, checkedRegion, type Region} from './video-policy'
 import type {VideoSource, VideoReview, PendingVideoTask} from '../shared/video-ppt'
 
-export const ffmpegPath = () =>
- join(app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'resources'), 'video', 'ffmpeg.exe')
-export function ffmpeg(args: string[], signal: AbortSignal, onData?: (b: Buffer) => void): Promise<string> {
+const mediaResources = () => (app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'resources'))
+export const ffmpegPath = () => mediaExecutablePath(mediaResources(), 'ffmpeg')
+export async function ffmpeg(args: string[], signal: AbortSignal, onData?: (b: Buffer) => void): Promise<string> {
+ signal.throwIfAborted()
+ const executable = await checkedMediaExecutable(mediaResources(), 'ffmpeg')
  signal.throwIfAborted()
  return new Promise((resolve, reject) => {
-  const child = spawn(ffmpegPath(), ['-hide_banner', '-nostdin', ...args], {
+  const child = spawn(executable, ['-hide_banner', '-nostdin', ...args], {
    windowsHide: true,
    stdio: ['ignore', 'pipe', 'pipe']
   })

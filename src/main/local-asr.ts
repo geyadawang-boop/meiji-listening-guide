@@ -1,5 +1,6 @@
 import {app, utilityProcess} from 'electron'
 import {spawn} from 'node:child_process'
+import {checkedMediaExecutable} from './media-executable'
 import {join, resolve, sep} from 'node:path'
 import {fileURLToPath} from 'node:url'
 import {existsSync} from 'node:fs'
@@ -21,10 +22,11 @@ const replySchema = z.discriminatedUnion('kind', [
 ])
 export async function transcribeLocalVideo(video: string, signal: AbortSignal, progress: (message: string) => void) {
  const resources = app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'resources')
- const model = join(resources, 'asr/onnx-small'),
-  ffmpeg = join(resources, 'video/ffmpeg.exe')
- if (!existsSync(join(model, 'acquisition.json')) || !existsSync(ffmpeg))
+ const model = join(resources, 'asr/onnx-small')
+ if (!existsSync(join(model, 'acquisition.json')))
   throw new Error('本地字幕模型或视频组件未安装，请在运行环境安装同版本组件')
+ signal.throwIfAborted()
+ const ffmpeg = await checkedMediaExecutable(resources, 'ffmpeg')
  signal.throwIfAborted()
  const root = resolve(app.getPath('userData'), 'asr-tasks'),
   directory = join(root, randomUUID()),
@@ -42,6 +44,8 @@ export async function transcribeLocalVideo(video: string, signal: AbortSignal, p
   })
  )
  progress('正在读取完整视频音频')
+ await checkedMediaExecutable(resources, 'ffmpeg')
+ signal.throwIfAborted()
  await new Promise<void>((resolve, reject) => {
   const child = spawn(
    ffmpeg,
