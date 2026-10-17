@@ -11,7 +11,7 @@ export const mediaSources = [
    usage: 'research-only',
    observedToolVersion: '6.0',
    reasons: ['nonfree_build', 'ad_hoc_signature', 'gatekeeper_rejected'],
-   evidence: 'https://github.com/mikudeshuo/meiji-listening-guide/actions/runs/39038682153'
+   evidence: 'https://github.com/geyadawang-boop/meiji-listening-guide/actions/runs/39038682153'
   },
   evidence: 'https://api.github.com/repos/eugeneware/ffmpeg-static/releases/tags/b6.1.1',
   allowedRedirectHosts: ['github.com', 'release-assets.githubusercontent.com'],

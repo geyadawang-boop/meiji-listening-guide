@@ -209,7 +209,7 @@ function distributionFindings(metadata: Record<string, ToolMetadata>, lockedReas
    /Signature=adhoc/i.test(info.signatureDetails.stdout + '\n' + info.signatureDetails.stderr)
   )
    reasons.add('ad_hoc_signature')
-  if (info.gatekeeperAssessment && info.gatekeeperAssessment.code !== 0) reasons.add('gatekeeper_not_accepted')
+  if (info.gatekeeperAssessment && info.gatekeeperAssessment.code !== 0) reasons.add('gatekeeper_rejected')
  }
  return {distribution_status: reasons.size ? 'blocked' : 'pending', distribution_reasons: [...reasons]}
 }

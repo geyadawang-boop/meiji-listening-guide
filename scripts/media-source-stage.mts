@@ -201,6 +201,7 @@ export async function stageMedia(request: {sourceId: string; inputDirectory: str
    schema: 1,
    state: 'staged_verified',
    sourceId: source.id,
+   source_distribution: source.distribution,
    target: {platform: source.platform, arch: source.arch},
    upstream: {repository: source.repository, tag: source.tag, evidence: source.evidence},
    files,
