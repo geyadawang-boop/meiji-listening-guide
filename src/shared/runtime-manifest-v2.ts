@@ -79,7 +79,7 @@ export const runtimeManifestV2Schema = manifestV2Base.superRefine((manifest, con
   const tools = manifest.target.platform === 'win32' ? ['ffmpeg.exe', 'ffprobe.exe'] : ['ffmpeg', 'ffprobe']
   if (component.id === 'video') {
    for (const tool of tools)
-    if (!component.files.some(file => file.path === tool))
+    if (!component.files.some(file => file.path === tool && file.size > 0))
      issue('Video tool pair is incomplete', [...location, 'files'])
   }
   for (const [fileIndex, file] of component.files.entries()) {
@@ -118,7 +118,7 @@ const legacySchema = z
    .max(10)
  })
  .strict()
-/** Legacy interpretation only; no conversion of bytes, modes, paths or installation behavior. */
+/** Legacy interpretation only, not installability or integrity acceptance; no conversion or installation changes. */
 export function parseLegacyRuntimeManifest(value: unknown, expectedTarget: RuntimeTarget) {
  const target = runtimeTargetSchema.parse(expectedTarget)
  if (target.platform !== 'win32' || target.arch !== 'x64')
