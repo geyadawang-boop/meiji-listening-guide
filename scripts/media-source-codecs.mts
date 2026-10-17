@@ -23,11 +23,12 @@ async function guardian(
  resources: string,
  tool: 'ffmpeg' | 'ffprobe',
  args: string[],
- stop?: 'cancel' | 'disconnect'
+ stop?: 'cancel' | 'disconnect',
+ env?: NodeJS.ProcessEnv
 ) {
  return await new Promise<{code: number; stdout: string; stderr: string; stop?: string; childExited?: boolean}>(
   (done, fail) => {
-   const child = fork(entry, [resources, tool], {stdio: ['ignore', 'pipe', 'pipe', 'ipc'], windowsHide: true})
+   const child = fork(entry, [resources, tool], {stdio: ['ignore', 'pipe', 'pipe', 'ipc'], windowsHide: true, env})
    const streamsClosed = Promise.all([once(child.stdout!, 'close'), once(child.stderr!, 'close')])
    let stdout = '',
     stderr = '',
@@ -103,23 +104,14 @@ async function guardian(
  )
 }
 
-export async function verifySourceCodecs(entry: string, resources: string, work: string) {
- const run = (args: string[]) =>
-  guardian(entry, resources, 'ffmpeg', ['-hide_banner', '-loglevel', 'error', '-nostdin', ...args])
+export async function verifySourceCodecs(entry: string, resources: string, work: string, env: NodeJS.ProcessEnv) {
+ const invoke = (tool: 'ffmpeg' | 'ffprobe', args: string[], stop?: 'cancel' | 'disconnect') =>
+  guardian(entry, resources, tool, args, stop, env)
+ const run = (args: string[]) => invoke('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-nostdin', ...args])
  const probe = async (file: string) =>
   JSON.parse(
-   (
-    await guardian(entry, resources, 'ffprobe', [
-     '-v',
-     'error',
-     '-show_streams',
-     '-show_format',
-     '-show_chapters',
-     '-of',
-     'json',
-     file
-    ])
-   ).stdout
+   (await invoke('ffprobe', ['-v', 'error', '-show_streams', '-show_format', '-show_chapters', '-of', 'json', file]))
+    .stdout
   )
  const checks: string[] = []
  for (const [flag, names] of [
@@ -151,7 +143,7 @@ export async function verifySourceCodecs(entry: string, resources: string, work:
   ],
   ['-protocols', ['file', 'pipe']]
  ] as const) {
-  const capabilities = await guardian(entry, resources, 'ffmpeg', ['-hide_banner', flag])
+  const capabilities = await invoke('ffmpeg', ['-hide_banner', flag])
   const tokens = (capabilities.stdout + '\n' + capabilities.stderr).split(/[\s,]+/)
   for (const name of names) check(tokens.includes(name), 'Missing capability ' + flag + ': ' + name)
  }
@@ -176,10 +168,8 @@ export async function verifySourceCodecs(entry: string, resources: string, work:
   'aac',
   video
  ])
- check(
-  (await probe(video)).streams.some((s: {codec_name: string}) => s.codec_name === 'h264'),
-  'H264 encoding failed'
- )
+ const primaryCodecs = (await probe(video)).streams.map((s: {codec_name: string}) => s.codec_name)
+ check(primaryCodecs.includes('h264') && primaryCodecs.includes('aac'), 'H264/AAC encoding failed')
  checks.push('libx264 H264 and AAC MP4')
  const webm = join(work, 'vp9.webm')
  await run(['-i', video, '-c:v', 'libvpx-vp9', '-deadline', 'realtime', '-cpu-used', '8', '-c:a', 'libopus', webm])
@@ -211,7 +201,7 @@ export async function verifySourceCodecs(entry: string, resources: string, work:
   check((await probe(file)).streams[0].width === 32, 'Image extraction failed')
   checks.push(extension + ' crop/scale extraction')
  }
- const raw = await guardian(entry, resources, 'ffmpeg', [
+ const raw = await invoke('ffmpeg', [
   '-v',
   'error',
   '-i',
@@ -247,13 +237,15 @@ export async function verifySourceCodecs(entry: string, resources: string, work:
   'aac',
   edited
  ])
- check(Number((await probe(edited)).format.duration) < 0.8, 'Trim/concat duration failed')
+ const editedDuration = Number((await probe(edited)).format.duration)
+ check(editedDuration > 0.5 && editedDuration < 0.8, 'Trim/concat duration failed')
  checks.push('trim/setpts/atrim/asetpts/concat filter script')
  const list = join(work, 'list.ffconcat'),
   combined = join(work, 'combined.mp4')
  await writeFile(list, "ffconcat version 1.0\nfile 'h264.mp4'\nfile 'h264.mp4'\n")
  await run(['-protocol_whitelist', 'file,pipe', '-f', 'concat', '-safe', '1', '-i', list, '-c', 'copy', combined])
- check(Number((await probe(combined)).format.duration) > 1.8, 'Concat demuxer failed')
+ const combinedDuration = Number((await probe(combined)).format.duration)
+ check(combinedDuration > 1.8 && combinedDuration < 2.3, 'Concat demuxer failed')
  checks.push('concat demuxer file/pipe stream copy')
  const srt = join(work, 'subtitle.srt'),
   metadata = join(work, 'chapters.txt'),
@@ -285,9 +277,20 @@ export async function verifySourceCodecs(entry: string, resources: string, work:
   join(work, 'frame.jpg'),
   '-metadata:s:t',
   'mimetype=image/jpeg',
+  '-metadata:s:t',
+  'filename=frame.jpg',
   decorated
  ])
  const decoratedMeta = await probe(decorated)
+ check(
+  decoratedMeta.streams.some(
+   (s: {codec_type: string; tags?: {filename?: string; mimetype?: string}; disposition?: {attached_pic?: number}}) =>
+    (s.codec_type === 'attachment' || s.disposition?.attached_pic === 1) &&
+    s.tags?.filename === 'frame.jpg' &&
+    s.tags?.mimetype === 'image/jpeg'
+  ),
+  'JPEG attachment metadata missing'
+ )
  check(
   decoratedMeta.streams.some((s: {codec_type: string}) => s.codec_type === 'subtitle') &&
    decoratedMeta.chapters.length === 1,
@@ -295,8 +298,8 @@ export async function verifySourceCodecs(entry: string, resources: string, work:
  )
  checks.push('SRT, ffmetadata chapter and JPEG Matroska attachment')
  const infinite = ['-v', 'error', '-re', '-f', 'lavfi', '-i', 'color=s=16x16:r=5', '-f', 'null', '-']
- const cancel = await guardian(entry, resources, 'ffmpeg', infinite, 'cancel'),
-  disconnect = await guardian(entry, resources, 'ffmpeg', infinite, 'disconnect')
+ const cancel = await invoke('ffmpeg', infinite, 'cancel'),
+  disconnect = await invoke('ffmpeg', infinite, 'disconnect')
  return {
   checks,
   cancel,

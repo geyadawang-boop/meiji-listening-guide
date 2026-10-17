@@ -3,6 +3,7 @@ import {createHash} from 'node:crypto'
 import {copyFile, mkdir, open, readFile, writeFile} from 'node:fs/promises'
 import {join, dirname, resolve} from 'node:path'
 import {fileURLToPath} from 'node:url'
+import {release} from 'node:os'
 import {build} from 'esbuild'
 import {prepareBuildSources} from './media-source-prepare.mts'
 import {buildSources} from './media-build-source-lock.mts'
@@ -184,9 +185,29 @@ try {
   const receipt = prepared.report.receipts.find(r => r.source.id === id)!
   const cwd = join(prepared.work, receipt.path)
   console.log('Building source: ' + id)
-  await execute(join(cwd, 'configure'), ['--prefix=' + prefix, ...configs[id]], cwd, env, id + '-configure')
-  await execute('/usr/bin/make', ['-j3'], cwd, env, id + '-make')
-  await execute('/usr/bin/make', ['install'], cwd, env, id + '-install')
+  try {
+   await execute(join(cwd, 'configure'), ['--prefix=' + prefix, ...configs[id]], cwd, env, id + '-configure')
+   await execute('/usr/bin/make', ['-j3'], cwd, env, id + '-make')
+   await execute('/usr/bin/make', ['install'], cwd, env, id + '-install')
+  } finally {
+   for (const file of [
+    'config.log',
+    'config.err',
+    'config.h',
+    'config.mak',
+    'ffbuild/config.log',
+    'ffbuild/config.mak'
+   ]) {
+    try {
+     await copyFile(join(cwd, file), join(logs, id + '-' + file.replaceAll('/', '-')))
+    } catch (error) {
+     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+      const failures = (report.diagnosticCopyFailures ??= []) as string[]
+      failures.push(id + '/' + file + ': ' + String((error as NodeJS.ErrnoException).code))
+     }
+    }
+   }
+  }
  }
  const resources = join(prepared.work, 'runtime'),
   video = join(resources, 'video')
@@ -247,7 +268,7 @@ try {
  report.diagnostics = diagnostics
  const fixtures = join(prepared.work, 'fixtures')
  await mkdir(fixtures)
- report.codecs = await verifySourceCodecs(entry, resources, fixtures)
+ report.codecs = await verifySourceCodecs(entry, resources, fixtures, env)
  const archive = join(artifacts, 'source-build-candidate.tar.gz')
  // Explicit isolated candidate archive: fixed source tarballs, full sources/configuration and built prefix.
  await execute(
@@ -260,6 +281,7 @@ try {
  report.archiveSha256 = createHash('sha256')
   .update(await readFile(archive))
   .digest('hex')
+ check(!report.diagnosticCopyFailures, 'Some build diagnostics could not be preserved')
  report.state = 'source_build_candidate_verified'
 } catch (error) {
  report.state = 'failed'
@@ -267,19 +289,25 @@ try {
  process.exitCode = 1
 } finally {
  report.binding = {
+  platform: process.platform,
+  arch: process.arch,
+  osRelease: release(),
+  osProductVersion: execFileSync('/usr/bin/sw_vers', ['-productVersion'], {encoding: 'utf8'}).trim(),
   commit: execFileSync('git', ['rev-parse', 'HEAD'], {cwd: root, encoding: 'utf8'}).trim(),
   dirty: !!execFileSync('git', ['status', '--porcelain'], {cwd: root, encoding: 'utf8'}).trim(),
   sourceHashes: Object.fromEntries(
    await Promise.all(
     [
-     'media-source-build.mts',
-     'media-source-codecs.mts',
-     'media-source-prepare.mts',
-     'media-build-source-lock.mts'
+     'scripts/media-source-build.mts',
+     'scripts/media-source-codecs.mts',
+     'scripts/media-source-prepare.mts',
+     'scripts/media-build-source-lock.mts',
+     'src/main/media-process-guardian.ts',
+     'src/main/media-executable.ts'
     ].map(async file => [
      file,
      createHash('sha256')
-      .update(await readFile(join(root, 'scripts', file)))
+      .update(await readFile(join(root, file)))
       .digest('hex')
     ])
    )
