@@ -25,8 +25,20 @@ export async function ffmpeg(args: string[], signal: AbortSignal, onData?: (b: B
    stdio: ['ignore', 'pipe', 'pipe']
   })
   let error = '',
-   settled = false
-  const abort = () => child.kill()
+   settled = false,
+   started = false,
+   stopRequested = false,
+   failure: Error | undefined
+  const stop = () => {
+   if (stopRequested) return
+   stopRequested = true
+   try {
+    child.kill()
+   } catch (e) {
+    failure ??= e instanceof Error ? e : new Error('视频进程停止失败')
+   }
+  }
+  const abort = () => stop()
   signal.addEventListener('abort', abort, {once: true})
   const finish = (err?: Error) => {
    if (settled) return
@@ -37,18 +49,28 @@ export async function ffmpeg(args: string[], signal: AbortSignal, onData?: (b: B
    else resolve(error)
   }
   child.stdout.on('data', (b: Buffer) => {
+   if (failure || signal.aborted || settled) return
    try {
     onData?.(b)
    } catch (e) {
-    child.kill()
-    finish(e instanceof Error ? e : new Error('视频读取失败'))
+    failure = e instanceof Error ? e : new Error('视频读取失败')
+    stop()
    }
   })
   child.stderr.on('data', b => {
    error = (error + b.toString()).slice(-32000)
   })
-  child.on('error', () => finish(new Error('无法启动视频处理组件，请重新安装软件')))
-  child.on('close', code => finish(code === 0 ? undefined : new Error('无法读取视频，请确认视频完整且格式受支持')))
+  child.once('spawn', () => {
+   started = true
+  })
+  child.on('error', () => {
+   failure ??= new Error(started ? '视频处理进程发生错误' : '无法启动视频处理组件，请重新安装软件')
+   if (!started) finish(failure)
+  })
+  child.on('close', code =>
+   finish(failure ?? (code === 0 ? undefined : new Error('无法读取视频，请确认视频完整且格式受支持')))
+  )
+  if (signal.aborted) abort()
  })
 }
 const json = (raw: string) =>
