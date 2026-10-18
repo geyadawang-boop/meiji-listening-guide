@@ -1,4 +1,6 @@
+import {Button, Input} from '@heroui/react'
 import {useEffect, useState} from 'react'
+import {SelectField} from '@renderer/ui/SelectField'
 import type {Profile, Settings} from '@shared/types'
 const invoke = <T,>(action: string, args?: unknown) => window.assistant.invoke<T>(action, args)
 const fallback: Profile = {
@@ -11,64 +13,16 @@ const fallback: Profile = {
  apiFormat: 'chat_completions',
  models: []
 }
-export type SettingsSection = 'qwen' | 'search' | 'prompts'
-export function SettingsNavigation({
- section,
- onSection
-}: {
- section: SettingsSection
- onSection?: (section: SettingsSection) => void
-}) {
- return (
-  <aside>
-   <h2>设置</h2>
-   <p>模型、搜索与提示词</p>
-   {onSection && (
-    <nav aria-label="设置导航">
-     {(
-      [
-       ['qwen', '通义千问'],
-       ['search', '搜索与主题'],
-       ['prompts', '提示词']
-      ] as const
-     ).map(([id, name]) => (
-      <button
-       key={id}
-       className={section === id ? 'active' : ''}
-       aria-current={section === id ? 'page' : undefined}
-       onClick={() => onSection(id)}
-      >
-       {name}
-      </button>
-     ))}
-    </nav>
-   )}
-   <a
-    href="https://bailian.console.aliyun.com/"
-    onClick={event => {
-     event.preventDefault()
-     void invoke('external', {url: 'https://bailian.console.aliyun.com/'})
-    }}
-   >
-    获取千问 API Key
-   </a>
-  </aside>
- )
-}
 export function QwenSettings({
  value,
  update,
  save,
- close,
- busy,
- onSection
+ busy
 }: {
  value: Settings
  update: (patch: Partial<Settings>) => void
  save: () => void
- close: () => void
  busy: boolean
- onSection?: (section: SettingsSection) => void
 }) {
  const [pending, setPending] = useState(false),
   [notice, setNotice] = useState(''),
@@ -116,136 +70,136 @@ export function QwenSettings({
   ])
  ]
  return (
-  <div className="settings-layout qwen-settings">
-   <SettingsNavigation section="qwen" onSection={onSection} />
-   <section>
-    <header>
-     <div>
-      <h2>通义千问连接</h2>
-      <p className="hint">模型通过 DashScope OpenAI 兼容 API 直连。旧登录凭据不会迁移到此连接。</p>
-     </div>
-     <div>
-      <button className="d-btn d-btn-ghost" disabled={disabled} onClick={close}>
-       关闭
-      </button>
-      <button className="d-btn d-btn-primary" disabled={disabled} onClick={save}>
-       保存并使用千问
-      </button>
-     </div>
-    </header>
-    <label>
-     API 地址
-     <input
-      aria-label="千问 API 地址"
-      disabled={disabled}
-      value={profile.baseUrl}
-      onChange={e => patch({baseUrl: e.target.value})}
-     />
-    </label>
-    <label>
-     千问 API Key
-     <input
-      aria-label="千问 API Key"
-      type="password"
-      autoComplete="off"
-      spellCheck={false}
-      disabled={disabled}
-      value={profile.apiKey || ''}
-      placeholder={profile.hasKey ? '已加密保存，留空保持原密钥' : '填写千问 API Key'}
-      onChange={e => patch({apiKey: e.target.value || undefined})}
-     />
-    </label>
-    <label>
-     文本模型
-     <select
-      aria-label="文本模型"
-      disabled={disabled}
-      value={profile.model}
-      onChange={e => patch({model: e.target.value})}
-     >
-      <option value="">请选择文本模型</option>
-      {[...new Set([profile.model, ...known])].filter(Boolean).map(model => (
-       <option key={model} value={model}>
-        {model}
-       </option>
-      ))}
-     </select>
-    </label>
-    <div className="row">
-     <input
-      aria-label="自定义文本模型 ID"
-      disabled={disabled}
-      value={manualText}
-      placeholder="自定义文本模型 ID"
-      onChange={e => setManualText(e.target.value)}
-     />
-     <button
-      className="d-btn"
-      disabled={disabled || !manualText.trim()}
-      onClick={() => {
-       const model = manualText.trim()
-       patch({model, models: [...new Set([...(profile.models || []), model])]})
-       setManualText('')
-      }}
-     >
-      添加文本模型
-     </button>
+  <div className="panel-section">
+   <header>
+    <div>
+     <h2>通义千问连接</h2>
+     <p className="hint">模型通过 DashScope OpenAI 兼容 API 直连。旧登录凭据不会迁移到此连接。</p>
     </div>
-    <label>
-     视觉模型
-     <select
-      aria-label="视觉模型"
-      disabled={disabled}
-      value={profile.visionModel || ''}
-      onChange={e => patch({visionModel: e.target.value})}
+    <div>
+     <Button
+      variant="tertiary"
+      size="sm"
+      isDisabled={disabled}
+      onClick={() => void invoke('external', {url: 'https://bailian.console.aliyun.com/'})}
      >
-      <option value="">请选择视觉模型</option>
-      {visionCandidates.filter(Boolean).map(model => (
-       <option key={model} value={model}>
-        {model}
-       </option>
-      ))}
-     </select>
-    </label>
-    <div className="row">
-     <input
-      aria-label="自定义视觉模型 ID"
-      disabled={disabled}
-      value={manualVision}
-      placeholder="自定义视觉模型 ID"
-      onChange={e => setManualVision(e.target.value)}
-     />
-     <button
-      className="d-btn"
-      disabled={disabled || !manualVision.trim()}
-      onClick={() => {
-       const model = manualVision.trim()
-       patch({visionModel: model, models: [...new Set([...(profile.models || []), model])]})
-       setManualVision('')
-      }}
-     >
-      添加视觉模型
-     </button>
+      获取千问 API Key
+     </Button>
+     <Button variant="primary" size="sm" isDisabled={disabled} onClick={save}>
+      保存并使用千问
+     </Button>
     </div>
-    <p className="hint">
-     请选择服务端可用的文本模型和视觉模型。含图像的任务使用视觉模型。视觉候选按可用模型的 VL
-     名称筛选，名称不保证支持图像；请核对服务商说明，也可手动填写完整
-     ID。模型调用会将字幕、图片和课程资料发送到你配置的服务端。
+   </header>
+   <label>
+    API 地址
+    <Input
+     aria-label="千问 API 地址"
+     disabled={disabled}
+     value={profile.baseUrl}
+     onChange={e => patch({baseUrl: e.target.value})}
+    />
+   </label>
+   <label>
+    千问 API Key
+    <Input
+     aria-label="千问 API Key"
+     type="password"
+     autoComplete="off"
+     spellCheck={false}
+     disabled={disabled}
+     value={profile.apiKey || ''}
+     placeholder={profile.hasKey ? '已加密保存，留空保持原密钥' : '填写千问 API Key'}
+     onChange={e => patch({apiKey: e.target.value || undefined})}
+    />
+   </label>
+   <label>
+    文本模型
+    <SelectField
+     label="文本模型"
+     placeholder="请选择文本模型"
+     isDisabled={disabled}
+     value={profile.model}
+     onChange={next => patch({model: next})}
+     options={[
+      {value: '', label: '请选择文本模型'},
+      ...[...new Set([profile.model, ...known])].filter(Boolean).map(model => ({value: model, label: model}))
+     ]}
+    />
+   </label>
+   <div className="row">
+    <Input
+     aria-label="自定义文本模型 ID"
+     disabled={disabled}
+     value={manualText}
+     placeholder="自定义文本模型 ID"
+     onChange={e => setManualText(e.target.value)}
+    />
+    <Button
+     variant="tertiary"
+     size="sm"
+     isDisabled={disabled || !manualText.trim()}
+     onClick={() => {
+      const model = manualText.trim()
+      patch({model, models: [...new Set([...(profile.models || []), model])]})
+      setManualText('')
+     }}
+    >
+     添加文本模型
+    </Button>
+   </div>
+   <label>
+    视觉模型
+    <SelectField
+     label="视觉模型"
+     placeholder="请选择视觉模型"
+     isDisabled={disabled}
+     value={profile.visionModel || ''}
+     onChange={next => patch({visionModel: next})}
+     options={[
+      {value: '', label: '请选择视觉模型'},
+      ...visionCandidates.filter(Boolean).map(model => ({value: model, label: model}))
+     ]}
+    />
+   </label>
+   <div className="row">
+    <Input
+     aria-label="自定义视觉模型 ID"
+     disabled={disabled}
+     value={manualVision}
+     placeholder="自定义视觉模型 ID"
+     onChange={e => setManualVision(e.target.value)}
+    />
+    <Button
+     variant="tertiary"
+     size="sm"
+     isDisabled={disabled || !manualVision.trim()}
+     onClick={() => {
+      const model = manualVision.trim()
+      patch({visionModel: model, models: [...new Set([...(profile.models || []), model])]})
+      setManualVision('')
+     }}
+    >
+     添加视觉模型
+    </Button>
+   </div>
+   <p className="hint">
+    请选择服务端可用的文本模型和视觉模型。含图像的任务使用视觉模型。视觉候选按可用模型的 VL
+    名称筛选，名称不保证支持图像；请核对服务商说明，也可手动填写完整
+    ID。模型调用会将字幕、图片和课程资料发送到你配置的服务端。
+   </p>
+   <div className="toolbar">
+    <Button variant="tertiary" size="sm" isDisabled={disabled || !hasKey} onClick={() => void readModels()}>
+     读取可用模型
+    </Button>
+    <Button variant="tertiary" size="sm" isDisabled={disabled || !hasKey} onClick={() => void test()}>
+     测试千问连接
+    </Button>
+   </div>
+   {notice && (
+    <p role="status" className="notice">
+     {notice}
     </p>
-    <div className="toolbar">
-     <button className="d-btn" disabled={disabled || !hasKey} onClick={() => void readModels()}>
-      读取可用模型
-     </button>
-     <button className="d-btn" disabled={disabled || !hasKey} onClick={() => void test()}>
-      测试千问连接
-     </button>
-    </div>
-    {notice && (
-     <p role="status" className="notice">
-      {notice}
-     </p>
-    )}
-   </section>
+   )}
   </div>
  )
 }

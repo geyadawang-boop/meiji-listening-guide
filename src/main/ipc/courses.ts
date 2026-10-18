@@ -1,10 +1,10 @@
 import {z} from 'zod'
-import {ensureLibrary} from '../library'
-import {copyInto, importDocument, parseCourseware, serializeCoursewareSourceCache} from '../documents'
+import {ensureLibrary} from '@main/library/library'
+import {copyInto, importDocument, parseCourseware, serializeCoursewareSourceCache} from '@main/documents/documents'
 import {questionSchema} from '@shared/types'
-import {readTranscript} from '../transcript'
-import type {ApplicationContext} from '../main'
-import type {IpcHandler} from './handler'
+import {readTranscript} from '@main/documents/transcript'
+import type {ApplicationContext} from '@main/app/context'
+import type {IpcHandler} from '@main/ipc/handler'
 export function createCoursesHandler(
  context: Pick<
   ApplicationContext,

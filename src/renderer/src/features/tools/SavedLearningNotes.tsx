@@ -1,5 +1,8 @@
+import {Button, Card, Input, TextArea} from '@heroui/react'
 import {useEffect, useState} from 'react'
 import ReactMarkdown from 'react-markdown'
+import {AlertBox} from '@renderer/ui/AlertBox'
+import {SelectField} from '@renderer/ui/SelectField'
 const request = <T,>(action: string, args: unknown = {}) => window.assistant.invoke<T>('tools:request', {action, args})
 const op = () => crypto.randomUUID().replaceAll('-', '')
 type Receipt = {note_id: string; title: string; body_sha256: string; created_at: string}
@@ -51,43 +54,43 @@ export function SavedLearningNotes() {
  }
  return (
   <>
-   <section className="knowledge-card">
+   <Card className="knowledge-card">
     <h3>保存研究笔记</h3>
     <p className="hint">
      先预览完整笔记及出处，再明确保存。保存时核验引用的资料版本；来源改变会拒绝旧保存。保存后可编辑，并保留每次修订，不自动修改原文或教材。
     </p>
     <div className="row">
-     <select
-      aria-label="待保存的研究"
+     <SelectField
+      label="待保存的研究"
+      placeholder="选择已完成研究"
       value={task}
-      onChange={e => {
-       setTask(e.target.value)
+      onChange={next => {
+       setTask(next)
        setPreview(undefined)
       }}
-     >
-      <option value="">选择已完成研究</option>
-      {tasks.map(item => (
-       <option key={item.task_id} value={item.task_id}>
-        {item.question}
-       </option>
-      ))}
-     </select>
-     <button
-      className="d-btn"
-      disabled={busy || !task}
+      options={[
+       {value: '', label: '选择已完成研究'},
+       ...tasks.map(item => ({value: item.task_id, label: item.question}))
+      ]}
+     />
+     <Button
+      variant="tertiary"
+      size="sm"
+      isDisabled={busy || !task}
       onClick={() => void run(async () => setPreview(await request<Preview>('note-preview', {id: task})))}
      >
       预览待保存笔记
-     </button>
+     </Button>
     </div>
     {preview && (
      <>
       <div className="learning-summary">
        <ReactMarkdown>{preview.markdown}</ReactMarkdown>
       </div>
-      <button
-       className="d-btn d-btn-primary"
-       disabled={busy}
+      <Button
+       variant="primary"
+       size="sm"
+       isDisabled={busy}
        onClick={() =>
         void run(async () => {
          const saved = await request<Note>('note-save', {
@@ -106,45 +109,52 @@ export function SavedLearningNotes() {
        }
       >
        确认保存可编辑笔记
-      </button>
+      </Button>
      </>
     )}
-   </section>
-   <section className="knowledge-card">
+   </Card>
+   <Card className="knowledge-card">
     <h3>我的笔记</h3>
     <div className="row">
-     <input
+     <Input
       aria-label="笔记检索词"
       placeholder="查找笔记正文或标题"
       maxLength={200}
       value={query}
       onChange={e => setQuery(e.target.value)}
      />
-     <select aria-label="笔记显示范围" value={state} onChange={e => setState(e.target.value)}>
-      <option value="active">当前笔记</option>
-      <option value="archived">已归档</option>
-      <option value="all">所有版本</option>
-     </select>
-     <button className="d-btn" disabled={busy} onClick={() => void run(() => list())}>
+     <SelectField
+      label="笔记显示范围"
+      value={state}
+      onChange={next => setState(next)}
+      options={[
+       {value: 'active', label: '当前笔记'},
+       {value: 'archived', label: '已归档'},
+       {value: 'all', label: '所有版本'}
+      ]}
+     />
+     <Button variant="tertiary" size="sm" isDisabled={busy} onClick={() => void run(() => list())}>
       检索笔记
-     </button>
+     </Button>
     </div>
     <div className="discussion-list">
      {notes.map(item => (
-      <button
-       className="d-btn d-btn-ghost d-btn-square d-btn-sm"
+      <Button
+       variant="ghost"
+       size="sm"
+       isIconOnly
        key={item.note_id}
-       disabled={busy}
+       isDisabled={busy}
        onClick={() => void run(() => read(item.note_id))}
       >
        {item.title} · {item.created_at}
-      </button>
+      </Button>
      ))}
     </div>
     {offset !== null && (
-     <button className="d-btn d-btn-ghost" disabled={busy} onClick={() => void run(() => list(offset))}>
+     <Button variant="ghost" size="sm" isDisabled={busy} onClick={() => void run(() => list(offset))}>
       更多笔记
-     </button>
+     </Button>
     )}
     {note && (
      <>
@@ -152,7 +162,7 @@ export function SavedLearningNotes() {
       <p className="hint">
        笔记保存时版本 · {note.lifecycle.state === 'archived' ? '已归档' : '当前有效'}。笔记是学习记录，不替代原始资料。
       </p>
-      <textarea
+      <TextArea
        aria-label="笔记正文"
        maxLength={40000}
        value={markdown}
@@ -160,9 +170,10 @@ export function SavedLearningNotes() {
        onChange={e => setMarkdown(e.target.value)}
       />
       <div className="row">
-       <button
-        className="d-btn d-btn-primary"
-        disabled={busy || !markdown.trim() || markdown === note.markdown || note.lifecycle.state === 'archived'}
+       <Button
+        variant="primary"
+        size="sm"
+        isDisabled={busy || !markdown.trim() || markdown === note.markdown || note.lifecycle.state === 'archived'}
         onClick={() =>
          void run(async () => {
           const saved = await request<Note>('note-revise', {
@@ -182,10 +193,11 @@ export function SavedLearningNotes() {
         }
        >
         保存笔记修订
-       </button>
-       <button
-        className="d-btn"
-        disabled={busy || note.lifecycle.state === 'archived'}
+       </Button>
+       <Button
+        variant="tertiary"
+        size="sm"
+        isDisabled={busy || note.lifecycle.state === 'archived'}
         onClick={() =>
          void run(async () => {
           setSource(await request<{status: string}>('note-source', {id: note.receipt.note_id}))
@@ -193,10 +205,11 @@ export function SavedLearningNotes() {
         }
        >
         核验原始来源
-       </button>
-       <button
-        className="d-btn"
-        disabled={busy}
+       </Button>
+       <Button
+        variant="tertiary"
+        size="sm"
+        isDisabled={busy}
         onClick={() =>
          void run(async () => {
           const path = await request<string>('note-export', {id: note.receipt.note_id})
@@ -206,10 +219,11 @@ export function SavedLearningNotes() {
         }
        >
         导出笔记
-       </button>
-       <button
-        className="d-btn"
-        disabled={busy}
+       </Button>
+       <Button
+        variant="tertiary"
+        size="sm"
+        isDisabled={busy}
         onClick={() =>
          void run(async () => {
           await request('note-lifecycle', {
@@ -227,7 +241,7 @@ export function SavedLearningNotes() {
         }
        >
         {note.lifecycle.state === 'archived' ? '恢复笔记' : '归档笔记'}
-       </button>
+       </Button>
       </div>
       {source != null && (
        <details open>
@@ -250,13 +264,9 @@ export function SavedLearningNotes() {
       )}
      </>
     )}
-   </section>
+   </Card>
    {notice && <p role="status">{notice}</p>}
-   {error && (
-    <p className="alert" role="alert">
-     {error}
-    </p>
-   )}
+   {error && <AlertBox>{error}</AlertBox>}
   </>
  )
 }

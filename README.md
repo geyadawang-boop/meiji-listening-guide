@@ -65,7 +65,8 @@ portable 为完整目录，full 为完整安装包，lite 为不含可选离线�
 
 | 目录 | 职责 |
 | --- | --- |
-| src/main、src/main/ipc | Electron 主进程、受限原生接口、课程和任务调度 |
+| src/main | Electron 主进程、IPC、媒体/知识库/IM 等业务域 |
+| src/main/workers | 工作进程入口（utilityProcess/子进程） |
 | src/renderer、src/preload | React 页面和最小隔离桥接 |
 | src/shared | 类型、协议和验证规则 |
 | scripts/*.mts | 当前构建、组件恢复、模型维护及验收入口 |
@@ -87,5 +88,5 @@ out 中的 JavaScript 是 TypeScript 的编译产物；第三方 npm 包、WASM�
 
 只有最终成果写入、回读、哈希及必要页数/时长核对通过，才删除该任务生成的中间视频、图片等；原教材、源文件、独立下载成果和失败恢复材料保留。开发清理按 AGENTS.md。
 
-沿用 AGPL-3.0-only 和第三方许可，详见 LICENSE、NOTICE、THIRD_PARTY_NOTICES.md。SponsorBlock 社区数据使用 CC BY-NC-SA 4.0，并随对应片段计划保留来源及许可；时长不符不执行裁剪。公开仓库及下载：https://github.com/mikudeshuo/meiji-listening-guide/releases/latest 。
+沿用 AGPL-3.0-only 和第三方许可，详见 LICENSE、NOTICE、docs/legal/THIRD_PARTY_NOTICES.md。SponsorBlock 社区数据使用 CC BY-NC-SA 4.0，并随对应片段计划保留来源及许可；时长不符不执行裁剪。公开仓库及下载：https://github.com/mikudeshuo/meiji-listening-guide/releases/latest 。
 

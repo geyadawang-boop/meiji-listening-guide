@@ -1,5 +1,8 @@
+import {Button} from '@heroui/react'
+import {ConfirmDialog} from '@renderer/ui/ConfirmDialog'
 import {useState} from 'react'
 import type {Lecture} from '@shared/types'
+import {AlertBox} from '@renderer/ui/AlertBox'
 import {CalendarDays, ChevronDown, Trash2} from 'lucide-react'
 export function LecturePicker({
  lectures,
@@ -47,9 +50,10 @@ export function LecturePicker({
        </header>
        {lectures.map(l => (
         <div className={`lecture-choice ${l.id === value ? 'selected' : ''}`} key={l.id}>
-         <button
-          className="d-btn d-btn-ghost d-btn-square"
-          role="option"
+         <Button
+          variant="ghost"
+          size="sm"
+          isIconOnly
           aria-selected={l.id === value}
           onClick={() => {
            select(l.id)
@@ -61,9 +65,11 @@ export function LecturePicker({
            <strong>{l.title}</strong>
            <small>{l.status}</small>
           </span>
-         </button>
-         <button
-          className="d-btn d-btn-ghost d-btn-error d-btn-square d-btn-sm"
+         </Button>
+         <Button
+          variant="danger-soft"
+          size="sm"
+          isIconOnly
           aria-label={`删除课次 ${l.title}`}
           onClick={() => {
            setPending(l)
@@ -71,10 +77,10 @@ export function LecturePicker({
           }}
          >
           <Trash2 />
-         </button>
+         </Button>
         </div>
        ))}
-       {!lectures.length && <p>还没有课次</p>}
+       {!lectures.length && <p className="hint lecture-empty">还没有课次</p>}
       </div>
      </>
     )}
@@ -83,31 +89,22 @@ export function LecturePicker({
     ＋ 新建课次
    </button>
    {pending && (
-    <div className="confirm-shade">
-     <section role="alertdialog" aria-label="确认删除课次">
-      <h3>删除「{pending.title}」？</h3>
-      <p>本课次的对话、字幕、笔记与练习记录会删除。资料文件和已导出文件仍保留，可在文件管理中单独删除。</p>
-      {error && <p className="alert">{error}</p>}
-      <footer>
-       <button className="d-btn d-btn-ghost" disabled={deleting} onClick={() => setPending(null)}>
-        取消
-       </button>
-       <button
-        className="d-btn d-btn-error"
-        disabled={deleting || busy}
-        onClick={() => {
-         setDeleting(true)
-         void remove(pending.id)
-          .then(() => setPending(null))
-          .catch(e => setError(String(e)))
-          .finally(() => setDeleting(false))
-        }}
-       >
-        删除课次
-       </button>
-      </footer>
-     </section>
-    </div>
+    <ConfirmDialog
+     title={`删除「${pending.title}」？`}
+     confirmLabel="删除课次"
+     busy={deleting || busy}
+     error={error}
+     onCancel={() => setPending(null)}
+     onConfirm={() => {
+      setDeleting(true)
+      void remove(pending.id)
+       .then(() => setPending(null))
+       .catch(e => setError(String(e)))
+       .finally(() => setDeleting(false))
+     }}
+    >
+     本课次的对话、字幕、笔记与练习记录会删除。资料文件和已导出文件仍保留，可在文件管理中单独删除。
+    </ConfirmDialog>
    )}
   </div>
  )

@@ -42,7 +42,7 @@ export interface CourseEvidenceBundle {
  schemaVersion: '1.0.0'
  generatedAt: string
  revisionId: string
- producer: {name: '梅酱的听课指南'; version: string | null}
+ producer: {name: '摘云'; version: string | null}
  verificationScope: string
  course: {id: string; name: string; createdAt: string}
  lecture: {
@@ -267,7 +267,7 @@ export function buildCourseEvidenceBundle(
   schemaVersion: '1.0.0',
   generatedAt,
   revisionId,
-  producer: {name: '梅酱的听课指南', version: producerVersion || null},
+  producer: {name: '摘云', version: producerVersion || null},
   verificationScope:
    'verified 只表示本地应用已有的原话匹配或来源校订标记通过；不表示模型内容已由外部权威、教师或原始媒体独立证实。',
   course: {id: course.id, name: course.name, createdAt: course.created_at},

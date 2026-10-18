@@ -1,3 +1,7 @@
+import {Button, Input, TextArea} from '@heroui/react'
+import {WindowPanel} from '@renderer/ui/WindowPanel'
+import {SelectField} from '@renderer/ui/SelectField'
+import {AlertBox} from '@renderer/ui/AlertBox'
 import {useEffect, useRef, useState} from 'react'
 import {getDocument, GlobalWorkerOptions} from 'pdfjs-dist/legacy/build/pdf.mjs'
 import workerUrl from 'pdfjs-dist/legacy/build/pdf.worker.mjs?url'
@@ -179,37 +183,30 @@ export function Study({
   ]
  }
  return (
-  <section className="study-page" aria-label="课表与教材">
-   <header>
-    <div>
-     <h2>课表与教材</h2>
-     <p>选择章节、预览建议，再保存可编辑划线</p>
-    </div>
-    <button className="d-btn d-btn-ghost" disabled={busy} onClick={close}>
-     返回课程对话
-    </button>
-   </header>
-   {error && (
-    <p role="alert" className="error">
-     {error}
-    </p>
-   )}
-   {notice && <p role="status">{notice}</p>}
-   <div className="study-layout">
-    <aside>
+  <WindowPanel
+   visible
+   label="课表与教材"
+   title="课表与教材"
+   description="选择章节、预览建议，再保存可编辑划线。"
+   heading="课表与教材"
+   subheading="课表条目在左侧设置，教材预览与划线在右侧完成"
+   close={close}
+   menu={
+    <div className="study-menu">
      <h3>课表</h3>
      <label>
       粘贴课表
-      <textarea value={text} onChange={e => setText(e.target.value)} placeholder="请包含日期、课程、章节和结束时间" />
+      <TextArea value={text} onChange={e => setText(e.target.value)} placeholder="请包含日期、课程、章节和结束时间" />
      </label>
      <label>
       课表时区
-      <input value={timezone} onChange={e => setTimezone(e.target.value)} />
+      <Input value={timezone} onChange={e => setTimezone(e.target.value)} />
      </label>
      <div className="row">
-      <button
-       className="d-btn"
-       disabled={busy || !text.trim()}
+      <Button
+       variant="tertiary"
+       size="sm"
+       isDisabled={busy || !text.trim()}
        onClick={() =>
         void run(async () => {
          const rows = await invoke<StudyEntry[]>('study:parse', {text, timezone})
@@ -221,10 +218,11 @@ export function Study({
        }
       >
        识别课表
-      </button>
-      <button
-       className="d-btn"
-       disabled={busy || !courses.length}
+      </Button>
+      <Button
+       variant="tertiary"
+       size="sm"
+       isDisabled={busy || !courses.length}
        onClick={() => {
         const row: StudyEntry = {
          id: crypto.randomUUID(),
@@ -238,38 +236,36 @@ export function Study({
        }}
       >
        手动添加
-      </button>
+      </Button>
      </div>
      <label>
       课表条目
-      <select value={selected} onChange={e => setSelected(e.target.value)}>
-       <option value="">请选择</option>
-       {entries.map(e => (
-        <option key={e.id} value={e.id}>
-         {e.title || '待填写课次'}
-        </option>
-       ))}
-      </select>
+      <SelectField
+       label="课表条目"
+       placeholder="请选择"
+       options={[{value: '', label: '请选择'}, ...entries.map(e => ({value: e.id, label: e.title || '待填写课次'}))]}
+       value={selected}
+       onChange={next => setSelected(next)}
+      />
      </label>
      {entry && (
       <>
        <label>
         课程
-        <select value={entry.courseId} onChange={e => update({courseId: e.target.value, lectureId: undefined})}>
-         {courses.map(c => (
-          <option key={c.id} value={c.id}>
-           {c.name}
-          </option>
-         ))}
-        </select>
+        <SelectField
+         label="课程"
+         value={entry.courseId}
+         onChange={next => update({courseId: next, lectureId: undefined})}
+         options={courses.map(c => ({value: c.id, label: c.name}))}
+        />
        </label>
        <label>
         课次名称
-        <input value={entry.title} onChange={e => update({title: e.target.value})} />
+        <Input value={entry.title} onChange={e => update({title: e.target.value})} />
        </label>
        <label>
         教材章节
-        <input value={entry.chapter} onChange={e => update({chapter: e.target.value})} />
+        <Input value={entry.chapter} onChange={e => update({chapter: e.target.value})} />
        </label>
        <label>
         <input
@@ -281,7 +277,7 @@ export function Study({
        </label>
        <label>
         课程结束时间（含时区）
-        <input
+        <Input
          value={entry.endsAt}
          onChange={e => update({endsAt: e.target.value})}
          placeholder="2026-10-08T12:00:00+08:00"
@@ -298,41 +294,45 @@ export function Study({
        </small>
        <label>
         关联已有课次
-        <select value={entry.lectureId || ''} onChange={e => update({lectureId: e.target.value || undefined})}>
-         <option value="">暂不关联</option>
-         {detail?.lectures.map(l => (
-          <option key={l.id} value={l.id}>
-           {l.title}
-          </option>
-         ))}
-        </select>
+        <SelectField
+         label="关联已有课次"
+         placeholder="暂不关联"
+         value={entry.lectureId || ''}
+         onChange={next => update({lectureId: next || undefined})}
+         options={[
+          {value: '', label: '暂不关联'},
+          ...(detail?.lectures || []).map(l => ({value: l.id, label: l.title}))
+         ]}
+        />
        </label>
        <label>
         智云课程编号
-        <input
+        <Input
          value={entry.zhiyunCourseId || ''}
          onChange={e => update({zhiyunCourseId: e.target.value || undefined})}
         />
        </label>
        <label>
         智云课次编号
-        <input value={entry.subId || ''} onChange={e => update({subId: e.target.value || undefined})} />
+        <Input value={entry.subId || ''} onChange={e => update({subId: e.target.value || undefined})} />
        </label>
-       <button
-        className="d-btn d-btn-ghost"
-        disabled={busy}
+       <Button
+        variant="ghost"
+        size="sm"
+        isDisabled={busy}
         onClick={() => {
          setEntries(entries.filter(e => e.id !== selected))
          setSelected('')
         }}
        >
         删除此条目
-       </button>
+       </Button>
       </>
      )}
-     <button
-      className="d-btn d-btn-primary"
-      disabled={busy}
+     <Button
+      variant="primary"
+      size="sm"
+      isDisabled={busy}
       onClick={() =>
        void run(async () => {
         setEntries(await invoke('study:save', {entries}))
@@ -342,7 +342,7 @@ export function Study({
       }
      >
       保存课表与课次名称
-     </button>
+     </Button>
      <h3>教材划线</h3>
      <p>只有点击保存划线，才会修改原教材。分析和预览不会添加批注。</p>
      <small>重复区域优先级：老师重点 → 学长学姐重点 → 老师讲授内容 → PPT 内容</small>
@@ -354,9 +354,10 @@ export function Study({
        </span>
       ))}
      </div>
-     <button
-      className="d-btn"
-      disabled={busy}
+     <Button
+      variant="tertiary"
+      size="sm"
+      isDisabled={busy}
       onClick={() =>
        void run(async () => {
         const result = await invoke<Book | null>('textbook:pick')
@@ -370,7 +371,7 @@ export function Study({
       }
      >
       选择原教材 PDF
-     </button>
+     </Button>
      {book && (
       <>
        <small>
@@ -379,11 +380,11 @@ export function Study({
        <div className="row">
         <label>
          章节起始页
-         <input type="number" min={1} max={book.pages} value={first} onChange={e => setFirst(Number(e.target.value))} />
+         <Input type="number" min={1} max={book.pages} value={first} onChange={e => setFirst(Number(e.target.value))} />
         </label>
         <label>
          结束页
-         <input
+         <Input
           type="number"
           min={first}
           max={book.pages}
@@ -392,9 +393,10 @@ export function Study({
          />
         </label>
        </div>
-       <button
-        className="d-btn"
-        disabled={busy || !entry?.lectureId}
+       <Button
+        variant="tertiary"
+        size="sm"
+        isDisabled={busy || !entry?.lectureId}
         onClick={() =>
          void run(async () => {
           await analyzeBook()
@@ -402,10 +404,11 @@ export function Study({
         }
        >
         按课堂资料生成划线建议
-       </button>
-       <button
-        className="d-btn"
-        disabled={busy}
+       </Button>
+       <Button
+        variant="tertiary"
+        size="sm"
+        isDisabled={busy}
         onClick={() =>
          void run(async () => {
           await invoke('textbook:open', {id: book.id})
@@ -413,10 +416,11 @@ export function Study({
         }
        >
         打开原教材
-       </button>
-       <button
-        className="d-btn"
-        disabled={busy}
+       </Button>
+       <Button
+        variant="tertiary"
+        size="sm"
+        isDisabled={busy}
         onClick={() =>
          void run(async () => {
           await invoke('textbook:clear', {id: book.id})
@@ -426,171 +430,171 @@ export function Study({
         }
        >
         撤销本软件的划线
-       </button>
+       </Button>
       </>
      )}
      {busy && (
-      <button className="d-btn d-btn-ghost" onClick={() => void invoke('cancel')}>
+      <Button variant="ghost" size="sm" onClick={() => void invoke('cancel')}>
        取消处理
-      </button>
+      </Button>
      )}
-    </aside>
-    <main>
-     {book ? (
-      <>
-       <div className="row">
-        <label>
-         预览页
-         <input
-          type="number"
-          min={1}
-          max={book.pages}
-          value={pageNumber}
-          onChange={e => {
-           const p = Number(e.target.value)
-           if (p >= 1 && p <= book.pages) setPageNumber(p)
-          }}
-         />
-        </label>
-        <select
-         aria-label="手动划线来源"
-         value={source}
-         onChange={e => setSource(e.target.value as Highlight['source'])}
-        >
-         {Object.entries(highlightLabels).map(([key, label]) => (
-          <option key={key} value={key}>
-           {label}
-          </option>
-         ))}
-        </select>
-       </div>
-       <p>在教材页面上拖动框选可添加可编辑划线，扫描教材也可使用。</p>
-       <div
-        className="textbook-preview"
-        onMouseDown={e => {
-         if (!busy) start.current = point(e)
-        }}
-        onMouseUp={e => {
-         if (!start.current || !viewport.current) return
-         const a = viewport.current.convertToPdfPoint(...start.current),
-          b = viewport.current.convertToPdfPoint(...point(e))
-         start.current = null
-         setRectangle([Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1])])
-        }}
-       >
-        <img draggable={false} src={image} />
-        {draft?.rows
-         .filter(r => r.page === pageNumber && chosen.includes(r.id))
-         .map(row => {
-          if (!viewport.current) return null
-          const v = viewport.current,
-           a = v.convertToViewportPoint(row.rect[0], row.rect[1]),
-           b = v.convertToViewportPoint(row.rect[0] + row.rect[2], row.rect[1] + row.rect[3])
-          return (
-           <span
-            key={row.id}
-            style={{
-             left: (Math.min(a[0], b[0]) / size.width) * 100 + '%',
-             top: (Math.min(a[1], b[1]) / size.height) * 100 + '%',
-             width: (Math.abs(a[0] - b[0]) / size.width) * 100 + '%',
-             height: (Math.abs(a[1] - b[1]) / size.height) * 100 + '%',
-             background: `rgba(${highlightColors[row.source].map(v => v * 255).join(',')},.35)`
-            }}
-           />
-          )
-         })}
-        {rectangle &&
-         viewport.current &&
-         (() => {
-          const v = viewport.current!,
-           a = v.convertToViewportPoint(rectangle[0], rectangle[1]),
-           b = v.convertToViewportPoint(rectangle[0] + rectangle[2], rectangle[1] + rectangle[3])
-          return (
-           <span
-            style={{
-             left: (Math.min(a[0], b[0]) / size.width) * 100 + '%',
-             top: (Math.min(a[1], b[1]) / size.height) * 100 + '%',
-             width: (Math.abs(a[0] - b[0]) / size.width) * 100 + '%',
-             height: (Math.abs(a[1] - b[1]) / size.height) * 100 + '%'
-            }}
-           />
-          )
-         })()}
-       </div>
+    </div>
+   }
+  >
+   {error && <AlertBox>{error}</AlertBox>}
+   {notice && <p role="status">{notice}</p>}
+   <main className="study-workspace">
+    {book ? (
+     <>
+      <div className="row">
        <label>
-        划线依据或说明
-        <input value={evidence} onChange={e => setEvidence(e.target.value)} />
+        预览页
+        <Input
+         type="number"
+         min={1}
+         max={book.pages}
+         value={pageNumber}
+         onChange={e => {
+          const p = Number(e.target.value)
+          if (p >= 1 && p <= book.pages) setPageNumber(p)
+         }}
+        />
        </label>
-       <label>
-        <input type="checkbox" checked={extension} onChange={e => setExtension(e.target.checked)} />
-        属于讲授内容的适当延伸
-       </label>
-       <button
-        className="d-btn d-btn-primary"
-        disabled={busy || !rectangle || !evidence.trim()}
-        onClick={() =>
-         void run(async () => {
-          await invoke('textbook:manual', {
-           id: book.id,
-           highlight: {
-            id: crypto.randomUUID(),
-            page: pageNumber,
-            rect: rectangle,
-            source,
-            quote: '手动框选区域',
-            evidence,
-            extension
-           }
-          })
-          setNotice('手动划线已保存到原教材 · ' + new Date().toLocaleTimeString())
-          setDraft(null)
-         })
-        }
-       >
-        保存框选划线
-       </button>
-      </>
-     ) : (
-      <div className="study-empty">选择教材后，在这里预览并检查划线。</div>
-     )}
-     {draft && (
-      <div className="highlight-review">
-       <h3>划线建议 · {chosen.length} 条选中</h3>
-       {draft.rows.map(row => (
-        <label key={row.id}>
-         <input
-          type="checkbox"
-          checked={chosen.includes(row.id)}
-          onChange={e => setChosen(e.target.checked ? [...chosen, row.id] : chosen.filter(id => id !== row.id))}
-         />
-         <span>
-          第 {row.page} 页 · {highlightLabels[row.source]}
-          {row.extension ? ' · 适当延伸' : ''}
-          <strong>{row.quote}</strong>
-          <small>依据：{row.evidence}</small>
-          <button className="d-btn" onClick={() => setPageNumber(row.page)}>
-           看这一页
-          </button>
-         </span>
-        </label>
-       ))}
-       <button
-        className="d-btn d-btn-primary"
-        disabled={busy || !chosen.length}
-        onClick={() =>
-         void run(async () => {
-          await invoke('textbook:apply', {id: draft.id, ids: chosen})
-          setDraft(null)
-          setNotice('可编辑划线已保存到原教材 · ' + new Date().toLocaleTimeString())
-         })
-        }
-       >
-        保存所选划线到原教材
-       </button>
+       <SelectField
+        label="手动划线来源"
+        value={source}
+        onChange={next => setSource(next as Highlight['source'])}
+        options={Object.entries(highlightLabels).map(([key, label]) => ({value: key, label}))}
+       />
       </div>
-     )}
-    </main>
-   </div>
-  </section>
+      <p>在教材页面上拖动框选可添加可编辑划线，扫描教材也可使用。</p>
+      <div
+       className="textbook-preview"
+       onMouseDown={e => {
+        if (!busy) start.current = point(e)
+       }}
+       onMouseUp={e => {
+        if (!start.current || !viewport.current) return
+        const a = viewport.current.convertToPdfPoint(...start.current),
+         b = viewport.current.convertToPdfPoint(...point(e))
+        start.current = null
+        setRectangle([Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1])])
+       }}
+      >
+       <img draggable={false} src={image} />
+       {draft?.rows
+        .filter(r => r.page === pageNumber && chosen.includes(r.id))
+        .map(row => {
+         if (!viewport.current) return null
+         const v = viewport.current,
+          a = v.convertToViewportPoint(row.rect[0], row.rect[1]),
+          b = v.convertToViewportPoint(row.rect[0] + row.rect[2], row.rect[1] + row.rect[3])
+         return (
+          <span
+           key={row.id}
+           style={{
+            left: (Math.min(a[0], b[0]) / size.width) * 100 + '%',
+            top: (Math.min(a[1], b[1]) / size.height) * 100 + '%',
+            width: (Math.abs(a[0] - b[0]) / size.width) * 100 + '%',
+            height: (Math.abs(a[1] - b[1]) / size.height) * 100 + '%',
+            background: `rgba(${highlightColors[row.source].map(v => v * 255).join(',')},.35)`
+           }}
+          />
+         )
+        })}
+       {rectangle &&
+        viewport.current &&
+        (() => {
+         const v = viewport.current!,
+          a = v.convertToViewportPoint(rectangle[0], rectangle[1]),
+          b = v.convertToViewportPoint(rectangle[0] + rectangle[2], rectangle[1] + rectangle[3])
+         return (
+          <span
+           style={{
+            left: (Math.min(a[0], b[0]) / size.width) * 100 + '%',
+            top: (Math.min(a[1], b[1]) / size.height) * 100 + '%',
+            width: (Math.abs(a[0] - b[0]) / size.width) * 100 + '%',
+            height: (Math.abs(a[1] - b[1]) / size.height) * 100 + '%'
+           }}
+          />
+         )
+        })()}
+      </div>
+      <label>
+       划线依据或说明
+       <Input value={evidence} onChange={e => setEvidence(e.target.value)} />
+      </label>
+      <label>
+       <input type="checkbox" checked={extension} onChange={e => setExtension(e.target.checked)} />
+       属于讲授内容的适当延伸
+      </label>
+      <Button
+       variant="primary"
+       size="sm"
+       isDisabled={busy || !rectangle || !evidence.trim()}
+       onClick={() =>
+        void run(async () => {
+         await invoke('textbook:manual', {
+          id: book.id,
+          highlight: {
+           id: crypto.randomUUID(),
+           page: pageNumber,
+           rect: rectangle,
+           source,
+           quote: '手动框选区域',
+           evidence,
+           extension
+          }
+         })
+         setNotice('手动划线已保存到原教材 · ' + new Date().toLocaleTimeString())
+         setDraft(null)
+        })
+       }
+      >
+       保存框选划线
+      </Button>
+     </>
+    ) : (
+     <div className="study-empty">选择教材后，在这里预览并检查划线。</div>
+    )}
+    {draft && (
+     <div className="highlight-review">
+      <h3>划线建议 · {chosen.length} 条选中</h3>
+      {draft.rows.map(row => (
+       <label key={row.id}>
+        <input
+         type="checkbox"
+         checked={chosen.includes(row.id)}
+         onChange={e => setChosen(e.target.checked ? [...chosen, row.id] : chosen.filter(id => id !== row.id))}
+        />
+        <span>
+         第 {row.page} 页 · {highlightLabels[row.source]}
+         {row.extension ? ' · 适当延伸' : ''}
+         <strong>{row.quote}</strong>
+         <small>依据：{row.evidence}</small>
+         <Button variant="tertiary" size="sm" onClick={() => setPageNumber(row.page)}>
+          看这一页
+         </Button>
+        </span>
+       </label>
+      ))}
+      <Button
+       variant="primary"
+       size="sm"
+       isDisabled={busy || !chosen.length}
+       onClick={() =>
+        void run(async () => {
+         await invoke('textbook:apply', {id: draft.id, ids: chosen})
+         setDraft(null)
+         setNotice('可编辑划线已保存到原教材 · ' + new Date().toLocaleTimeString())
+        })
+       }
+      >
+       保存所选划线到原教材
+      </Button>
+     </div>
+    )}
+   </main>
+  </WindowPanel>
  )
 }

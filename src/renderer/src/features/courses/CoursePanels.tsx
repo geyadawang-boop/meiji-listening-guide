@@ -1,7 +1,8 @@
+import {Button, Input, TextArea} from '@heroui/react'
 import {StudyIcon} from '@renderer/ui/StudyIcon'
-import {QwenSettings, SettingsNavigation, type SettingsSection} from '@renderer/features/settings/QwenSettings'
-import {useEffect, useState} from 'react'
-import type {CourseFile, Detail, LectureNotes, PastQuestion, Settings} from '@shared/types'
+import {SelectField} from '@renderer/ui/SelectField'
+import {useState} from 'react'
+import type {CourseFile, Detail, LectureNotes, PastQuestion} from '@shared/types'
 import {invoke, Modal, FilePicker} from '@renderer/ui/UiParts'
 export function NewCourse({
  close,
@@ -25,18 +26,18 @@ export function NewCourse({
    >
     <label>
      课程名称
-     <input autoFocus required value={name} onChange={e => setName(e.target.value)} placeholder="例如：我的课程" />
+     <Input autoFocus required value={name} onChange={e => setName(e.target.value)} placeholder="例如：我的课程" />
     </label>
     <FilePicker label="学长学姐笔记（可选）" paths={senior} set={setSenior} />
     <FilePicker label="历年卷（可选）" paths={exams} set={setExams} />
     <p className="hint">支持 PDF、DOCX、TXT、MD；可以以后继续补充。历年卷导入后在“课前资料”中拆题并校对。</p>
     <footer>
-     <button className="d-btn d-btn-ghost" type="button" onClick={close}>
+     <Button variant="ghost" size="sm" type="button" onClick={close}>
       取消
-     </button>
-     <button className="d-btn d-btn-primary" disabled={busy || !name.trim()}>
+     </Button>
+     <Button type="submit" variant="primary" size="sm" isDisabled={busy || !name.trim()}>
       创建课程
-     </button>
+     </Button>
     </footer>
    </form>
   </Modal>
@@ -70,7 +71,7 @@ export function NewLecture({
    >
     <label>
      课次标题
-     <input autoFocus required value={title} onChange={e => setTitle(e.target.value)} placeholder="第 1 讲" />
+     <Input autoFocus required value={title} onChange={e => setTitle(e.target.value)} placeholder="第 1 讲" />
     </label>
     <FilePicker
      courseId={courseId}
@@ -85,12 +86,12 @@ export function NewLecture({
      后，软件先在本地提取页面文字与嵌入图片，再交给千问结合语音原文分批校订。
     </p>
     <footer>
-     <button className="d-btn d-btn-ghost" type="button" onClick={close}>
+     <Button variant="ghost" size="sm" type="button" onClick={close}>
       取消
-     </button>
-     <button className="d-btn d-btn-primary" disabled={busy || !title.trim() || !original.length}>
+     </Button>
+     <Button type="submit" variant="primary" size="sm" isDisabled={busy || !title.trim() || !original.length}>
       添加课次
-     </button>
+     </Button>
     </footer>
    </form>
   </Modal>
@@ -127,12 +128,12 @@ export function AddTranscript({
     />
     <p className="hint">替换原文后需要重新校订字幕，旧笔记与练习也需重新生成。</p>
     <footer>
-     <button className="d-btn d-btn-ghost" type="button" onClick={close}>
+     <Button variant="ghost" size="sm" type="button" onClick={close}>
       取消
-     </button>
-     <button className="d-btn d-btn-primary" disabled={busy || !paths.length}>
+     </Button>
+     <Button type="submit" variant="primary" size="sm" isDisabled={busy || !paths.length}>
       保存原文
-     </button>
+     </Button>
     </footer>
    </form>
   </Modal>
@@ -172,12 +173,12 @@ export function AddCourseware({
      PPTX 页面文字与嵌入图片，再交给千问结合语音原文分批校订。旧 PPT 请另存为 PPTX；PDF 目前读取文字内容。
     </p>
     <footer>
-     <button className="d-btn d-btn-ghost" type="button" onClick={close}>
+     <Button variant="ghost" size="sm" type="button" onClick={close}>
       取消
-     </button>
-     <button className="d-btn d-btn-primary" disabled={busy || !paths.length}>
+     </Button>
+     <Button type="submit" variant="primary" size="sm" isDisabled={busy || !paths.length}>
       添加课件
-     </button>
+     </Button>
     </footer>
    </form>
   </Modal>
@@ -225,13 +226,19 @@ export function Notes({
          <StudyIcon name="clock" />
          {p.timestamp}
         </button>
-        <button className="d-btn" disabled={disabled} onClick={() => setEditing({group, index: i, value: {...p}})}>
+        <Button
+         variant="tertiary"
+         size="sm"
+         isDisabled={disabled}
+         onClick={() => setEditing({group, index: i, value: {...p}})}
+        >
          <StudyIcon name="edit" />
          编辑
-        </button>
-        <button
-         className="d-btn d-btn-ghost"
-         disabled={disabled}
+        </Button>
+        <Button
+         variant="ghost"
+         size="sm"
+         isDisabled={disabled}
          onClick={() => {
           const n = structuredClone(notes)
           n[group]!.splice(i, 1)
@@ -240,7 +247,7 @@ export function Notes({
         >
          <StudyIcon name="trash" />
          删除
-        </button>
+        </Button>
        </div>
        {'detail' in p && <p>{p.detail}</p>}
        <blockquote>{p.quote}</blockquote>
@@ -260,7 +267,7 @@ export function Notes({
         >
          <label>
           知识点
-          <input
+          <Input
            required
            value={editing.value.topic}
            onChange={e => setEditing({...editing, value: {...editing.value, topic: e.target.value}})}
@@ -269,25 +276,23 @@ export function Notes({
          {'level' in editing.value && (
           <label>
            重点强度
-           <select
+           <SelectField
+            label="重点强度"
             value={editing.value.level}
-            onChange={e =>
+            onChange={next =>
              setEditing({
               ...editing,
-              value: {...editing.value, level: e.target.value as LectureNotes['keyPoints'][number]['level']}
+              value: {...editing.value, level: next as LectureNotes['keyPoints'][number]['level']}
              })
             }
-           >
-            {['必考', '很可能考', '重要', '要求掌握'].map(level => (
-             <option key={level}>{level}</option>
-            ))}
-           </select>
+            options={['必考', '很可能考', '重要', '要求掌握'].map(level => ({value: level, label: level}))}
+           />
           </label>
          )}
          {'detail' in editing.value && (
           <label>
            具体内容
-           <textarea
+           <TextArea
             value={editing.value.detail}
             onChange={e => setEditing({...editing, value: {...editing.value, detail: e.target.value}})}
            />
@@ -295,7 +300,7 @@ export function Notes({
          )}
          <label>
           老师原话
-          <textarea
+          <TextArea
            required
            value={editing.value.quote}
            onChange={e => setEditing({...editing, value: {...editing.value, quote: e.target.value}})}
@@ -303,7 +308,7 @@ export function Notes({
          </label>
          <label>
           时间戳
-          <input
+          <Input
            required
            pattern="[0-9]{2,}:[0-9]{2}:[0-9]{2}"
            value={editing.value.timestamp}
@@ -313,18 +318,18 @@ export function Notes({
          {'level' in editing.value && (
           <label>
            课件位置（可选）
-           <input
+           <Input
             value={editing.value.pptRef || ''}
             onChange={e => setEditing({...editing, value: {...editing.value, pptRef: e.target.value}})}
            />
           </label>
          )}
-         <button className="d-btn d-btn-primary" disabled={disabled}>
+         <Button type="submit" variant="primary" size="sm" isDisabled={disabled}>
           校验并保存
-         </button>
-         <button className="d-btn d-btn-ghost" type="button" onClick={() => setEditing(null)}>
+         </Button>
+         <Button variant="ghost" size="sm" type="button" onClick={() => setEditing(null)}>
           取消
-         </button>
+         </Button>
         </form>
        )}
       </article>
@@ -359,15 +364,15 @@ export function Materials({
  return (
   <Modal title="课前资料与历年题库" close={close}>
    <div className="toolbar">
-    <button className="d-btn" onClick={files}>
+    <Button variant="tertiary" size="sm" onClick={files}>
      查看本课程 PDF 与文件
-    </button>
-    <button className="d-btn" disabled={busy} onClick={() => add('senior_notes')}>
+    </Button>
+    <Button variant="tertiary" size="sm" isDisabled={busy} onClick={() => add('senior_notes')}>
      ＋ 学长学姐笔记
-    </button>
-    <button className="d-btn" disabled={busy} onClick={() => add('past_exam')}>
+    </Button>
+    <Button variant="tertiary" size="sm" isDisabled={busy} onClick={() => add('past_exam')}>
      ＋ 历年卷
-    </button>
+    </Button>
    </div>
    {detail.files.map(f => (
     <article className="material" key={f.id}>
@@ -379,29 +384,32 @@ export function Materials({
       </small>
      </div>
      {f.kind === 'past_exam' && (
-      <button
-       className="d-btn"
-       disabled={busy || !!f.needs_ocr}
+      <Button
+       variant="tertiary"
+       size="sm"
+       isDisabled={busy || !!f.needs_ocr}
        onClick={() => void run(() => invoke('questions:split', {courseId: detail.course.id, id: f.id}))}
       >
        拆成单题
-      </button>
+      </Button>
      )}
-     <button
-      className="d-btn d-btn-ghost"
-      disabled={busy}
+     <Button
+      variant="ghost"
+      size="sm"
+      isDisabled={busy}
       onClick={() => void run(() => invoke('files:remove', {courseId: detail.course.id, id: f.id}))}
      >
       删除资料
-     </button>
+     </Button>
     </article>
    ))}
    {!detail.files.length && <p className="hint">尚未导入资料。支持 PDF、DOCX、TXT、MD；扫描件会标记“需 OCR”。</p>}
    <h3>历年题库 · {detail.questions.length} 道</h3>
    <div className="toolbar">
-    <button
-     className="d-btn"
-     disabled={busy || selected.length < 2}
+    <Button
+     variant="tertiary"
+     size="sm"
+     isDisabled={busy || selected.length < 2}
      onClick={() => {
       const chosen = detail.questions.filter(q => selected.includes(q.id)),
        first = chosen[0]
@@ -423,16 +431,17 @@ export function Materials({
      }}
     >
      合并选中题目
-    </button>
-    <button
-     className="d-btn d-btn-ghost"
-     disabled={busy || !selected.length}
+    </Button>
+    <Button
+     variant="ghost"
+     size="sm"
+     isDisabled={busy || !selected.length}
      onClick={() =>
       void saveQuestions(detail.questions.filter(q => !selected.includes(q.id))).then(() => setSelected([]))
      }
     >
      删除选中
-    </button>
+    </Button>
    </div>
    {detail.questions.map(q => (
     <article key={q.id} className="question-card">
@@ -447,10 +456,10 @@ export function Materials({
       <small>
        {q.year} · {q.sourceFile}
       </small>
-      <button className="d-btn" disabled={busy} onClick={() => setEdit(q)}>
+      <Button variant="tertiary" size="sm" isDisabled={busy} onClick={() => setEdit(q)}>
        <StudyIcon name="edit" />
        编辑
-      </button>
+      </Button>
      </div>
      <p className="question-stem">{q.stem}</p>
      <small>{q.knowledgePoints.join(' / ')}</small>
@@ -463,168 +472,37 @@ export function Materials({
       >
        <label>
         题型
-        <input value={edit.type} onChange={e => setEdit({...edit, type: e.target.value})} />
+        <Input value={edit.type} onChange={e => setEdit({...edit, type: e.target.value})} />
        </label>
        <label>
         年份
-        <input value={edit.year || ''} onChange={e => setEdit({...edit, year: e.target.value})} />
+        <Input value={edit.year || ''} onChange={e => setEdit({...edit, year: e.target.value})} />
        </label>
        <label>
         题干
-        <textarea value={edit.stem} onChange={e => setEdit({...edit, stem: e.target.value})} />
+        <TextArea value={edit.stem} onChange={e => setEdit({...edit, stem: e.target.value})} />
        </label>
        <label>
         答案
-        <textarea value={edit.answer || ''} onChange={e => setEdit({...edit, answer: e.target.value})} />
+        <TextArea value={edit.answer || ''} onChange={e => setEdit({...edit, answer: e.target.value})} />
        </label>
        <label>
         知识点（用逗号分隔）
-        <input
+        <Input
          value={edit.knowledgePoints.join(',')}
          onChange={e => setEdit({...edit, knowledgePoints: e.target.value.split(/[,，]/).filter(Boolean)})}
         />
        </label>
-       <button className="d-btn d-btn-primary" disabled={busy}>
+       <Button type="submit" variant="primary" size="sm" isDisabled={busy}>
         保存
-       </button>
-       <button className="d-btn d-btn-ghost" type="button" onClick={() => setEdit(null)}>
+       </Button>
+       <Button variant="ghost" size="sm" type="button" onClick={() => setEdit(null)}>
         取消
-       </button>
+       </Button>
       </form>
      )}
     </article>
    ))}
   </Modal>
- )
-}
-export function SettingsPanel({
- onZhiyunLogin,
- initial,
- error,
- close,
- save,
- busy,
- task,
- rightWidth,
- onApiVisible
-}: {
- onZhiyunLogin: () => void
- rightWidth: number
- onApiVisible: (visible: boolean) => void
- initial: Settings
- error: string
- close: () => void
- save: (s: Settings) => Promise<boolean>
- busy: boolean
- task: (fn: () => Promise<unknown>) => Promise<boolean>
-}) {
- const [value, setValue] = useState(initial),
-  [prompt, setPrompt] = useState('correction'),
-  [section, setSection] = useState<SettingsSection>('qwen'),
-  [saved, setSaved] = useState(false)
- const update = (patch: Partial<Settings>) => {
-  setValue(v => ({...v, ...patch}))
-  setSaved(false)
- }
- useEffect(() => {
-  setValue(initial)
- }, [initial])
- useEffect(() => onApiVisible(section === 'qwen'), [section, onApiVisible])
- return (
-  <div className="model-settings-window" style={{right: rightWidth}} role="dialog" aria-modal="true" aria-label="设置">
-   {section === 'qwen' ? (
-    <>
-     <QwenSettings
-      value={value}
-      update={update}
-      busy={busy}
-      close={close}
-      onSection={setSection}
-      save={() => void save({...value, connection: 'qwen'}).then(ok => setSaved(ok))}
-     />
-     {error && <p className="alert">{error}</p>}
-     {saved && <p role="status">已保存</p>}
-    </>
-   ) : (
-    <div className="settings-layout">
-     <SettingsNavigation section={section} onSection={setSection} />
-     <section>
-      <header>
-       <h2>{section === 'search' ? '搜索与主题' : '提示词'}</h2>
-       <button className="d-btn d-btn-ghost" onClick={close}>
-        关闭
-       </button>
-      </header>
-      {section === 'search' && (
-       <>
-        <label>
-         Tavily 搜索 API Key
-         <input
-          type="password"
-          autoComplete="off"
-          value={value.searchKey || ''}
-          placeholder={value.hasSearchKey ? '已加密保存；留空保持原密钥' : '未配置时显示拓展题差额'}
-          onChange={e => update({searchKey: e.target.value || undefined})}
-         />
-        </label>
-        <label>
-         主题
-         <select value={value.theme} onChange={e => update({theme: e.target.value as Settings['theme']})}>
-          <option value="light">浅色</option>
-          <option value="dark">深色</option>
-         </select>
-        </label>
-       </>
-      )}
-      {section === 'prompts' && (
-       <>
-        <select value={prompt} onChange={e => setPrompt(e.target.value)}>
-         {Object.keys(value.prompts)
-          .filter(p => p !== 'subtitles')
-          .map(p => (
-           <option key={p} value={p}>
-            {(
-             {
-              subtitles: '旧字幕提示词',
-              correction: '原文与 PPT 校订',
-              notes: '教师重点',
-              'past-exam': '历年卷拆题',
-              match: '真题匹配',
-              search: '网上题抽取',
-              answer: '参考解析',
-              chat: '课程追问'
-             } as Record<string, string>
-            )[p] || p}
-           </option>
-          ))}
-        </select>
-        <textarea
-         className="prompt-editor"
-         value={value.prompts[prompt]}
-         onChange={e => update({prompts: {...value.prompts, [prompt]: e.target.value}})}
-        />
-       </>
-      )}
-      <footer className="row">
-       {error && (
-        <div className="alert" role="alert">
-         {error}
-        </div>
-       )}
-       <span className="hint" role="status">
-        {saved ? '已保存' : ''}
-       </span>
-       <button
-        className="d-btn d-btn-primary"
-        disabled={busy}
-        onClick={() => void save(value).then(ok => setSaved(ok))}
-       >
-        保存设置
-       </button>
-      </footer>
-     </section>
-    </div>
-   )}
-  </div>
  )
 }

@@ -1,5 +1,8 @@
+import {Button, Input} from '@heroui/react'
 import {useEffect, useState} from 'react'
 import type {KnowledgeEntry} from '@shared/knowledge'
+import {AlertBox} from '@renderer/ui/AlertBox'
+import {SelectField} from '@renderer/ui/SelectField'
 const invoke = <T,>(action: string, args?: unknown) => window.assistant.invoke<T>(action, args)
 type Selection = {
  type: string
@@ -55,32 +58,29 @@ export function KnowledgeClassification({entries, refresh}: {entries: KnowledgeE
     按类型、主题、难度、时长和语言整理资料。模型建议使用实际资料文字，保存前可修改；来源改变会拒绝旧草稿。
    </p>
    <div className="row">
-    <select
-     aria-label="选择分类资料"
+    <SelectField
+     label="选择分类资料"
+     placeholder="请选择资料"
      value={id}
-     disabled={busy}
-     onChange={e => {
-      setId(e.target.value)
+     isDisabled={busy}
+     onChange={next => {
+      setId(next)
       setDraft(null)
      }}
-    >
-     <option value="">请选择资料</option>
-     {entries.map(entry => (
-      <option key={entry.bvid} value={entry.bvid}>
-       {entry.title}
-      </option>
-     ))}
-    </select>
-    <button
-     className="d-btn"
-     disabled={busy || !id}
+     options={[{value: '', label: '请选择资料'}, ...entries.map(entry => ({value: entry.bvid, label: entry.title}))]}
+    />
+    <Button
+     variant="tertiary"
+     size="sm"
+     isDisabled={busy || !id}
      onClick={() => void run(async () => setDraft(await invoke('knowledge:classification-read', {id})))}
     >
      编辑分类
-    </button>
-    <button
-     className="d-btn"
-     disabled={busy || !id}
+    </Button>
+    <Button
+     variant="tertiary"
+     size="sm"
+     isDisabled={busy || !id}
      onClick={() =>
       void run(async () => {
        setDraft(await invoke('knowledge:classification-suggest', {id}))
@@ -89,7 +89,7 @@ export function KnowledgeClassification({entries, refresh}: {entries: KnowledgeE
      }
     >
      生成分类建议
-    </button>
+    </Button>
    </div>
    {draft && (
     <>
@@ -100,17 +100,16 @@ export function KnowledgeClassification({entries, refresh}: {entries: KnowledgeE
        ([key, label]) => (
         <label key={key}>
          {label}
-         <select
+         <SelectField
+          label={label}
           value={value[key as keyof Selection] as string}
-          disabled={busy}
-          onChange={e => set(key, e.target.value)}
-         >
-          {options[key]?.map(option => (
-           <option key={option} value={option}>
-            {option === 'unknown' ? '未知' : option}
-           </option>
-          ))}
-         </select>
+          isDisabled={busy}
+          onChange={next => set(key, next)}
+          options={(options[key] || []).map(option => ({
+           value: option,
+           label: option === 'unknown' ? '未知' : option
+          }))}
+         />
         </label>
        )
       )}
@@ -118,7 +117,7 @@ export function KnowledgeClassification({entries, refresh}: {entries: KnowledgeE
        ([key, label]) => (
         <label key={key}>
          {label}
-         <input
+         <Input
           disabled={busy}
           value={
            Array.isArray(value[key as keyof Selection])
@@ -141,9 +140,10 @@ export function KnowledgeClassification({entries, refresh}: {entries: KnowledgeE
        )
       )}
      </div>
-     <button
-      disabled={busy}
-      className="d-btn d-btn-primary"
+     <Button
+      variant="primary"
+      size="sm"
+      isDisabled={busy}
       onClick={() =>
        void run(async () => {
         await invoke('knowledge:classification-save', {token: draft.token, selection: value})
@@ -154,14 +154,10 @@ export function KnowledgeClassification({entries, refresh}: {entries: KnowledgeE
       }
      >
       保存内容分类
-     </button>
+     </Button>
     </>
    )}
-   {error && (
-    <p role="alert" className="alert">
-     {error}
-    </p>
-   )}
+   {error && <AlertBox>{error}</AlertBox>}
    {notice && (
     <p role="status" className="learning-status">
      {notice}

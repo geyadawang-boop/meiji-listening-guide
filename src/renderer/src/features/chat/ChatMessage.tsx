@@ -1,3 +1,4 @@
+import {Button, Surface} from '@heroui/react'
 import {useContext} from 'react'
 import {IdentityContext, IdentityAvatar} from '@renderer/features/identity/Identity'
 import {useEffect, useState, type ReactNode} from 'react'
@@ -22,17 +23,20 @@ export function ChatMessage({
     <IdentityAvatar role={role} />
    </span>
    <header className="chat-author">{role === 'user' ? identity.userName : identity.assistantName}</header>
-   <div className="chat-bubble">{children}</div>
+   <Surface className="chat-bubble" variant="transparent">
+    {children}
+   </Surface>
    {!pending && (
     <div className="chat-message-actions">
-     <button
-      className="d-btn d-btn-ghost d-btn-square"
-      title="复制"
+     <Button
+      variant="ghost"
+      size="sm"
+      isIconOnly
       aria-label="复制消息"
       onClick={() => void navigator.clipboard.writeText(content)}
      >
       <Copy size={16} />
-     </button>
+     </Button>
     </div>
    )}
   </article>

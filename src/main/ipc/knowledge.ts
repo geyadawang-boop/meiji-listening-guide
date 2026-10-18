@@ -1,9 +1,9 @@
 import {dialog} from 'electron'
 import {z} from 'zod'
 import {basename} from 'node:path'
-import {knowledgeAnswerPrompt, verifyKnowledgeAnswer} from '../knowledge-answer'
-import type {ApplicationContext} from '../main'
-import type {IpcHandler} from './handler'
+import {knowledgeAnswerPrompt, verifyKnowledgeAnswer} from '@main/knowledge/knowledge-answer'
+import type {ApplicationContext} from '@main/app/context'
+import type {IpcHandler} from '@main/ipc/handler'
 export function createKnowledgeHandler(
  context: Pick<ApplicationContext, 'api' | 'job' | 'knowledge' | 'libraryRoot' | 'window'>
 ): IpcHandler {

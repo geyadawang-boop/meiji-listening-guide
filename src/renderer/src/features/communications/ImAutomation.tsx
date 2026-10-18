@@ -1,4 +1,7 @@
+import {Button, Card, Input, TextArea} from '@heroui/react'
 import {useEffect, useState} from 'react'
+import {AlertBox} from '@renderer/ui/AlertBox'
+import {SelectField} from '@renderer/ui/SelectField'
 type Scope = {
  connection_id: string
  revision: string
@@ -132,7 +135,7 @@ export function ImAutomation({
   }
  }, [visible, active, runs, jobs])
  return (
-  <section className="knowledge-card" aria-label="会话助手设置">
+  <Card className="knowledge-card" aria-label="会话助手设置">
    <h3>会话助手设置</h3>
    <p className="hint">
     仅对账号 {scope.account} 的会话 {scope.peer}{' '}
@@ -146,7 +149,7 @@ export function ImAutomation({
    )}
    <label>
     会话角色与回复方式
-    <textarea
+    <TextArea
      aria-label="通讯会话设定"
      maxLength={6000}
      value={identity}
@@ -159,21 +162,22 @@ export function ImAutomation({
    <div className="row">
     <label>
      处理方式
-     <select
-      aria-label="后台回复方式"
+     <SelectField
+      label="后台回复方式"
       value={mode}
-      onChange={e => {
-       setMode(e.target.value as typeof mode)
+      onChange={next => {
+       setMode(next as typeof mode)
        setConfirmed(false)
       }}
-     >
-      <option value="draft">只生成草稿，核对后手动发送</option>
-      {scope.platform === 'qq_napcat' && <option value="auto_reply">自动回复所选会话</option>}
-     </select>
+      options={[
+       {value: 'draft', label: '只生成草稿，核对后手动发送'},
+       ...(scope.platform === 'qq_napcat' ? [{value: 'auto_reply', label: '自动回复所选会话'}] : [])
+      ]}
+     />
     </label>
     <label>
      检查间隔（秒）
-     <input
+     <Input
       aria-label="消息检查间隔"
       type="number"
       min={5}
@@ -187,7 +191,7 @@ export function ImAutomation({
     </label>
     <label>
      每小时回复上限
-     <input
+     <Input
       aria-label="每小时回复上限"
       type="number"
       min={1}
@@ -218,9 +222,10 @@ export function ImAutomation({
     使用梅酱当前模型连接。改变模型连接或会话规则会阻止旧任务继续发送；学习记忆不会自动共享到聊天账号。
    </p>
    <div className="row">
-    <button
-     className="d-btn"
-     disabled={busy || !rules || interval < 5 || interval > 3600 || limit < 1 || limit > 120}
+    <Button
+     variant="tertiary"
+     size="sm"
+     isDisabled={busy || !rules || interval < 5 || interval > 3600 || limit < 1 || limit > 120}
      onClick={() =>
       void run(async () => {
        const model = await request<{profile_id: string}>('model')
@@ -247,10 +252,10 @@ export function ImAutomation({
      }
     >
      保存会话规则
-    </button>
-    <button className="d-btn d-btn-ghost" disabled={busy} onClick={() => void run(refresh)}>
+    </Button>
+    <Button variant="ghost" size="sm" isDisabled={busy} onClick={() => void run(refresh)}>
      刷新会话状态
-    </button>
+    </Button>
    </div>
    {supported ? (
     <>
@@ -260,9 +265,10 @@ export function ImAutomation({
       {mode === 'auto_reply' ? '，并允许自动发送回复' : '，只生成待核对草稿'}
      </label>
      <div className="row">
-      <button
-       className="d-btn d-btn-primary"
-       disabled={
+      <Button
+       variant="primary"
+       size="sm"
+       isDisabled={
         busy ||
         !liveAvailable ||
         !confirmed ||
@@ -284,10 +290,11 @@ export function ImAutomation({
        }
       >
        开启所选会话助手
-      </button>
-      <button
-       className="d-btn"
-       disabled={busy || !active}
+      </Button>
+      <Button
+       variant="tertiary"
+       size="sm"
+       isDisabled={busy || !active}
        onClick={() =>
         void run(async () => {
          await request('runs', {...scope, action: 'pause'})
@@ -299,7 +306,7 @@ export function ImAutomation({
        }
       >
        暂停后台处理
-      </button>
+      </Button>
       <span>{active ? '正在运行' : '已暂停'}</span>
      </div>
     </>
@@ -307,9 +314,9 @@ export function ImAutomation({
     <p className="hint">此连接支持手动读取和回复；平台尚未验证后台轮询，不提供自动开启。</p>
    )}
    <h4>回复待办</h4>
-   <button className="d-btn d-btn-ghost" disabled={busy} onClick={() => void run(() => list())}>
+   <Button variant="ghost" size="sm" isDisabled={busy} onClick={() => void run(() => list())}>
     刷新回复待办
-   </button>
+   </Button>
    <div className="discussion-list">
     {jobs.map(job => (
      <article key={job.id}>
@@ -318,14 +325,15 @@ export function ImAutomation({
       {job.error && <p className="hint">本条需重新核验当前连接或规则，未确认完成。</p>}
       <div className="row">
        {job.output?.text && (
-        <button className="d-btn" disabled={busy} onClick={() => onDraft(job.output!.text)}>
+        <Button variant="tertiary" size="sm" isDisabled={busy} onClick={() => onDraft(job.output!.text)}>
          复制到待核对正文
-        </button>
+        </Button>
        )}
        {job.allowed_actions.includes('reconcile') && (
-        <button
-         className="d-btn"
-         disabled={busy}
+        <Button
+         variant="tertiary"
+         size="sm"
+         isDisabled={busy}
          onClick={() =>
           void run(async () => {
            await request('reply-jobs', {...scope, action: 'reconcile', job_id: job.id})
@@ -334,12 +342,13 @@ export function ImAutomation({
          }
         >
          核对已保存回执
-        </button>
+        </Button>
        )}
        {job.allowed_actions.includes('retry_generation') && (
-        <button
-         className="d-btn"
-         disabled={busy || !active}
+        <Button
+         variant="tertiary"
+         size="sm"
+         isDisabled={busy || !active}
          onClick={() =>
           void run(async () => {
            await request('reply-jobs', {
@@ -353,38 +362,40 @@ export function ImAutomation({
          }
         >
          重试未生成的草稿
-        </button>
+        </Button>
        )}
       </div>
      </article>
     ))}
    </div>
    {offset !== null && (
-    <button className="d-btn d-btn-ghost" disabled={busy} onClick={() => void run(() => list(offset))}>
+    <Button variant="ghost" size="sm" isDisabled={busy} onClick={() => void run(() => list(offset))}>
      更多回复待办
-    </button>
+    </Button>
    )}
    <details>
     <summary>清理本会话的本地消息记录</summary>
     <p className="hint">
      只清理本软件保存的当前会话记录；不会删除 QQ / 微信原始聊天、教材或课程资料。未完成回复待办需要的证据保留。
     </p>
-    <button
-     className="d-btn"
-     disabled={busy}
+    <Button
+     variant="tertiary"
+     size="sm"
+     isDisabled={busy}
      onClick={() => void run(async () => setCleanup(await request('cleanup', scope)))}
     >
      预览可清理记录
-    </button>
+    </Button>
     {cleanup && (
      <>
       {cleanup.reason && <p className="hint">{cleanup.reason}</p>}
       <p>
        {cleanup.count} 条消息、{cleanup.images} 张图片，约 {(cleanup.bytes / 1048576).toFixed(2)} MB
       </p>
-      <button
-       className="d-btn"
-       disabled={busy}
+      <Button
+       variant="tertiary"
+       size="sm"
+       isDisabled={busy}
        onClick={() =>
         void run(async () => {
          await request('cleanup', {...scope, preview_id: cleanup.preview_id, user_confirmed: true})
@@ -395,16 +406,12 @@ export function ImAutomation({
        }
       >
        确认清理以上记录
-      </button>
+      </Button>
      </>
     )}
    </details>
    {notice && <p role="status">{notice}</p>}
-   {error && (
-    <p className="alert" role="alert">
-     {error}
-    </p>
-   )}
-  </section>
+   {error && <AlertBox>{error}</AlertBox>}
+  </Card>
  )
 }

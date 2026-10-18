@@ -1,7 +1,9 @@
+import {Button, Input, TextArea} from '@heroui/react'
 import {createContext, useContext, useState} from 'react'
 import {defaultIdentity, type Identity} from '@shared/identity'
 import buddy from '@renderer/assets/mei-avatar.png'
 import lian from '@renderer/assets/lian-avatar.jpg'
+import {AlertBox} from '@renderer/ui/AlertBox'
 export const IdentityContext = createContext<Identity>(defaultIdentity)
 export function IdentityAvatar({role}: {role: 'user' | 'assistant'}) {
  const identity = useContext(IdentityContext),
@@ -18,11 +20,13 @@ export function IdentityAvatar({role}: {role: 'user' | 'assistant'}) {
 export function IdentityEditor({
  initial,
  close,
- save
+ save,
+ embedded = false
 }: {
  initial: Identity
  close: () => void
  save: (value: Identity) => Promise<void>
+ embedded?: boolean
 }) {
  const [value, setValue] = useState(initial),
   [selected, setSelected] = useState<'user' | 'assistant'>('assistant'),
@@ -44,7 +48,11 @@ export function IdentityEditor({
  }
  return (
   <IdentityContext.Provider value={value}>
-   <section className="identity-editor" role="dialog" aria-label="角色与头像">
+   <section
+    className={'identity-editor' + (embedded ? ' identity-editor--embedded' : '')}
+    role={embedded ? undefined : 'dialog'}
+    aria-label="角色与头像"
+   >
     <aside>
      <h2>角色与头像</h2>
      {(['user', 'assistant'] as const).map(role => (
@@ -73,12 +81,14 @@ export function IdentityEditor({
      <header>
       <h2>{selected === 'user' ? '我的资料' : '梅酱'}</h2>
       <div>
-       <button className="d-btn d-btn-ghost" type="button" disabled={busy} onClick={close}>
-        关闭
-       </button>
-       <button className="d-btn d-btn-primary" disabled={busy}>
+       {!embedded && (
+        <Button variant="ghost" size="sm" type="button" isDisabled={busy} onClick={close}>
+         关闭
+        </Button>
+       )}
+       <Button variant="primary" size="sm" type="submit" isDisabled={busy}>
         保存
-       </button>
+       </Button>
       </div>
      </header>
      <div className="identity-avatar-editor">
@@ -86,22 +96,23 @@ export function IdentityEditor({
        <IdentityAvatar role={selected} />
       </div>
       <div>
-       <button className="d-btn" type="button" disabled={busy} onClick={() => void chooseAvatar()}>
+       <Button variant="tertiary" size="sm" type="button" isDisabled={busy} onClick={() => void chooseAvatar()}>
         更换头像
-       </button>
-       <button
-        className="d-btn"
+       </Button>
+       <Button
+        variant="tertiary"
+        size="sm"
         type="button"
-        disabled={busy}
+        isDisabled={busy}
         onClick={() => update(selected === 'user' ? {userAvatar: ''} : {assistantAvatar: ''})}
        >
         恢复默认头像
-       </button>
+       </Button>
       </div>
      </div>
      <label>
       {selected === 'user' ? '我的名字' : '助手名字'}
-      <input
+      <Input
        required
        maxLength={40}
        aria-label={selected === 'user' ? '我的名字' : '助手名字'}
@@ -112,7 +123,7 @@ export function IdentityEditor({
      {selected === 'assistant' && (
       <label>
        角色设定
-       <textarea
+       <TextArea
         aria-label="助手角色设定"
         maxLength={12000}
         value={value.persona}
@@ -122,11 +133,7 @@ export function IdentityEditor({
       </label>
      )}
      <footer>
-      {error && (
-       <p className="alert" role="alert">
-        {error}
-       </p>
-      )}
+      {error && <AlertBox>{error}</AlertBox>}
       {saved && <p role="status">已保存</p>}
      </footer>
     </form>

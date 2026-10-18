@@ -1,3 +1,4 @@
+import {Button, Input, Modal as HeroModal} from '@heroui/react'
 import {type ReactNode} from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -5,17 +6,23 @@ export const invoke = <T,>(action: string, args?: unknown) => window.assistant.i
 export const basename = (p: string) => p.split(/[\\/]/).at(-1) || p
 export function Modal({title, children, close}: {title: string; children: ReactNode; close: () => void}) {
  return (
-  <div className="overlay">
-   <section className="modal" role="dialog" aria-modal="true" aria-label={title}>
-    <header>
-     <h2>{title}</h2>
-     <button className="d-btn d-btn-ghost d-btn-square d-btn-sm" aria-label="关闭" onClick={close}>
-      ×
-     </button>
-    </header>
-    {children}
-   </section>
-  </div>
+  <HeroModal.Backdrop
+   isOpen
+   variant="blur"
+   onOpenChange={open => {
+    if (!open) close()
+   }}
+  >
+   <HeroModal.Container placement="center" scroll="inside">
+    <HeroModal.Dialog className="app-modal" aria-label={title}>
+     <HeroModal.CloseTrigger aria-label="关闭" />
+     <HeroModal.Header>
+      <HeroModal.Heading>{title}</HeroModal.Heading>
+     </HeroModal.Header>
+     <HeroModal.Body>{children}</HeroModal.Body>
+    </HeroModal.Dialog>
+   </HeroModal.Container>
+  </HeroModal.Backdrop>
  )
 }
 export function FilePicker({
@@ -47,8 +54,9 @@ export function FilePicker({
    }}
   >
    <label>{label}</label>
-   <button
-    className="d-btn"
+   <Button
+    variant="tertiary"
+    size="sm"
     type="button"
     onClick={() =>
      void invoke<string[]>('pick', {
@@ -58,21 +66,23 @@ export function FilePicker({
     }
    >
     {transcript ? '选择或拖入原文' : '选择或拖入文件'}
-   </button>
+   </Button>
    {paths.map((p, i) => (
     <div key={i} className="file-chip">
      <div>
       <strong>{basename(p)}</strong>
-      <input className="local-path" aria-label="本地文件完整路径" readOnly value={p} title={p} />
+      <Input className="local-path" aria-label="本地文件完整路径" readOnly value={p} title={p} />
      </div>
-     <button
-      className="d-btn d-btn-ghost d-btn-square d-btn-sm"
+     <Button
+      variant="ghost"
+      size="sm"
+      isIconOnly
       type="button"
       aria-label="移除文件"
       onClick={() => set(paths.filter((_, j) => i !== j))}
      >
       ×
-     </button>
+     </Button>
     </div>
    ))}
   </div>

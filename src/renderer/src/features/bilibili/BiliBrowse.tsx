@@ -1,4 +1,6 @@
+import {Button, Card, Input} from '@heroui/react'
 import {useState} from 'react'
+import {AlertBox} from '@renderer/ui/AlertBox'
 type Video = {bvid: string; title: string; author: string; duration: string; url: string}
 type Listing = {videos: Video[]; page: number; hasMore: boolean}
 export function BiliBrowse({useVideo}: {useVideo: (url: string, kind: 'videoPpt' | 'videoSubtitles') => void}) {
@@ -21,7 +23,7 @@ export function BiliBrowse({useVideo}: {useVideo: (url: string, kind: 'videoPpt'
   }
  }
  return (
-  <section className="knowledge-card">
+  <Card className="knowledge-card">
    <h3>查找 B 站视频</h3>
    <p className="hint">在应用内搜索或读取热门视频；选择某个视频后再勾选分集和处理方式。</p>
    <form
@@ -31,19 +33,19 @@ export function BiliBrowse({useVideo}: {useVideo: (url: string, kind: 'videoPpt'
      void read('search')
     }}
    >
-    <input
+    <Input
      aria-label="视频搜索词"
      placeholder="课程、老师或视频名称"
      maxLength={100}
      value={query}
      onChange={e => setQuery(e.target.value)}
     />
-    <button className="d-btn d-btn-primary" disabled={busy || !query.trim()}>
+    <Button type="submit" variant="primary" size="sm" isDisabled={busy || !query.trim()}>
      搜索视频
-    </button>
-    <button className="d-btn" type="button" disabled={busy} onClick={() => void read('popular')}>
+    </Button>
+    <Button variant="tertiary" size="sm" type="button" isDisabled={busy} onClick={() => void read('popular')}>
      读取热门视频
-    </button>
+    </Button>
    </form>
    {result && (
     <>
@@ -55,12 +57,12 @@ export function BiliBrowse({useVideo}: {useVideo: (url: string, kind: 'videoPpt'
          {video.author} {video.duration ? ' · ' + video.duration : ''}
         </p>
         <div className="row">
-         <button className="d-btn" disabled={busy} onClick={() => useVideo(video.url, 'videoPpt')}>
+         <Button variant="tertiary" size="sm" isDisabled={busy} onClick={() => useVideo(video.url, 'videoPpt')}>
           提取视频课件
-         </button>
-         <button className="d-btn" disabled={busy} onClick={() => useVideo(video.url, 'videoSubtitles')}>
+         </Button>
+         <Button variant="tertiary" size="sm" isDisabled={busy} onClick={() => useVideo(video.url, 'videoSubtitles')}>
           取得字幕
-         </button>
+         </Button>
         </div>
        </article>
       ))}
@@ -68,31 +70,29 @@ export function BiliBrowse({useVideo}: {useVideo: (url: string, kind: 'videoPpt'
      {!result.videos.length && <p>本次未找到视频，请调整关键词。</p>}
      {submitted && (
       <div className="row">
-       <button
-        className="d-btn"
-        disabled={busy || result.page === 1}
+       <Button
+        variant="tertiary"
+        size="sm"
+        isDisabled={busy || result.page === 1}
         onClick={() => void read('search', result.page - 1, submitted)}
        >
         上一页搜索
-       </button>
+       </Button>
        <span>第 {result.page} 页</span>
-       <button
-        className="d-btn"
-        disabled={busy || !result.hasMore}
+       <Button
+        variant="tertiary"
+        size="sm"
+        isDisabled={busy || !result.hasMore}
         onClick={() => void read('search', result.page + 1, submitted)}
        >
         下一页搜索
-       </button>
+       </Button>
       </div>
      )}
     </>
    )}
    {busy && <p role="status">正在读取视频列表…</p>}
-   {error && (
-    <p className="alert" role="alert">
-     {error}
-    </p>
-   )}
-  </section>
+   {error && <AlertBox>{error}</AlertBox>}
+  </Card>
  )
 }

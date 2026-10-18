@@ -1,5 +1,8 @@
+import {Button, Card, Input} from '@heroui/react'
 import {useEffect, useState} from 'react'
 import type {MediaCatalog, MediaJob} from '@shared/media'
+import {AlertBox} from '@renderer/ui/AlertBox'
+import {SelectField} from '@renderer/ui/SelectField'
 const invoke = <T,>(action: string, args?: unknown) => window.assistant.invoke<T>(action, args)
 type Options = Record<string, string | number | boolean | null>
 type LoginProfile = {id: string; name: string; site: string; count: number}
@@ -131,15 +134,15 @@ export function MediaDownloads({visible}: {visible: boolean}) {
   if (failed.length) setError(failed.join('\n'))
  }
  return (
-  <section className="knowledge-card" aria-label="媒体下载">
+  <Card className="knowledge-card" aria-label="媒体下载">
    <header>
     <div>
      <h3>媒体下载</h3>
      <p className="hint">输入公开的视频网址，选择格式后保存到本地。需登录或受限的视频会显示站点错误，不打开网页。</p>
     </div>
-    <button className="d-btn d-btn-ghost" disabled={busy} onClick={() => void run(refresh)}>
+    <Button variant="ghost" size="sm" isDisabled={busy} onClick={() => void run(refresh)}>
      刷新下载记录
-    </button>
+    </Button>
    </header>
    <details className="media-advanced">
     <summary>站点登录档案</summary>
@@ -150,7 +153,7 @@ export function MediaDownloads({visible}: {visible: boolean}) {
     <div className="media-options">
      <label>
       档案名称
-      <input
+      <Input
        aria-label="登录档案名称"
        value={profileName}
        maxLength={80}
@@ -159,16 +162,17 @@ export function MediaDownloads({visible}: {visible: boolean}) {
      </label>
      <label>
       站点域名
-      <input
+      <Input
        aria-label="登录档案站点域名"
        placeholder="例如 youtube.com"
        value={profileSite}
        onChange={event => setProfileSite(event.target.value)}
       />
      </label>
-     <button
-      className="d-btn"
-      disabled={busy || !profileName.trim() || !profileSite.trim()}
+     <Button
+      variant="tertiary"
+      size="sm"
+      isDisabled={busy || !profileName.trim() || !profileSite.trim()}
       onClick={() =>
        void run(async () => {
         const result = await invoke<LoginProfile | null>('media:auth-import', {
@@ -185,24 +189,22 @@ export function MediaDownloads({visible}: {visible: boolean}) {
       }
      >
       选择文件并导入
-     </button>
+     </Button>
      <label>
       下载使用的登录档案
-      <select
-       aria-label="下载登录档案"
-       disabled={busy}
+      <SelectField
+       label="下载登录档案"
+       isDisabled={busy}
        value={String(options.cookie_profile || '')}
-       onChange={event =>
-        setOptions(current => ({...current, cookie_profile: event.target.value, use_cookies: !!event.target.value}))
-       }
-      >
-       <option value="">应用内 B 站会话 / 其它站点公开访问</option>
-       {profiles.map(profile => (
-        <option key={profile.id} value={profile.id}>
-         {profile.name} · {profile.site} · {profile.count} 项
-        </option>
-       ))}
-      </select>
+       onChange={next => setOptions(current => ({...current, cookie_profile: next, use_cookies: !!next}))}
+       options={[
+        {value: '', label: '应用内 B 站会话 / 其它站点公开访问'},
+        ...profiles.map(profile => ({
+         value: profile.id,
+         label: profile.name + ' · ' + profile.site + ' · ' + profile.count + ' 项'
+        }))
+       ]}
+      />
      </label>
      <label className="media-check">
       <input
@@ -221,9 +223,10 @@ export function MediaDownloads({visible}: {visible: boolean}) {
       </span>
       {confirmingProfile === profile.id ? (
        <>
-        <button
-         className="d-btn d-btn-error"
-         disabled={busy}
+        <Button
+         variant="danger"
+         size="sm"
+         isDisabled={busy}
          onClick={() =>
           void run(async () => {
            await invoke('media:auth-remove', {id: profile.id, confirmed: true})
@@ -235,25 +238,21 @@ export function MediaDownloads({visible}: {visible: boolean}) {
          }
         >
          确认删除
-        </button>
-        <button className="d-btn d-btn-ghost" disabled={busy} onClick={() => setConfirmingProfile('')}>
+        </Button>
+        <Button variant="ghost" size="sm" isDisabled={busy} onClick={() => setConfirmingProfile('')}>
          取消
-        </button>
+        </Button>
        </>
       ) : (
-       <button
-        className="d-btn d-btn-error d-btn-ghost"
-        disabled={busy}
-        onClick={() => setConfirmingProfile(profile.id)}
-       >
+       <Button variant="danger-soft" size="sm" isDisabled={busy} onClick={() => setConfirmingProfile(profile.id)}>
         删除此档案
-       </button>
+       </Button>
       )}
      </div>
     ))}
    </details>
    <div className="row">
-    <input
+    <Input
      aria-label="媒体网址"
      placeholder="视频网址"
      value={url}
@@ -277,9 +276,10 @@ export function MediaDownloads({visible}: {visible: boolean}) {
      />
      读取播放列表
     </label>
-    <button
-     className="d-btn"
-     disabled={busy || !url.trim()}
+    <Button
+     variant="tertiary"
+     size="sm"
+     isDisabled={busy || !url.trim()}
      onClick={() =>
       void run(async () => {
        setSource(null)
@@ -289,7 +289,7 @@ export function MediaDownloads({visible}: {visible: boolean}) {
      }
     >
      读取可用格式
-    </button>
+    </Button>
    </div>
    {source && (
     <div className="media-source">
@@ -326,17 +326,16 @@ export function MediaDownloads({visible}: {visible: boolean}) {
         {typeof options[key] === 'boolean' ? (
          <input type="checkbox" checked={!!options[key]} disabled={busy} onChange={e => set(key, e.target.checked)} />
         ) : (
-         <select
-          disabled={busy}
+         <SelectField
+          label={labels[key]}
+          isDisabled={busy}
           value={String(options[key])}
-          onChange={e => set(key, key === 'height' ? Number(e.target.value) : e.target.value)}
-         >
-          {(enums[key] || []).map(value => (
-           <option key={value} value={value}>
-            {value === 0 ? '自动' : value === 'auto' ? '自动' : value === 'best' ? '最高质量' : value}
-           </option>
-          ))}
-         </select>
+          onChange={next => set(key, key === 'height' ? Number(next) : next)}
+          options={(enums[key] || []).map(value => ({
+           value: String(value),
+           label: value === 0 ? '自动' : value === 'auto' ? '自动' : value === 'best' ? '最高质量' : String(value)
+          }))}
+         />
         )}
        </label>
       ))}
@@ -354,17 +353,20 @@ export function MediaDownloads({visible}: {visible: boolean}) {
           {typeof options[key] === 'boolean' ? (
            <input type="checkbox" checked={!!options[key]} disabled={busy} onChange={e => set(key, e.target.checked)} />
           ) : enums[key] ? (
-           <select disabled={busy} value={String(options[key])} onChange={e => set(key, e.target.value)}>
-            {enums[key]
+           <SelectField
+            label={labels[key]}
+            isDisabled={busy}
+            value={String(options[key])}
+            onChange={next => set(key, next)}
+            options={enums[key]
              .filter(value => value !== 'aria2c')
-             .map(value => (
-              <option key={value} value={value}>
-               {value === 'auto' ? '自动' : value === 'best' ? '最高质量' : value}
-              </option>
-             ))}
-           </select>
+             .map(value => ({
+              value: String(value),
+              label: value === 'auto' ? '自动' : value === 'best' ? '最高质量' : String(value)
+             }))}
+           />
           ) : (
-           <input
+           <Input
             disabled={busy}
             type={typeof options[key] === 'number' || ['clip_start', 'clip_end'].includes(key) ? 'number' : 'text'}
             value={options[key] === null ? '' : String(options[key] ?? '')}
@@ -406,13 +408,14 @@ export function MediaDownloads({visible}: {visible: boolean}) {
        </details>
       )}
      </details>
-     <button
-      className="d-btn d-btn-primary"
-      disabled={busy || (source.playlist && !selected.length)}
+     <Button
+      variant="primary"
+      size="sm"
+      isDisabled={busy || (source.playlist && !selected.length)}
       onClick={() => void run(enqueue)}
      >
       下载所选媒体（{source.playlist ? selected.length : 1}）
-     </button>
+     </Button>
     </div>
    )}
    {notice && (
@@ -420,11 +423,7 @@ export function MediaDownloads({visible}: {visible: boolean}) {
      {notice}
     </p>
    )}
-   {error && (
-    <p className="alert" role="alert">
-     {error}
-    </p>
-   )}
+   {error && <AlertBox>{error}</AlertBox>}
    <div className="media-jobs">
     {jobs.map(job => (
      <article key={job.id}>
@@ -445,9 +444,10 @@ export function MediaDownloads({visible}: {visible: boolean}) {
       </div>
       <div className="row">
        {active(job) ? (
-        <button
-         className="d-btn d-btn-ghost"
-         disabled={busy}
+        <Button
+         variant="ghost"
+         size="sm"
+         isDisabled={busy}
          onClick={() =>
           void run(async () => {
            await invoke('media:cancel', {id: job.id})
@@ -455,11 +455,12 @@ export function MediaDownloads({visible}: {visible: boolean}) {
          }
         >
          取消下载
-        </button>
+        </Button>
        ) : job.state === 'completed' ? (
-        <button
-         className="d-btn"
-         disabled={busy}
+        <Button
+         variant="tertiary"
+         size="sm"
+         isDisabled={busy}
          onClick={() =>
           void run(async () => {
            await invoke('media:open', {id: job.id})
@@ -467,11 +468,12 @@ export function MediaDownloads({visible}: {visible: boolean}) {
          }
         >
          查看下载文件
-        </button>
+        </Button>
        ) : (
-        <button
-         className="d-btn"
-         disabled={busy}
+        <Button
+         variant="tertiary"
+         size="sm"
+         isDisabled={busy}
          onClick={() =>
           void run(async () => {
            await invoke('media:retry', {id: job.id})
@@ -479,12 +481,12 @@ export function MediaDownloads({visible}: {visible: boolean}) {
          }
         >
          继续下载
-        </button>
+        </Button>
        )}
       </div>
      </article>
     ))}
    </div>
-  </section>
+  </Card>
  )
 }

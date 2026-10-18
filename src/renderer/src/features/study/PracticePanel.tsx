@@ -1,8 +1,10 @@
+import {Button, Input} from '@heroui/react'
 import {useState} from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type {PracticeSet, PracticeQuestion} from '@shared/types'
 import {questionOptions} from '@shared/practice'
+import {AlertBox} from '@renderer/ui/AlertBox'
 import {StudyIcon} from '@renderer/ui/StudyIcon'
 import {IdentityAvatar} from '@renderer/features/identity/Identity'
 type Group = 'past' | 'extended' | 'generated'
@@ -86,7 +88,7 @@ function Question({
      <div className="answer-options" role="group" aria-label="选择答案">
       {options.map(o => (
        <label className={'answer-option ' + (selected.includes(o.key) ? 'selected' : '')} key={o.key}>
-        <input
+        <Input
          type={multiple ? 'checkbox' : 'radio'}
          name={group + index}
          value={o.key}
@@ -109,7 +111,7 @@ function Question({
      </div>
      <label className="choice-response-label">
       输入你的选项
-      <input
+      <Input
        className="choice-response"
        aria-label="输入选项答案"
        placeholder={multiple ? '例如 AC' : '例如 A'}
@@ -134,9 +136,10 @@ function Question({
    <div className="practice-actions">
     {!!options.length &&
      (q.attempt ? (
-      <button
-       className="d-btn"
-       disabled={pending}
+      <Button
+       variant="tertiary"
+       size="sm"
+       isDisabled={pending}
        onClick={() =>
         void run(async () => {
          await reset(group, index)
@@ -148,11 +151,12 @@ function Question({
       >
        <StudyIcon name="reset" />
        重新作答
-      </button>
+      </Button>
      ) : (
-      <button
-       className="d-btn"
-       disabled={pending || !draft.trim() || !q.answer}
+      <Button
+       variant="tertiary"
+       size="sm"
+       isDisabled={pending || !draft.trim() || !q.answer}
        onClick={() =>
         void run(async () => {
          await submit(group, index, draft)
@@ -162,17 +166,13 @@ function Question({
       >
        <StudyIcon name="check" />
        提交答案
-      </button>
+      </Button>
      ))}
     {!!options.length && (
-     <button
-      className="d-btn d-btn-ghost d-btn-square"
-      aria-expanded={showAnswer}
-      onClick={() => setShowAnswer(!showAnswer)}
-     >
+     <Button variant="ghost" size="sm" isIconOnly aria-expanded={showAnswer} onClick={() => setShowAnswer(!showAnswer)}>
       <StudyIcon name="eye" />
       {showAnswer ? '隐藏答案' : '显示答案'}
-     </button>
+     </Button>
     )}
     <button className="explanation-toggle" aria-expanded={open} onClick={() => setOpen(!open)}>
      <StudyIcon name="notes" />
@@ -227,11 +227,7 @@ function Question({
      <p className="hint">本课关联依据：{q.reason}</p>
     </div>
    )}
-   {error && (
-    <p className="alert" role="alert">
-     {error}
-    </p>
-   )}
+   {error && <AlertBox>{error}</AlertBox>}
   </article>
  )
 }

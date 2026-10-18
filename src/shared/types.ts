@@ -145,7 +145,9 @@ export interface Settings {
  activeProfile: string
  hasSearchKey: boolean
  searchKey?: string
- theme: 'light' | 'dark'
+ searchProvider?: 'duckduckgo' | 'searxng'
+ searchEndpoint?: string
+ theme: 'light' | 'dark' | 'system'
  browserWidth: number
  browserOpen: boolean
  maxMinutes: number
@@ -181,6 +183,7 @@ export type EventPayload =
  | {kind: 'progress'; data: Progress}
  | {kind: 'chat'; requestId: string; text: string}
  | {kind: 'browser'; url: string}
+ | {kind: 'window'; data: {maximized: boolean}}
  | {kind: 'video-batch'; items: import('./video-ppt.js').VideoBatchItem[]}
 export interface Bridge {
  invoke<T = unknown>(action: string, args?: unknown): Promise<T>

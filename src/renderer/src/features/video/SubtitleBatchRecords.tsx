@@ -1,7 +1,9 @@
+import {Button, Card} from '@heroui/react'
 import {useEffect, useState} from 'react'
 import type {SubtitleSyncTask} from '@shared/subtitle-sync'
 import type {SubtitleDerivedTask} from '@shared/subtitle-derived'
 import {noteTitles, type VideoNoteMode} from '@shared/video-notes'
+import {AlertBox} from '@renderer/ui/AlertBox'
 const invoke = <T,>(action: string, args?: unknown) => window.assistant.invoke<T>(action, args)
 export function SubtitleBatchRecords({
  visible,
@@ -42,9 +44,9 @@ export function SubtitleBatchRecords({
     <section className="ppt-export-history batch-records" aria-label="批量同步与笔记记录">
      <header>
       <h3>同步与笔记任务</h3>
-      <button className="d-btn d-btn-ghost" disabled={busy} onClick={() => action(async () => {})}>
+      <Button variant="ghost" size="sm" isDisabled={busy} onClick={() => action(async () => {})}>
        刷新任务记录
-      </button>
+      </Button>
      </header>
      {tasks
       .filter(task => !courseName || task.courseName === courseName)
@@ -69,9 +71,10 @@ export function SubtitleBatchRecords({
              </p>
             )}
             {item.status === '失败' && (
-             <button
-              className="d-btn"
-              disabled={busy}
+             <Button
+              variant="tertiary"
+              size="sm"
+              isDisabled={busy}
               onClick={() =>
                action(async () => {
                 const result = await invoke<SubtitleSyncTask | null>('subtitle-sync:attach', {
@@ -83,7 +86,7 @@ export function SubtitleBatchRecords({
               }
              >
               为 P{item.page} 选择已有 SRT
-             </button>
+             </Button>
             )}
            </div>
           ))}
@@ -91,9 +94,10 @@ export function SubtitleBatchRecords({
          {task.interrupted && <p className="hint">上次处理中断，保存的字幕会核对后复用。</p>}
         </div>
         <div className="row">
-         <button
-          className="d-btn"
-          disabled={busy}
+         <Button
+          variant="tertiary"
+          size="sm"
+          isDisabled={busy}
           onClick={() =>
            action(async () => {
             await invoke('subtitle-sync:resume', {id: task.id})
@@ -102,26 +106,27 @@ export function SubtitleBatchRecords({
           }
          >
           核对并继续同步
-         </button>
-         <button
-          className="d-btn"
-          disabled={busy || !task.items.some(item => item.status === '已完成')}
+         </Button>
+         <Button
+          variant="tertiary"
+          size="sm"
+          isDisabled={busy || !task.items.some(item => item.status === '已完成')}
           onClick={() => setDraft({task, urls: [], modes: []})}
          >
           选择生成笔记
-         </button>
+         </Button>
         </div>
        </article>
       ))}
     </section>
    )}
    {draft && (
-    <section className="knowledge-card" aria-label="选择批量课程笔记">
+    <Card className="knowledge-card" aria-label="选择批量课程笔记">
      <header>
       <h3>选择要整理的字幕</h3>
-      <button className="d-btn" disabled={busy} onClick={() => setDraft(null)}>
+      <Button variant="tertiary" size="sm" isDisabled={busy} onClick={() => setDraft(null)}>
        收起选择
-      </button>
+      </Button>
      </header>
      <p className="hint">
       只整理勾选的分集和形式。生成时会将这些字幕交给当前连接的模型；字幕同步和本地检索不会调用模型。
@@ -167,9 +172,10 @@ export function SubtitleBatchRecords({
        </label>
       ))}
      </div>
-     <button
-      className="d-btn d-btn-primary"
-      disabled={busy || !draft.urls.length || !draft.modes.length}
+     <Button
+      variant="primary"
+      size="sm"
+      isDisabled={busy || !draft.urls.length || !draft.modes.length}
       onClick={() =>
        action(async () => {
         const result = await invoke<SubtitleDerivedTask>('subtitle-derived:start', {
@@ -185,8 +191,8 @@ export function SubtitleBatchRecords({
       }
      >
       生成所选笔记（{draft.urls.length * draft.modes.length}）
-     </button>
-    </section>
+     </Button>
+    </Card>
    )}
    {!!derived.length && (
     <section className="ppt-export-history" aria-label="批量笔记成果">
@@ -208,9 +214,10 @@ export function SubtitleBatchRecords({
            )}
            {item.outputs && (
             <div className="row">
-             <button
-              className="d-btn"
-              disabled={busy}
+             <Button
+              variant="tertiary"
+              size="sm"
+              isDisabled={busy}
               onClick={() =>
                action(async () => {
                 await invoke('library:open-file', {path: item.outputs![0].path})
@@ -218,14 +225,15 @@ export function SubtitleBatchRecords({
               }
              >
               打开笔记
-             </button>
+             </Button>
              {(['docx', 'pdf', 'svg'] as const)
               .filter(format => format !== 'svg' || item.mode === 'mindmap')
               .map(format => (
-               <button
-                className="d-btn"
+               <Button
+                variant="tertiary"
+                size="sm"
                 key={format}
-                disabled={busy}
+                isDisabled={busy}
                 onClick={() =>
                  action(async () => {
                   const existing = item.outputs?.find(output => output.path.endsWith('.' + format))
@@ -238,16 +246,17 @@ export function SubtitleBatchRecords({
                 }
                >
                 {format === 'svg' ? '查看导图 SVG' : `导出 ${format.toUpperCase()}`}
-               </button>
+               </Button>
               ))}
             </div>
            )}
           </div>
          ))}
         </div>
-        <button
-         className="d-btn"
-         disabled={busy}
+        <Button
+         variant="tertiary"
+         size="sm"
+         isDisabled={busy}
          onClick={() =>
           action(async () => {
            await invoke('subtitle-derived:resume', {id: task.id})
@@ -256,7 +265,7 @@ export function SubtitleBatchRecords({
          }
         >
          核对并继续笔记
-        </button>
+        </Button>
        </article>
       ))}
     </section>
@@ -266,11 +275,7 @@ export function SubtitleBatchRecords({
      {notice}
     </p>
    )}
-   {error && (
-    <p className="alert" role="alert">
-     {error}
-    </p>
-   )}
+   {error && <AlertBox>{error}</AlertBox>}
   </>
  )
 }

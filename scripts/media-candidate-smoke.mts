@@ -263,8 +263,8 @@ try {
     'scripts/media-candidate-smoke.mts',
     'scripts/media-source-lock.mts',
     'scripts/media-source-stage.mts',
-    'src/main/media-process-guardian.ts',
-    'src/main/media-executable.ts'
+    'src/main/workers/media-process-guardian.ts',
+    'src/main/media/tools/media-executable.ts'
    ].map(async file => [file, await sha256(join(root, file))])
   )
  )
@@ -288,7 +288,7 @@ try {
  }
  const entry = join(work, 'guardian.mjs')
  await build({
-  entryPoints: [join(root, 'src/main/media-process-guardian.ts')],
+  entryPoints: [join(root, 'src/main/workers/media-process-guardian.ts')],
   outfile: entry,
   bundle: true,
   platform: 'node',

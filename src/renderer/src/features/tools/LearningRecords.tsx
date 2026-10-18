@@ -1,6 +1,9 @@
+import {Button, Card, Input, TextArea} from '@heroui/react'
 import {useEffect, useState} from 'react'
 import ReactMarkdown from 'react-markdown'
+import {AlertBox} from '@renderer/ui/AlertBox'
 import {MemorySuggestions} from '@renderer/features/tools/MemorySuggestions'
+import {SelectField} from '@renderer/ui/SelectField'
 const request = <T,>(action: string, args: unknown = {}) => window.assistant.invoke<T>('tools:request', {action, args})
 const op = () => crypto.randomUUID().replaceAll('-', '')
 type Session = {conversation_id: string; title: string; revision: number; pinned: boolean}
@@ -84,22 +87,23 @@ export function LearningRecords() {
  }
  return (
   <>
-   <section className="knowledge-card">
+   <Card className="knowledge-card">
     <h3>知识会话</h3>
     <p className="hint">
      研究结果和已读来源保存在副本知识库。打开历史不会重新请求模型；后续问题采用保存的上下文，重新核验引用资料，不把历史回答当原文。
     </p>
     <div className="row">
-     <input
+     <Input
       aria-label="知识会话名称"
       placeholder="例如：龋病病因复习"
       maxLength={80}
       value={title}
       onChange={e => setTitle(e.target.value)}
      />
-     <button
-      className="d-btn"
-      disabled={busy || !title.trim()}
+     <Button
+      variant="tertiary"
+      size="sm"
+      isDisabled={busy || !title.trim()}
       onClick={() =>
        void run(async () => {
         const created = await request<Session>('conversation-create', {title})
@@ -110,17 +114,18 @@ export function LearningRecords() {
       }
      >
       新建知识会话
-     </button>
-     <button className="d-btn d-btn-ghost" disabled={busy} onClick={() => void run(refresh)}>
+     </Button>
+     <Button variant="ghost" size="sm" isDisabled={busy} onClick={() => void run(refresh)}>
       刷新学习记录
-     </button>
+     </Button>
     </div>
     <div className="discussion-list">
      {sessions.map(item => (
-      <button
-       className="d-btn"
+      <Button
+       variant="tertiary"
+       size="sm"
        key={item.conversation_id}
-       disabled={busy}
+       isDisabled={busy}
        onClick={() =>
         void run(async () => {
          setDetail(await request<Detail>('conversation-read', {id: item.conversation_id}))
@@ -130,21 +135,22 @@ export function LearningRecords() {
       >
        {item.pinned ? '置顶 · ' : ''}
        {item.title}
-      </button>
+      </Button>
      ))}
     </div>
     {offset !== null && (
-     <button className="d-btn d-btn-ghost" disabled={busy} onClick={() => void run(() => listing(offset))}>
+     <Button variant="ghost" size="sm" isDisabled={busy} onClick={() => void run(() => listing(offset))}>
       更多知识会话
-     </button>
+     </Button>
     )}
     {detail && (
      <>
       <h4>{detail.title}</h4>
       <div className="row">
-       <button
-        className="d-btn"
-        disabled={busy || !title.trim()}
+       <Button
+        variant="tertiary"
+        size="sm"
+        isDisabled={busy || !title.trim()}
         onClick={() =>
          void run(async () => {
           const organization = await request<{revision: number; pinned: boolean}>('conversation-organization', {
@@ -163,10 +169,11 @@ export function LearningRecords() {
         }
        >
         保存会话名称
-       </button>
-       <button
-        className="d-btn"
-        disabled={busy}
+       </Button>
+       <Button
+        variant="tertiary"
+        size="sm"
+        isDisabled={busy}
         onClick={() =>
          void run(async () => {
           const organization = await request<{revision: number; pinned: boolean}>('conversation-organization', {
@@ -184,18 +191,19 @@ export function LearningRecords() {
         }
        >
         切换置顶
-       </button>
+       </Button>
       </div>
-      <textarea
+      <TextArea
        aria-label="知识会话问题"
        maxLength={1500}
        value={question}
        onChange={e => setQuestion(e.target.value)}
        placeholder="依据知识库继续提问…"
       />
-      <button
-       className="d-btn d-btn-primary"
-       disabled={busy || !question.trim() || !!detail.research_tasks?.some(task => task.status === 'running')}
+      <Button
+       variant="primary"
+       size="sm"
+       isDisabled={busy || !question.trim() || !!detail.research_tasks?.some(task => task.status === 'running')}
        onClick={() =>
         void run(async () => {
          const overview = await request<{extensions: {revision: number}; mcp: {revision: number}}>('overview')
@@ -215,7 +223,7 @@ export function LearningRecords() {
        }
       >
        发送本次问题
-      </button>
+      </Button>
       {detail.research_tasks?.map(task => (
        <article key={task.task_id}>
         <h4>{task.question}</h4>
@@ -224,8 +232,9 @@ export function LearningRecords() {
          {task.error_code || ''}
         </p>
         {task.status === 'running' && (
-         <button
-          className="d-btn"
+         <Button
+          variant="tertiary"
+          size="sm"
           onClick={() =>
            void run(async () => {
             await request('agent-stop', {id: task.task_id})
@@ -234,7 +243,7 @@ export function LearningRecords() {
           }
          >
           停止本次回答
-         </button>
+         </Button>
         )}
         {task.note && (
          <div className="learning-summary">
@@ -252,9 +261,10 @@ export function LearningRecords() {
          ))}
         </details>
         {task.status === 'completed' && (
-         <button
-          className="d-btn"
-          disabled={busy}
+         <Button
+          variant="tertiary"
+          size="sm"
+          isDisabled={busy}
           onClick={() =>
            void run(async () => {
             const path = await request<string>('agent-export', {id: task.task_id})
@@ -264,15 +274,15 @@ export function LearningRecords() {
           }
          >
           保存本次回答
-         </button>
+         </Button>
         )}
        </article>
       ))}
      </>
     )}
-   </section>
+   </Card>
    <MemorySuggestions saved={async () => setMemories(await request<Memories>('memories'))} />
-   <section className="knowledge-card">
+   <Card className="knowledge-card">
     <h3>
      学习记忆 · {memories?.capacity.used || 0}/{memories?.capacity.limit || 100}
     </h3>
@@ -280,27 +290,33 @@ export function LearningRecords() {
      由你明确填写和保存，模型建议不自动写入。记忆仅辅助后续检索，不能当作教材事实。停用保留内容；忘记会清除内容。
     </p>
     <div className="row">
-     <select aria-label="学习记忆类型" value={kind} onChange={e => setKind(e.target.value)}>
-      <option value="preference">学习偏好</option>
-      <option value="progress">学习进度</option>
-      <option value="correction">待核实纠错</option>
-     </select>
-     <input
+     <SelectField
+      label="学习记忆类型"
+      value={kind}
+      onChange={next => setKind(next)}
+      options={[
+       {value: 'preference', label: '学习偏好'},
+       {value: 'progress', label: '学习进度'},
+       {value: 'correction', label: '待核实纠错'}
+      ]}
+     />
+     <Input
       aria-label="学习记忆标题"
       maxLength={80}
       value={memoryTitle}
       onChange={e => setMemoryTitle(e.target.value)}
      />
     </div>
-    <textarea aria-label="学习记忆正文" maxLength={1000} value={body} onChange={e => setBody(e.target.value)} />
+    <TextArea aria-label="学习记忆正文" maxLength={1000} value={body} onChange={e => setBody(e.target.value)} />
     <label className="media-check">
      <input type="checkbox" checked={paused} onChange={e => setPaused(e.target.checked)} />
      停用这条记忆
     </label>
     <div className="row">
-     <button
-      className="d-btn"
-      disabled={busy || !memoryTitle.trim() || !body.trim()}
+     <Button
+      variant="tertiary"
+      size="sm"
+      isDisabled={busy || !memoryTitle.trim() || !body.trim()}
       onClick={() =>
        void run(async () => {
         await request('memory-change', {
@@ -323,11 +339,11 @@ export function LearningRecords() {
       }
      >
       保存学习记忆
-     </button>
+     </Button>
      {editing && (
-      <button className="d-btn d-btn-ghost" onClick={() => edit()}>
+      <Button variant="ghost" size="sm" onClick={() => edit()}>
        取消编辑
-      </button>
+      </Button>
      )}
     </div>
     {memories?.records.map(memory => (
@@ -337,12 +353,13 @@ export function LearningRecords() {
       </h4>
       <p>{memory.body}</p>
       <div className="row">
-       <button className="d-btn" disabled={busy} onClick={() => edit(memory)}>
+       <Button variant="tertiary" size="sm" isDisabled={busy} onClick={() => edit(memory)}>
         编辑记忆
-       </button>
-       <button
-        className="d-btn"
-        disabled={busy}
+       </Button>
+       <Button
+        variant="tertiary"
+        size="sm"
+        isDisabled={busy}
         onClick={() =>
          void run(async () => {
           await request('memory-change', {
@@ -355,17 +372,13 @@ export function LearningRecords() {
         }
        >
         忘记这条记忆
-       </button>
+       </Button>
       </div>
      </article>
     ))}
-   </section>
+   </Card>
    {notice && <p role="status">{notice}</p>}
-   {error && (
-    <p className="alert" role="alert">
-     {error}
-    </p>
-   )}
+   {error && <AlertBox>{error}</AlertBox>}
   </>
  )
 }

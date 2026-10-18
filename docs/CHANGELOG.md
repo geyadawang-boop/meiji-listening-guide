@@ -2,6 +2,35 @@
 
 ## Unreleased
 
+- 侧栏轨道按参考图重做：恢复右侧分隔线、去除按钮描边、图标放大到 30px 并加深颜色；Tooltip/快捷键提示改为即时显示（延迟 0）。
+- 主题设置迁移到 设置 → 界面与主题（首个分区，改名自「聊天外观」），新增带浅色/深色/跟随系统示例预览的卡片选择器；移除侧栏底部主题切换。
+- 程序更名为「摘云」，新增自绘应用标识（轨道与品牌位），同步窗口标题、错误框、PDF/证据导出元数据与安装包产品名。
+- 侧栏轨道重做：图标 28px、按钮 42px，补齐 hover/active 底色；每项新增 HeroUI `Tooltip` + `Kbd` 提示（⌘1–⌘8、⌘0），并支持对应快捷键；窗口页整体下移标题栏高度，修复二级页面顶部被裁切；返回按钮与轨道底部设置键对齐。
+- 弹窗与提示统一：新增 `ui/ConfirmDialog`（HeroUI Modal + 官方关闭按钮 + 危险操作确认）替换 4 处自绘确认层；新增 `ui/AlertBox` 替换 31 处旧式 `.alert`；二级功能窗口集中到 `app/AppWindows` 挂载。
+- 补齐 HeroUI 控件：聊天外观改用 `Slider`，窗口内容/菜单、课程列表与聊天滚动区改用 `ScrollShadow`，弹窗关闭统一官方 `CloseButton`。
+- 间距与排版修复：标签与控件统一 6px 间距、多行文本默认高度提升（提示词 320px）、知识卡内部节奏、课程笔记「摘要形式」行对齐、课次下拉空态内边距。
+- 功能入口合并：智云登录与智云搜索导出合并为「智云课堂」（登录内嵌同一窗口，中途中断不再跳回登录页）；截取 PPT 与画面识别合并为「识别工具」；视频学习与视频资源合并为「B站视频」（新增「收藏视频」视图，选片后直接切到课件/字幕）；工具与工作流更名为「研究工具」。
+- 设置中心重构为 9 个分区：通义千问、搜索、通讯助手、学习方法、MCP 工具、运行环境、提示词、聊天外观、角色与头像；通讯助手整体移入设置并移除轨道入口；删除设置内主题配置（首页底部已有），搜索分区新增默认搜索引擎与 SearXNG 实例地址（`Settings.searchProvider/searchEndpoint` 持久化）。
+- 左侧轨道视觉修复：图标 25→28px、按钮 42px，补齐 hover/active 底色与过渡；轨道样式规则自 legacy 层收口到 `panel.css`。
+- 知识库与文件管理职责区分文案：文件管理负责原始文件导入、归类、打开与清理；知识库负责正文索引与跨资料检索问答。
+- 主进程与渲染层目录按业务域重构（`app`/`ipc`/`workers` 与 `features`/`ui`/`lib`/`styles`），跨目录引用改用 `@main`、`@renderer`、`@shared` 别名；新增仓库级 AGENTS.md 约束目录、别名与文档规则。
+- 更新日志与合规文本迁入 `docs/`（`docs/CHANGELOG.md`、`docs/legal/THIRD_PARTY_NOTICES.md`），临时文档统一放不提交的 `docs/tmp/`。
+- 交互控件全量迁移到 HeroUI React 组件（`Button` 等），语义变量映射现有调色板；图标全量迁移到 lucide-react。
+- 新增 `ui/WindowPanel` + `WindowMenuButton` 统一整页窗口的菜单宽度、内容间距与页头节奏，知识库、工具、通讯、视频资源、画面识别、视频学习等窗口全部改用；修复视频学习一级（rail）与二级（窗口菜单）功能重复的问题。
+- 设置集中到固定入口：左侧栏底部新增设置按钮，`SettingsHub` 分区收纳通义千问、搜索与主题、提示词、聊天外观、角色与头像；移除轨道上的散装设置入口。
+- 主题选择改为 HeroUI `ToggleButtonGroup` 分段控件（浅色/深色/自动），侧栏底部与设置中心共用同一组件；新增「自动」跟随系统模式，替换原侧栏切换按钮与设置里的下拉框。
+- 统一按钮层级：同视图只保留一个主按钮，视频学习内重复主按钮降级；表单提交按钮显式 `type="submit"`，危险操作使用 HeroUI danger 变体。
+- 清理迁移后遗留的死样式：`model-desktop`、`agent`、`chat-eleckoi`、`style`、`identity`、`knowledge`、`ppt-extract`、`practice` 共删除约 1500 行无引用规则，样式表无未使用类，构建 CSS 体积下降约 20KB。
+- 表单原语迁移到 HeroUI `Input`/`TextArea`（71 个输入框、23 个文本域）；文件管理、智云课堂改用 `WindowPanel` 统一页头与间距，分类筛选改用 HeroUI 分段按钮组；窗口页头操作按钮分组对齐。
+- 课程/课次等弹窗改用 HeroUI `Modal`（模糊遮罩、焦点陷阱、ESC/点击遮罩关闭），删除旧 `overlay/modal` 样式。
+- 主窗口改为自绘标题栏：Windows/Linux 无边框，macOS 保留红绿灯；新增最小化/最大化/关闭与最大化状态事件。
+- 移除未引用的 ChatModelPicker、旧内联图标与死样式；删除本地微信删除档案的 `window.confirm`，改为应用内二次确认。
+- 原生 `<select>` 全量迁移到 HeroUI `Select`（新增 `ui/SelectField` 统一包装，34 处），禁用态与占位文案保持原语义。
+- 聊天区改用 HeroUI 组件：消息气泡为 `Surface`、输入区容器为 `Surface`、附件/发送/模型入口为 HeroUI 圆形按钮；`agent.css` 与 `chat-eleckoi.css` 合并为 components 层的 `chat.css`，会话/输入区旧原生按钮规则退役。
+- 知识卡面板改用 HeroUI `Card`（约 37 处），工具与工作流的任务状态改用 `Chip` 呈现；`details.knowledge-card` 形态在 `panel.css` 统一覆盖。
+- 课程树与会话行 chrome 规则从 `identity.css` 迁入 components 层 `panel.css`（`identity.css` 326 → 121 行），删除 `style.css` 中 `.fallback`、`.check`、`.messages`、`.profile` 等无引用规则。
+- 样式文件收敛：11 个 legacy 分片按原顺序合并为 `styles/legacy.css`，`titlebar.css` 并入 `panel.css`，`styles/` 从 16 个文件收敛为 5 个（入口、令牌、legacy、chat、panel），级联行为不变。
+
 - 媒体工具解析支持白名单系统回退：未打包开发环境在缺少应用内组件时使用系统 FFmpeg/FFprobe（macOS `/opt/homebrew/bin`、`/usr/local/bin`；Linux `/usr/bin`、`/usr/local/bin`），打包应用需显式 `MEIJI_SYSTEM_MEDIA=1`；不搜索 PATH，仍校验真实路径与执行权限。
 - 运行清单与打包过滤按平台化：清单按 `process.platform` 收录 `ffmpeg`/`ffprobe`（Windows 为 `.exe`），portable 只按组件目录是否存在取舍，缺少组件目录时清单生成跳过并告警，`release-info.json` 记录实际跳过项。
 - 运行环境安装入口与会话助手提示改读 `app:info` 的 `platform`（不再使用已废弃的 `navigator.platform`）；登录档案文案改为「当前系统用户加密保存」。

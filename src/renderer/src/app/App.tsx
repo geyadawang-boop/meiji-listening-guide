@@ -1,61 +1,65 @@
-import {LearningRail, type LearningView} from '@renderer/features/video/LearningNav'
-import {KnowledgeBase} from '@renderer/features/knowledge/KnowledgeBase'
-import {BiliResources} from '@renderer/features/bilibili/BiliResources'
-import {VisualAnalysis} from '@renderer/features/visual/VisualAnalysis'
-import {ToolsWorkbench} from '@renderer/features/tools/ToolsWorkbench'
-import {Communications} from '@renderer/features/communications/Communications'
-import {Study} from '@renderer/features/study/Study'
-import {PptExtract} from '@renderer/features/ppt-extract/PptExtract'
-import {VideoPpt} from '@renderer/features/video/VideoPpt'
-import {AppearanceEditor, Wallpaper, chatStyle} from '@renderer/features/appearance/Appearance'
+import {Button, Input, Kbd, ScrollShadow, Surface, TextArea, Tooltip} from '@heroui/react'
+import {learningViews, type LearningView} from '@renderer/features/video/LearningNav'
+import {Wallpaper, chatStyle} from '@renderer/features/appearance/Appearance'
 import {defaultAppearanceState, resolveAppearance, type AppearanceState} from '@shared/appearance'
 import {CourseList} from '@renderer/features/courses/CourseList'
 import {sortCoursesForNavigation} from '@shared/course-groups'
-import {IdentityContext, IdentityEditor} from '@renderer/features/identity/Identity'
+import {IdentityContext} from '@renderer/features/identity/Identity'
 import {defaultIdentity, type Identity} from '@shared/identity'
 import {PracticePanel} from '@renderer/features/study/PracticePanel'
 import {StudyIcon} from '@renderer/ui/StudyIcon'
-import {ListeningBuddy} from '@renderer/app/ListeningBuddy'
 import {TitleBar} from '@renderer/app/TitleBar'
+import {AppWindows, type AppWindowKey} from '@renderer/app/AppWindows'
+import {AppLogo} from '@renderer/ui/brand/AppLogo'
 import {FileManager} from '@renderer/features/files/FileManager'
 import {LecturePicker} from '@renderer/features/courses/LecturePicker'
-import {ZhiyunLogin} from '@renderer/features/zhiyun/ZhiyunLogin'
-import {ZhiyunImporter} from '@renderer/features/zhiyun/ZhiyunImporter'
 import {ChatMessage, ChatWaitingReply} from '@renderer/features/chat/ChatMessage'
 import {
  ArrowUp,
  BookOpen,
- Bookmark,
  Boxes,
  ChevronDown,
+ CirclePlay,
  CloudDownload,
+ Cog,
+ FileText,
  Folder,
- Image,
+ History,
  MessageSquare,
  MessagesSquare,
- Moon,
- Palette,
  Plus,
+ Presentation,
  Scan,
+ Search,
  Square,
- Sun,
- UserRound,
- UserRoundCog,
  Wrench
 } from 'lucide-react'
-import {useEffect, useRef, useState} from 'react'
+import {useEffect, useRef, useState, type ReactNode} from 'react'
 import type {ChatSession, Course, Detail, LectureDetail, Progress, Settings} from '@shared/types'
 import {milliseconds, time} from '@shared/srt'
 import {invoke, basename, Modal, Markdown} from '@renderer/ui/UiParts'
+import {AlertBox} from '@renderer/ui/AlertBox'
+import {SelectField} from '@renderer/ui/SelectField'
 import {
  NewCourse,
  NewLecture,
  AddTranscript,
  AddCourseware,
  Notes,
- Materials,
- SettingsPanel
+ Materials
 } from '@renderer/features/courses/CoursePanels'
+import {SettingsHub} from '@renderer/features/settings/SettingsHub'
+type RailTarget = LearningView | 'zhiyun' | 'files' | 'recognition' | 'knowledge' | 'tools' | 'study' | null
+const railItems: {target: RailTarget; label: string; shortcut: string; icon: ReactNode}[] = [
+ {target: null, label: '课程对话', shortcut: '1', icon: <MessageSquare />},
+ {target: 'zhiyun', label: '智云课堂', shortcut: '2', icon: <CloudDownload />},
+ {target: 'files', label: '文件管理', shortcut: '3', icon: <Folder />},
+ {target: 'recognition', label: '识别工具', shortcut: '4', icon: <Scan />},
+ {target: 'videoPpt', label: 'B站视频', shortcut: '5', icon: <CirclePlay />},
+ {target: 'knowledge', label: '知识库', shortcut: '6', icon: <BookOpen />},
+ {target: 'tools', label: '研究工具', shortcut: '7', icon: <Wrench />},
+ {target: 'study', label: '课表与教材', shortcut: '8', icon: <StudyIcon name="notes" />}
+]
 export default function App() {
  const [sessionDraft, setSessionDraft] = useState<{
   detail: Detail
@@ -78,25 +82,45 @@ export default function App() {
    | 'lecture'
    | 'settings'
    | 'materials'
-   | 'modelPicker'
    | 'zhiyun'
-   | 'zhiyunLogin'
    | 'courseware'
    | 'transcript'
    | 'files'
-   | 'identity'
-   | 'appearance'
-   | 'pptExtract'
    | LearningView
    | 'study'
    | 'knowledge'
-   | 'biliResources'
-   | 'visual'
+   | 'recognition'
    | 'tools'
-   | 'communications'
    | null
   >(null)
- const [resourceUrl, setResourceUrl] = useState<string | undefined>()
+ const [platform, setPlatform] = useState('')
+ const modKey = platform === 'darwin' ? ('command' as const) : ('ctrl' as const)
+ const railActive = (target: RailTarget) =>
+  target === null
+   ? modal === null
+   : target === 'videoPpt'
+     ? learningViews.some(item => item.id === modal)
+     : modal === target
+ useEffect(() => {
+  void invoke<{platform: string}>('app:info').then(info => setPlatform(info.platform))
+ }, [])
+ useEffect(() => {
+  const onKeyDown = (event: KeyboardEvent) => {
+   if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return
+   if (event.key === '0') {
+    event.preventDefault()
+    setModal('settings')
+    return
+   }
+   const index = Number(event.key) - 1
+   if (index >= 0 && index < railItems.length) {
+    event.preventDefault()
+    setModal(railItems[index].target)
+   }
+  }
+  window.addEventListener('keydown', onKeyDown)
+  return () => window.removeEventListener('keydown', onKeyDown)
+ }, [])
  const [error, setError] = useState(''),
   [busy, setBusy] = useState(false),
   [progress, setProgress] = useState<Progress | null>(null)
@@ -108,7 +132,6 @@ export default function App() {
  const [sourceDraft, setSourceDraft] = useState(''),
   [pptDraft, setPptDraft] = useState('')
  const [withSearch, setWithSearch] = useState(false),
-  [settingsApi, setSettingsApi] = useState(true),
   [menu, setMenu] = useState(false),
   [activities, setActivities] = useState<
    Array<
@@ -130,6 +153,17 @@ export default function App() {
    setSessions(v => [...v.filter(s => s.course_id !== id), ...result.sessions])
   }
   return result
+ }
+ async function zhiyunImported(id: string, cid: string) {
+  setCourses(await invoke<Course[]>('courses'))
+  if (cid === courseId) {
+   await reloadCourse()
+   setLectureId(id)
+  } else {
+   importedLecture.current = id
+   setCourseId(cid)
+  }
+  setTab('subtitles')
  }
  async function reloadLecture(id = lectureId) {
   const result = await invoke<LectureDetail>('lecture:detail', {id})
@@ -187,7 +221,14 @@ export default function App() {
   })
  }, [])
  useEffect(() => {
-  document.documentElement.dataset.theme = settings?.theme || 'light'
+  const media = window.matchMedia('(prefers-color-scheme: dark)')
+  const apply = () => {
+   const theme = settings?.theme ?? 'light'
+   document.documentElement.dataset.theme = theme === 'system' ? (media.matches ? 'dark' : 'light') : theme
+  }
+  apply()
+  media.addEventListener('change', apply)
+  return () => media.removeEventListener('change', apply)
  }, [settings?.theme])
  useEffect(() => {
   setDetail(null)
@@ -288,38 +329,14 @@ export default function App() {
   <IdentityContext.Provider value={identity}>
    <TitleBar />
    <div className="app" data-background={activeAppearance.background}>
-    {modal === 'study' && <Study courses={courses} close={() => setModal(null)} refresh={reloadCourse} />}
-    <Communications visible={modal === 'communications'} close={() => setModal(null)} />
-    <ToolsWorkbench visible={modal === 'tools'} close={() => setModal(null)} />
-    <VisualAnalysis visible={modal === 'visual'} close={() => setModal(null)} />
-    <KnowledgeBase visible={modal === 'knowledge'} close={() => setModal(null)} />
-    <BiliResources
+    <AppWindows
+     current={modal as AppWindowKey}
+     setModal={setModal}
+     courses={courses}
      courseId={courseId}
      courseName={detail?.course.name}
-     visible={modal === 'biliResources'}
-     close={() => setModal(null)}
-     useVideo={(url, kind) => {
-      setResourceUrl(url)
-      setModal(kind)
-     }}
-    />
-    <VideoPpt
-     visible={modal === 'videoPpt' || modal === 'videoSubtitles' || modal === 'videoNotes' || modal === 'videoTasks'}
-     view={modal === 'videoSubtitles' || modal === 'videoNotes' || modal === 'videoTasks' ? modal : 'videoPpt'}
-     select={setModal}
-     close={() => setModal(null)}
-     courseId={courseId}
-     courseName={detail?.course.name}
-     files={() => setModal('files')}
-     incomingUrl={resourceUrl}
-     consumeUrl={() => setResourceUrl(undefined)}
-    />
-    <PptExtract
-     visible={modal === 'pptExtract'}
-     close={() => setModal(null)}
-     courseId={courseId}
-     courseName={detail?.course.name}
-     files={() => setModal('files')}
+     reloadCourse={reloadCourse}
+     zhiyunImported={zhiyunImported}
     />
     {sessionDraft && (
      <Modal
@@ -348,224 +365,88 @@ export default function App() {
       >
        <label>
         对应课次
-        <select
-         aria-label="新会话对应课次"
+        <SelectField
+         label="新会话对应课次"
+         placeholder="暂无课次"
+         isDisabled={busy || !sessionDraft.detail.lectures.length}
          value={sessionDraft.lectureId}
-         disabled={busy || !sessionDraft.detail.lectures.length}
-         onChange={e => setSessionDraft({...sessionDraft, lectureId: e.target.value})}
-        >
-         {sessionDraft.detail.lectures.length ? (
-          sessionDraft.detail.lectures.map(l => (
-           <option key={l.id} value={l.id}>
-            {l.title}
-           </option>
-          ))
-         ) : (
-          <option value="">暂无课次</option>
-         )}
-        </select>
+         options={
+          sessionDraft.detail.lectures.length
+           ? sessionDraft.detail.lectures.map(l => ({value: l.id, label: l.title}))
+           : [{value: '', label: '暂无课次'}]
+         }
+         onChange={next => setSessionDraft({...sessionDraft, lectureId: next})}
+        />
        </label>
-       <button type="submit" className="d-btn d-btn-primary" disabled={busy}>
+       <Button variant="primary" size="sm" type="submit" isDisabled={busy}>
         创建会话
-       </button>
+       </Button>
       </form>
      </Modal>
-    )}
-    {modal === 'zhiyunLogin' && (
-     <ZhiyunLogin close={() => setModal('zhiyun')} exportResources={() => setModal('zhiyun')} />
-    )}
-    {
-     <ZhiyunImporter
-      visible={modal === 'zhiyun'}
-      localCourseId={courseId}
-      close={() => setModal(null)}
-      login={() => setModal('zhiyunLogin')}
-      imported={async (id, cid) => {
-       setCourses(await invoke<Course[]>('courses'))
-       if (cid === courseId) {
-        await reloadCourse()
-        setLectureId(id)
-       } else {
-        importedLecture.current = id
-        setCourseId(cid)
-       }
-       setTab('subtitles')
-      }}
-     />
-    }
-    {modal === 'modelPicker' && settings && (
-     <SettingsPanel
-      initial={settings}
-      busy={busy}
-      error={error}
-      close={() => setModal(null)}
-      save={async value => {
-       let ok = false
-       await task(async () => {
-        setSettings(await invoke<Settings>('settings:save', {settings: value}))
-        ok = true
-       })
-       return ok
-      }}
-      onZhiyunLogin={() => setModal('zhiyunLogin')}
-      task={task}
-      onApiVisible={setSettingsApi}
-      rightWidth={0}
-     />
     )}
     {busy && (
      <div className="busy-indicator">
       <span className="pulse">●</span> {progress ? `${progress.stage} · ${progress.message}` : '正在处理，请稍等'}{' '}
-      <button className="d-btn d-btn-ghost" onClick={() => void invoke('cancel')}>
+      <Button variant="ghost" size="sm" onClick={() => void invoke('cancel')}>
        取消任务
-      </button>
+      </Button>
      </div>
-    )}
-    {modal === 'appearance' && (
-     <AppearanceEditor
-      initial={appearance}
-      courseId={courseId}
-      courses={courses}
-      close={() => setModal(null)}
-      saved={setAppearance}
-     />
-    )}
-    {modal === 'identity' && (
-     <IdentityEditor
-      initial={identity}
-      close={() => setModal(null)}
-      save={async value => setIdentity(await invoke<Identity>('identity:save', {identity: value}))}
-     />
     )}
     <nav className="app-icon-rail">
      <span className="rail-logo">
-      <ListeningBuddy />
+      <AppLogo size={30} />
      </span>
-     <button
-      className={modal === null ? 'active' : ''}
-      title="课程对话"
-      aria-label="课程对话"
-      onClick={() => setModal(null)}
-     >
-      <MessageSquare />
-     </button>
-     <button
-      className={modal === 'settings' || modal === 'modelPicker' ? 'active' : ''}
-      title="模型库"
-      aria-label="模型库"
-      onClick={() => {
-       setSettingsApi(true)
-       setModal('settings')
-      }}
-     >
-      <Boxes />
-     </button>
-     <button
-      title="角色与头像"
-      aria-label="角色与头像"
-      className={modal === 'identity' ? 'active' : ''}
-      onClick={() => setModal('identity')}
-     >
-      <UserRoundCog />
-     </button>
-     <button
-      title="智云登录"
-      aria-label="智云登录"
-      className={modal === 'zhiyunLogin' ? 'active' : ''}
-      onClick={() => setModal('zhiyunLogin')}
-     >
-      <UserRound />
-     </button>
-     <button
-      title="智云搜索与导出"
-      aria-label="智云搜索与导出"
-      className={modal === 'zhiyun' ? 'active' : ''}
-      onClick={() => setModal('zhiyun')}
-     >
-      <CloudDownload />
-     </button>
-     <button
-      title="文件管理"
-      aria-label="文件管理"
-      className={modal === 'files' ? 'active' : ''}
-      onClick={() => setModal('files')}
-     >
-      <Folder />
-     </button>
-     <button
-      title="聊天外观"
-      aria-label="聊天外观"
-      className={modal === 'appearance' ? 'active' : ''}
-      onClick={() => setModal('appearance')}
-     >
-      <Palette />
-     </button>
-     <button
-      title="截取 PPT"
-      aria-label="截取 PPT"
-      className={modal === 'pptExtract' ? 'active' : ''}
-      onClick={() => setModal('pptExtract')}
-     >
-      <Scan />
-     </button>
-     <LearningRail current={modal} select={setModal} />
-     <button
-      title="视频资源"
-      aria-label="视频资源"
-      className={modal === 'biliResources' ? 'active' : ''}
-      onClick={() => setModal('biliResources')}
-     >
-      <Bookmark />
-     </button>
-     <button
-      title="画面识别"
-      aria-label="画面识别"
-      className={modal === 'visual' ? 'active' : ''}
-      onClick={() => setModal('visual')}
-     >
-      <Image />
-     </button>
-     <button
-      title="知识库"
-      aria-label="知识库"
-      className={modal === 'knowledge' ? 'active' : ''}
-      onClick={() => setModal('knowledge')}
-     >
-      <BookOpen />
-     </button>
-     <button
-      title="通讯助手"
-      aria-label="通讯助手"
-      className={modal === 'communications' ? 'active' : ''}
-      onClick={() => setModal('communications')}
-     >
-      <MessagesSquare />
-     </button>
-     <button
-      title="工具与工作流"
-      aria-label="工具与工作流"
-      className={modal === 'tools' ? 'active' : ''}
-      onClick={() => setModal('tools')}
-     >
-      <Wrench />
-     </button>
-     <button
-      title="课表与教材"
-      aria-label="课表与教材"
-      className={modal === 'study' ? 'active' : ''}
-      onClick={() => setModal('study')}
-     >
-      <StudyIcon name="notes" />
-     </button>
+     {railItems.map(item => (
+      <Tooltip key={item.label} delay={0} closeDelay={0}>
+       <Button
+        variant="ghost"
+        isIconOnly
+        aria-label={item.label}
+        className={railActive(item.target) ? 'active' : ''}
+        onClick={() => setModal(item.target)}
+       >
+        {item.icon}
+       </Button>
+       <Tooltip.Content placement="right">
+        <span className="rail-tooltip">
+         {item.label}
+         <Kbd>
+          <Kbd.Abbr keyValue={modKey} />
+          <Kbd.Content>{item.shortcut}</Kbd.Content>
+         </Kbd>
+        </span>
+       </Tooltip.Content>
+      </Tooltip>
+     ))}
      <div className="rail-spacer" />
+     <Tooltip delay={0} closeDelay={0}>
+      <Button
+       variant="ghost"
+       isIconOnly
+       aria-label="设置"
+       className={modal === 'settings' ? 'active' : ''}
+       onClick={() => setModal('settings')}
+      >
+       <Cog />
+      </Button>
+      <Tooltip.Content placement="right">
+       <span className="rail-tooltip">
+        设置
+        <Kbd>
+         <Kbd.Abbr keyValue={modKey} />
+         <Kbd.Content>0</Kbd.Content>
+        </Kbd>
+       </span>
+      </Tooltip.Content>
+     </Tooltip>
     </nav>
     <aside className="sidebar">
      <div className="brand">
       <span className="brand-mark">
-       <ListeningBuddy />
+       <AppLogo size={26} />
       </span>
       <div>
-       <strong>梅酱的听课指南</strong>
+       <strong>摘云</strong>
        <small>把老师的原话留下来</small>
       </div>
      </div>
@@ -642,20 +523,6 @@ export default function App() {
        if (!ok) throw new Error('课程未删除，请查看错误提示')
       }}
      />
-     <div className="sidebar-bottom">
-      <button
-       className="d-btn d-btn-ghost d-btn-square"
-       onClick={() => {
-        if (settings) {
-         const next = {...settings, theme: settings.theme === 'light' ? 'dark' : 'light'} as Settings
-         void task(async () => setSettings(await invoke<Settings>('settings:save', {settings: next})))
-        }
-       }}
-      >
-       {settings?.theme === 'dark' ? <Moon className="theme-switch-icon" /> : <Sun className="theme-switch-icon" />}
-       {settings?.theme === 'dark' ? '切换浅色' : '切换深色'}
-      </button>
-     </div>
     </aside>
     <main
      className={'workspace agent-workspace wallpaper-workspace ' + (tab === 'chat' ? 'chat-styled' : '')}
@@ -668,34 +535,37 @@ export default function App() {
      <Wallpaper value={activeAppearance} />
      <header className="workspace-header">
       <div className="agent-heading">
-       <h1>{detail?.course.name || '梅酱的听课指南'}</h1>
+       <h1>{detail?.course.name || '摘云'}</h1>
       </div>
       <div className="row">
-       <button className="header-icon" aria-label="课程资料" disabled={!courseId} onClick={() => setModal('materials')}>
-        ▤
-       </button>
+       <Button
+        variant="ghost"
+        size="sm"
+        isIconOnly
+        className="header-icon"
+        aria-label="课程资料"
+        isDisabled={!courseId}
+        onClick={() => setModal('materials')}
+       >
+        <FileText size={18} />
+       </Button>
       </div>
      </header>
-     {error && (
-      <div className="alert" role="alert">
-       {error}
-       <button className="d-btn d-btn-ghost d-btn-square d-btn-sm" onClick={() => setError('')}>
-        ×
-       </button>
-      </div>
-     )}
+     {error && <AlertBox onClose={() => setError('')}>{error}</AlertBox>}
      {!courseId ? (
       <div className="welcome">
-       <div className="welcome-symbol">▤</div>
+       <div className="welcome-symbol">
+        <BookOpen size={25} />
+       </div>
        <h2>从一门课程开始</h2>
        <p>
         导入资料和语音识别原文，保留完整字幕，
         <br />
         只提取老师亲口强调的重点。
        </p>
-       <button className="d-btn d-btn-primary" onClick={() => setModal('course')}>
+       <Button variant="primary" size="sm" onClick={() => setModal('course')}>
         ＋ 新建课程
-       </button>
+       </Button>
        <div className="steps">
         <span>01 课前资料</span>
         <span>02 原文校订</span>
@@ -747,7 +617,7 @@ export default function App() {
          </button>
         ))}
        </div>
-       <div className="agent-scroll">
+       <ScrollShadow className="agent-scroll" orientation="vertical">
         {tab === 'chat' && (
          <div className="agent-thread">
           {!detail?.messages.filter(m => m.session_id === sessionId).length && !pendingChat && !chatText && (
@@ -755,26 +625,28 @@ export default function App() {
             <h2>{lecture ? '这一讲，想从哪里开始？' : '今天要听哪一门课？'}</h2>
             <p>拖入语音识别原文和 PPT，或直接向听课助手提问。</p>
             <div className="suggestions">
-             <button
-              className="d-btn"
+             <Button
+              variant="tertiary"
+              size="sm"
               onClick={() => {
                setInput('本节课老师明确强调了哪些重点？')
               }}
              >
               提取教师重点
-             </button>
-             <button className="d-btn" onClick={() => setModal('materials')}>
+             </Button>
+             <Button variant="tertiary" size="sm" onClick={() => setModal('materials')}>
               整理课前资料
-             </button>
-             <button
-              className="d-btn"
+             </Button>
+             <Button
+              variant="tertiary"
+              size="sm"
               onClick={() => {
                setSourceDraft('')
                setModal('lecture')
               }}
              >
               添加语音识别原文
-             </button>
+             </Button>
             </div>
            </div>
           )}
@@ -836,15 +708,17 @@ export default function App() {
           <>
            <div className="lecture-source-card">
             <h2>{lecture.lecture.title}</h2>
-            <button className="d-btn" disabled={busy} onClick={() => setModal('transcript')}>
-             添加或替换原文
-            </button>
-            <button className="d-btn" disabled={busy} onClick={() => setModal('courseware')}>
-             添加或替换课件
-            </button>
+            <div className="lecture-source-actions">
+             <Button variant="tertiary" size="sm" isDisabled={busy} onClick={() => setModal('transcript')}>
+              添加或替换原文
+             </Button>
+             <Button variant="tertiary" size="sm" isDisabled={busy} onClick={() => setModal('courseware')}>
+              添加或替换课件
+             </Button>
+            </div>
             <details>
              <summary>查看语音识别原文</summary>
-             <textarea className="srt-editor" readOnly value={lecture.lecture.transcript_text} />
+             <TextArea className="srt-editor" readOnly value={lecture.lecture.transcript_text} />
             </details>
            </div>
            {progress && (
@@ -858,9 +732,9 @@ export default function App() {
               </small>
              )}
              {busy && (
-              <button className="d-btn d-btn-ghost" onClick={() => void invoke('cancel')}>
+              <Button variant="ghost" size="sm" onClick={() => void invoke('cancel')}>
                取消任务
-              </button>
+              </Button>
              )}
             </div>
            )}
@@ -868,17 +742,19 @@ export default function App() {
             {tab === 'subtitles' && (
              <>
               <div className="toolbar">
-               <button
-                className="d-btn d-btn-primary"
-                disabled={busy || !lecture.lecture.transcript_path || !lecture.lecture.ppt_path}
+               <Button
+                variant="primary"
+                size="sm"
+                isDisabled={busy || !lecture.lecture.transcript_path || !lecture.lecture.ppt_path}
                 onClick={() => void task(() => generate('subtitles:generate'))}
                >
                 <StudyIcon name="sparkle" />
                 {lecture.correction ? '继续校订字幕' : lecture.segments.length ? '重新校订字幕' : '原文 + PPT 校订字幕'}
-               </button>
-               <button
-                className="d-btn"
-                disabled={busy}
+               </Button>
+               <Button
+                variant="tertiary"
+                size="sm"
+                isDisabled={busy}
                 onClick={() =>
                  void task(async () => {
                   await invoke('subtitles:import', {id: lectureId})
@@ -888,29 +764,31 @@ export default function App() {
                >
                 <StudyIcon name="upload" />
                 导入 SRT
-               </button>
+               </Button>
                {lecture.segments.length > 0 && (
                 <>
-                 <button
-                  className="d-btn d-btn-ghost d-btn-square"
-                  disabled={busy || !!lecture.correction}
+                 <Button
+                  variant="ghost"
+                  size="sm"
+                  isIconOnly
+                  isDisabled={busy || !!lecture.correction}
                   onClick={() => setSrtEdit(srtEdit === null ? lecture.srt : null)}
                  >
                   <StudyIcon name="edit" />
                   {srtEdit === null ? '编辑字幕' : '退出编辑'}
-                 </button>
-                 <button className="d-btn" onClick={() => exportResult('subtitles', 'srt')}>
+                 </Button>
+                 <Button variant="tertiary" size="sm" onClick={() => exportResult('subtitles', 'srt')}>
                   <StudyIcon name="download" />
                   SRT
-                 </button>
-                 <button className="d-btn" onClick={() => exportResult('subtitles', 'txt')}>
+                 </Button>
+                 <Button variant="tertiary" size="sm" onClick={() => exportResult('subtitles', 'txt')}>
                   <StudyIcon name="download" />
                   TXT
-                 </button>
-                 <button className="d-btn" onClick={() => exportResult('evidence-bundle', 'md')}>
+                 </Button>
+                 <Button variant="tertiary" size="sm" onClick={() => exportResult('evidence-bundle', 'md')}>
                   <StudyIcon name="download" />
                   课程证据包
-                 </button>
+                 </Button>
                 </>
                )}
               </div>
@@ -923,10 +801,11 @@ export default function App() {
               {srtEdit !== null ? (
                <>
                 <p className="hint">保存修改后，旧笔记与练习会清空，需重新生成。</p>
-                <textarea className="srt-editor" value={srtEdit} onChange={e => setSrtEdit(e.target.value)} />
-                <button
-                 className="d-btn d-btn-primary"
-                 disabled={busy}
+                <TextArea className="srt-editor" value={srtEdit} onChange={e => setSrtEdit(e.target.value)} />
+                <Button
+                 variant="primary"
+                 size="sm"
+                 isDisabled={busy}
                  onClick={() =>
                   void task(async () => {
                    await invoke('subtitles:save', {id: lectureId, srt: srtEdit})
@@ -936,11 +815,11 @@ export default function App() {
                  }
                 >
                  校验并保存字幕
-                </button>
+                </Button>
                </>
               ) : lecture.segments.length ? (
                <>
-                <input
+                <Input
                  className="search"
                  placeholder="搜索老师的原话…"
                  aria-label="搜索字幕"
@@ -986,31 +865,42 @@ export default function App() {
             {tab === 'notes' && (
              <>
               <div className="toolbar">
-               <button
-                className="d-btn d-btn-primary"
-                disabled={busy || !lecture.segments.length || !!lecture.correction}
+               <Button
+                variant="primary"
+                size="sm"
+                isDisabled={busy || !lecture.segments.length || !!lecture.correction}
                 onClick={() => void task(() => generate('notes:generate'))}
                >
                 {lecture.notes ? '重新提取重点' : '生成听课重点笔记'}
-               </button>
+               </Button>
                {lecture.notes && (
                 <>
-                 <button className="d-btn" onClick={() => exportResult('notes', 'md')}>
+                 <Button variant="tertiary" size="sm" onClick={() => exportResult('notes', 'md')}>
                   Markdown
-                 </button>
-                 <button className="d-btn" onClick={() => exportResult('notes', 'docx')}>
+                 </Button>
+                 <Button variant="tertiary" size="sm" onClick={() => exportResult('notes', 'docx')}>
                   Word
-                 </button>
+                 </Button>
                 </>
                )}
-               <button className="d-btn" disabled={busy} onClick={() => exportResult('evidence-bundle', 'json')}>
+               <Button
+                variant="tertiary"
+                size="sm"
+                isDisabled={busy}
+                onClick={() => exportResult('evidence-bundle', 'json')}
+               >
                 <StudyIcon name="download" />
                 证据包 JSON
-               </button>
-               <button className="d-btn" disabled={busy} onClick={() => exportResult('evidence-bundle', 'md')}>
+               </Button>
+               <Button
+                variant="tertiary"
+                size="sm"
+                isDisabled={busy}
+                onClick={() => exportResult('evidence-bundle', 'md')}
+               >
                 <StudyIcon name="download" />
                 证据包 Markdown
-               </button>
+               </Button>
               </div>
               {lecture.notes ? (
                <Notes
@@ -1035,33 +925,35 @@ export default function App() {
             {tab === 'practice' && (
              <>
               <div className="toolbar">
-               <button
-                className="d-btn d-btn-primary"
-                disabled={busy || !lecture.segments.length || !!lecture.correction}
+               <Button
+                variant="primary"
+                size="sm"
+                isDisabled={busy || !lecture.segments.length || !!lecture.correction}
                 onClick={() => void task(() => generate('practice:generate'))}
                >
                 <StudyIcon name="practice" />
                 生成课后练习
-               </button>
+               </Button>
                {lecture.practice &&
                 [...lecture.practice.past, ...lecture.practice.extended, ...(lecture.practice.generated || [])].some(
                  q => !q.answer || !q.explanation
                 ) && (
-                 <button
-                  className="d-btn"
-                  disabled={busy}
+                 <Button
+                  variant="tertiary"
+                  size="sm"
+                  isDisabled={busy}
                   onClick={() => void task(() => generate('practice:prepare'))}
                  >
                   <StudyIcon name="sparkle" />
                   补全已有答案与详解
-                 </button>
+                 </Button>
                 )}
                {lecture.practice &&
                 ['md', 'docx', 'pdf'].map(f => (
-                 <button className="d-btn d-btn-ghost d-btn-square" key={f} onClick={() => exportResult('practice', f)}>
+                 <Button variant="ghost" size="sm" isIconOnly key={f} onClick={() => exportResult('practice', f)}>
                   <StudyIcon name="download" />
                   {f === 'md' ? 'Markdown' : f === 'docx' ? 'Word' : 'PDF'}
-                 </button>
+                 </Button>
                 ))}
               </div>
               <label className="practice-options">
@@ -1116,7 +1008,7 @@ export default function App() {
            </div>
           </>
          ))}
-       </div>
+       </ScrollShadow>
        <section className="agent-composer">
         {pendingChat && <ChatWaitingReply streaming={!!chatText} />}
         <form
@@ -1154,204 +1046,236 @@ export default function App() {
         >
          {sourceDraft && (
           <div className="draft-attachment">
-           <span>▤</span>
+           <span aria-hidden="true">
+            <FileText size={18} />
+           </span>
            <div>
             <strong>{basename(sourceDraft)}</strong>
-            <input aria-label="拖入文件完整路径" readOnly value={sourceDraft} title={sourceDraft} />
+            <Input
+             className="local-path"
+             aria-label="拖入文件完整路径"
+             readOnly
+             value={sourceDraft}
+             title={sourceDraft}
+            />
            </div>
-           <button className="d-btn" type="button" disabled={busy} onClick={() => setModal('lecture')}>
+           <Button variant="tertiary" size="sm" type="button" isDisabled={busy} onClick={() => setModal('lecture')}>
             建立课次
-           </button>
-           <button
-            className="d-btn d-btn-ghost d-btn-square d-btn-sm"
+           </Button>
+           <Button
+            variant="ghost"
+            size="sm"
+            isIconOnly
             type="button"
             aria-label="移除待导入文件"
             onClick={() => setSourceDraft('')}
            >
             ×
-           </button>
+           </Button>
           </div>
          )}
-         <textarea
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          placeholder="输入消息，或拖入语音原文、PPT…"
-          aria-label="追问内容"
-          onKeyDown={e => {
-           if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
-            e.preventDefault()
-            if (input.trim() && !busy) e.currentTarget.form?.requestSubmit()
-           }
-          }}
-         />
-         <div className="composer-controls">
-          <div className="attachment-menu-anchor">
-           <button
-            type="button"
-            className="round-button"
-            aria-label="附件与工具"
-            aria-expanded={menu}
-            onClick={() => setMenu(!menu)}
+         <Surface className="composer-box" variant="default">
+          <TextArea
+           value={input}
+           onChange={e => setInput(e.target.value)}
+           placeholder="输入消息，或拖入语音原文、PPT…"
+           aria-label="追问内容"
+           onKeyDown={e => {
+            if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+             e.preventDefault()
+             if (input.trim() && !busy) e.currentTarget.form?.requestSubmit()
+            }
+           }}
+          />
+          <div className="composer-controls">
+           <div className="attachment-menu-anchor">
+            <Button
+             variant="ghost"
+             isIconOnly
+             className="composer-plus"
+             aria-label="附件与工具"
+             aria-expanded={menu}
+             onClick={() => setMenu(!menu)}
+            >
+             <Plus size={20} />
+            </Button>
+            {menu && (
+             <div className="attachment-menu" role="menu">
+              <Button
+               variant="tertiary"
+               size="sm"
+               type="button"
+               isDisabled={busy}
+               onClick={() => {
+                setMenu(false)
+                setModal(lectureId ? 'transcript' : 'lecture')
+               }}
+              >
+               <Search size={16} />
+               添加语音识别原文
+              </Button>
+              <Button
+               variant="tertiary"
+               size="sm"
+               type="button"
+               isDisabled={busy}
+               onClick={() => {
+                setMenu(false)
+                setModal(lectureId ? 'courseware' : 'lecture')
+               }}
+              >
+               <Presentation size={16} />
+               添加 PPT/课件
+              </Button>
+              <Button
+               variant="tertiary"
+               size="sm"
+               type="button"
+               onClick={() => {
+                setMenu(false)
+                setModal('zhiyun')
+               }}
+              >
+               <span aria-hidden="true">
+                <CloudDownload size={18} strokeWidth={1.7} />
+               </span>
+               智云课堂 · 搜索与导出
+              </Button>
+              <Button
+               variant="tertiary"
+               size="sm"
+               type="button"
+               onClick={() => {
+                setMenu(false)
+                setModal('materials')
+               }}
+              >
+               <BookOpen size={16} />
+               课前资料
+              </Button>
+              <Button
+               variant="tertiary"
+               size="sm"
+               type="button"
+               onClick={() => {
+                setMenu(false)
+                setTab('chat')
+               }}
+              >
+               <MessagesSquare size={16} />
+               聊天记录
+              </Button>
+              <Button
+               variant="tertiary"
+               size="sm"
+               type="button"
+               onClick={() => {
+                setMenu(false)
+                void task(() => invoke('library:open'))
+               }}
+              >
+               <Folder size={16} />
+               资料文件夹
+              </Button>
+              <div className="menu-divider" />
+              <Button
+               variant="tertiary"
+               size="sm"
+               type="button"
+               isDisabled={!lecture || busy}
+               onClick={() => {
+                setMenu(false)
+                setTab('subtitles')
+                void task(() => generate('subtitles:generate'))
+               }}
+              >
+               <CirclePlay size={16} />
+               校订完整字幕
+              </Button>
+              <Button
+               variant="tertiary"
+               size="sm"
+               type="button"
+               isDisabled={!lecture?.segments.length || !!lecture?.correction || busy}
+               onClick={() => {
+                setMenu(false)
+                setTab('notes')
+                void task(() => generate('notes:generate'))
+               }}
+              >
+               <StudyIcon name="sparkle" />
+               提取重点笔记
+              </Button>
+              <Button
+               variant="tertiary"
+               size="sm"
+               type="button"
+               isDisabled={!lecture?.segments.length || !!lecture?.correction || busy}
+               onClick={() => {
+                setMenu(false)
+                setTab('practice')
+                void task(() => generate('practice:generate'))
+               }}
+              >
+               <StudyIcon name="practice" />
+               生成课后练习
+              </Button>
+              <div className="menu-divider" />
+              <Button
+               variant="tertiary"
+               size="sm"
+               type="button"
+               onClick={() => {
+                setMenu(false)
+                setTab('activity')
+               }}
+              >
+               <History size={16} />
+               任务轨迹
+              </Button>
+             </div>
+            )}
+           </div>
+           <Button
+            variant="ghost"
+            className="composer-model-trigger"
+            aria-label="选择对话模型"
+            aria-haspopup="dialog"
+            aria-expanded={modal === 'settings'}
+            isDisabled={busy}
+            onClick={() => setModal('settings')}
            >
-            <Plus size={20} />
-           </button>
-           {menu && (
-            <div className="attachment-menu" role="menu">
-             <button
-              className="d-btn"
-              type="button"
-              role="menuitem"
-              disabled={busy}
-              onClick={() => {
-               setMenu(false)
-               setModal(lectureId ? 'transcript' : 'lecture')
-              }}
-             >
-              <span>⌕</span>添加语音识别原文
-             </button>
-             <button
-              className="d-btn"
-              type="button"
-              role="menuitem"
-              disabled={busy}
-              onClick={() => {
-               setMenu(false)
-               setModal(lectureId ? 'courseware' : 'lecture')
-              }}
-             >
-              <span>▤</span>添加 PPT/课件
-             </button>
-             <button
-              className="d-btn"
-              type="button"
-              role="menuitem"
-              onClick={() => {
-               setMenu(false)
-               setModal('zhiyun')
-              }}
-             >
-              <span aria-hidden="true">
-               <CloudDownload size={18} strokeWidth={1.7} />
-              </span>
-              智云课堂 · 搜索与导出
-             </button>
-             <button
-              className="d-btn"
-              type="button"
-              role="menuitem"
-              onClick={() => {
-               setMenu(false)
-               setModal('materials')
-              }}
-             >
-              <span>▤</span>课前资料
-             </button>
-             <button
-              className="d-btn"
-              type="button"
-              role="menuitem"
-              onClick={() => {
-               setMenu(false)
-               setTab('chat')
-              }}
-             >
-              <span>☷</span>聊天记录
-             </button>
-             <button
-              className="d-btn"
-              type="button"
-              role="menuitem"
-              onClick={() => {
-               setMenu(false)
-               void task(() => invoke('library:open'))
-              }}
-             >
-              <span>▱</span>资料文件夹
-             </button>
-             <div className="menu-divider" />
-             <button
-              className="d-btn"
-              type="button"
-              role="menuitem"
-              disabled={!lecture || busy}
-              onClick={() => {
-               setMenu(false)
-               setTab('subtitles')
-               void task(() => generate('subtitles:generate'))
-              }}
-             >
-              <span>▶</span>校订完整字幕
-             </button>
-             <button
-              className="d-btn"
-              type="button"
-              role="menuitem"
-              disabled={!lecture?.segments.length || !!lecture?.correction || busy}
-              onClick={() => {
-               setMenu(false)
-               setTab('notes')
-               void task(() => generate('notes:generate'))
-              }}
-             >
-              <span>✎</span>
-              <StudyIcon name="sparkle" />
-              提取重点笔记
-             </button>
-             <button
-              className="d-btn"
-              type="button"
-              role="menuitem"
-              disabled={!lecture?.segments.length || !!lecture?.correction || busy}
-              onClick={() => {
-               setMenu(false)
-               setTab('practice')
-               void task(() => generate('practice:generate'))
-              }}
-             >
-              <span>▦</span>
-              <StudyIcon name="practice" />
-              生成课后练习
-             </button>
-             <div className="menu-divider" />
-             <button
-              className="d-btn"
-              type="button"
-              role="menuitem"
-              onClick={() => {
-               setMenu(false)
-               setTab('activity')
-              }}
-             >
-              <span>↗</span>任务轨迹
-             </button>
-            </div>
+            <span className={`composer-brand ${modelBrand}`} aria-hidden="true">
+             {modelBrand === 'custom' && <Boxes />}
+            </span>
+            <span className="composer-model-name">{activeProfile?.model || '请选择千问模型'}</span>
+            <ChevronDown size={14} />
+           </Button>
+           {busy ? (
+            <Button
+             type="button"
+             variant="primary"
+             isIconOnly
+             className="composer-send"
+             aria-label="停止任务"
+             onClick={() => void invoke('cancel')}
+            >
+             <Square size={20} />
+            </Button>
+           ) : (
+            <Button
+             type="submit"
+             variant="primary"
+             isIconOnly
+             className="composer-send"
+             aria-label="发送消息"
+             isDisabled={!input.trim()}
+            >
+             <ArrowUp size={20} />
+            </Button>
            )}
           </div>
-          <button
-           type="button"
-           className="composer-model-trigger"
-           aria-label="选择对话模型"
-           aria-haspopup="dialog"
-           aria-expanded={modal === 'modelPicker'}
-           disabled={busy}
-           onClick={() => setModal('modelPicker')}
-          >
-           <span className={`composer-brand ${modelBrand}`} aria-hidden="true">
-            {modelBrand === 'custom' && <Boxes />}
-           </span>
-           <span className="composer-model-name">{activeProfile?.model || '请选择千问模型'}</span>
-           <ChevronDown size={14} />
-          </button>
-          {busy ? (
-           <button type="button" className="send-round" aria-label="停止任务" onClick={() => void invoke('cancel')}>
-            <Square size={20} />
-           </button>
-          ) : (
-           <button className="send-round" aria-label="发送消息" disabled={!input.trim()}>
-            <ArrowUp size={20} />
-           </button>
-          )}
-         </div>
+         </Surface>
         </form>
        </section>
       </>
@@ -1448,21 +1372,26 @@ export default function App() {
      />
     )}
     {modal === 'settings' && settings && (
-     <SettingsPanel
-      onZhiyunLogin={() => setModal('zhiyunLogin')}
-      rightWidth={0}
-      onApiVisible={setSettingsApi}
+     <SettingsHub
+      visible
       initial={settings}
+      busy={busy}
       error={error}
       close={() => setModal(null)}
-      busy={busy}
-      save={value =>
-       task(async () => {
-        const saved = await invoke<Settings>('settings:save', {settings: value})
-        setSettings(saved)
+      save={async value => {
+       let ok = false
+       await task(async () => {
+        setSettings(await invoke<Settings>('settings:save', {settings: value}))
+        ok = true
        })
-      }
-      task={task}
+       return ok
+      }}
+      appearance={appearance}
+      appearanceSaved={setAppearance}
+      courses={courses}
+      courseId={courseId}
+      identity={identity}
+      identitySave={async value => setIdentity(await invoke<Identity>('identity:save', {identity: value}))}
      />
     )}
     {modal === 'materials' && detail && (

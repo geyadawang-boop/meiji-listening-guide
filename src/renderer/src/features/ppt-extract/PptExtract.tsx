@@ -1,16 +1,16 @@
+import {Button, Input, TextArea} from '@heroui/react'
 import type {LibraryFile} from '@shared/types'
 import {useEffect, useRef, useState} from 'react'
 import {defaultPptExtractPrompt, type PptExtractReview, type PptExtractPage} from '@shared/ppt-extract'
+import {AlertBox} from '@renderer/ui/AlertBox'
 const invoke = <T,>(action: string, args?: unknown) => window.assistant.invoke<T>(action, args)
-export function PptExtract({
+export function PptExtractPanel({
  visible,
- close,
  courseId,
  courseName,
  files
 }: {
  visible: boolean
- close: () => void
  courseId: string
  courseName?: string
  files: () => void
@@ -83,11 +83,8 @@ export function PptExtract({
  }
  const kept = review?.pages.filter(p => p.keep).length || 0
  return (
-  <section
-   className="ppt-extract-page"
-   aria-label="截取 PPT"
-   hidden={!visible}
-   style={!visible ? {display: 'none'} : undefined}
+  <div
+   className="ppt-extract-panel"
    onDragOver={e => e.preventDefault()}
    onDrop={e => {
     e.preventDefault()
@@ -95,17 +92,12 @@ export function PptExtract({
     if (!busy && e.dataTransfer.files[0]) choose(window.assistant.filePath(e.dataTransfer.files[0]))
    }}
   >
-   <header>
-    <h2>截取 PPT</h2>
-    <button className="d-btn d-btn-ghost" onClick={close}>
-     返回课程对话
-    </button>
-   </header>
    <div className="ppt-extract-form">
     <div className="row">
-     <button
-      className="d-btn"
-      disabled={busy}
+     <Button
+      variant="tertiary"
+      size="sm"
+      isDisabled={busy}
       onClick={() =>
        void run(async () => {
         const file = await invoke<string | null>('ppt-extract:pick')
@@ -114,12 +106,12 @@ export function PptExtract({
       }
      >
       选择 PPTX
-     </button>
+     </Button>
      <span>{path.split(/[\\/]/).at(-1) || '拖入图片型 PPTX'}</span>
     </div>
     <label>
      处理提示词
-     <textarea
+     <TextArea
       aria-label="PPT 处理提示词"
       value={prompt}
       disabled={busy}
@@ -131,9 +123,10 @@ export function PptExtract({
      />
     </label>
     <div className="row">
-     <button
-      className="d-btn"
-      disabled={busy}
+     <Button
+      variant="tertiary"
+      size="sm"
+      isDisabled={busy}
       onClick={() => {
        setPrompt(defaultPptExtractPrompt)
        setReview(null)
@@ -141,10 +134,11 @@ export function PptExtract({
       }}
      >
       恢复默认提示词
-     </button>
-     <button
-      className="d-btn d-btn-primary"
-      disabled={busy || !path || !prompt.trim()}
+     </Button>
+     <Button
+      variant="primary"
+      size="sm"
+      isDisabled={busy || !path || !prompt.trim()}
       onClick={() =>
        void run(async () => {
         setReview(null)
@@ -155,11 +149,11 @@ export function PptExtract({
       }
      >
       分析并预览
-     </button>
+     </Button>
      {busy && (
-      <button className="d-btn d-btn-ghost" onClick={() => void invoke('cancel')}>
+      <Button variant="ghost" size="sm" onClick={() => void invoke('cancel')}>
        取消处理
-      </button>
+      </Button>
      )}
     </div>
     {sourceDeleted && <p className="hint">原始 PPT 已删除。现有预览可以调整并再次导出；重新分析请另选 PPT。</p>}
@@ -169,11 +163,7 @@ export function PptExtract({
      保存并检查成功后自动删除对应的原始 PPT。按原页序导出一份 PDF，每页保留裁剪后的尺寸。
     </p>
    </div>
-   {error && (
-    <div className="alert" role="alert">
-     {error}
-    </div>
-   )}
+   {error && <AlertBox>{error}</AlertBox>}
    {progress && <p aria-live="polite">{progress}</p>}
    {saved && (
     <footer>
@@ -181,13 +171,13 @@ export function PptExtract({
       已导出 {saved.kept} 页，删除 {saved.removed} 页{saved.sourceDeleted ? ' · 原始 PPT 已删除' : ''}
      </span>
      {saved.cleanupWarning && <p role="alert">{saved.cleanupWarning}</p>}
-     <input aria-label="截取 PPT 输出路径" readOnly value={saved.path} />
-     <button className="d-btn d-btn-primary" onClick={() => void openFile(saved.path)}>
+     <Input aria-label="截取 PPT 输出路径" readOnly value={saved.path} />
+     <Button variant="primary" size="sm" onClick={() => void openFile(saved.path)}>
       打开 PDF
-     </button>
-     <button className="d-btn" onClick={() => void openFile(saved.path, true)}>
+     </Button>
+     <Button variant="tertiary" size="sm" onClick={() => void openFile(saved.path, true)}>
       在文件夹中查看
-     </button>
+     </Button>
     </footer>
    )}
    {review && (
@@ -196,16 +186,18 @@ export function PptExtract({
       <strong>
        保留 {kept} 页 · 删除 {review.pages.length - kept} 页
       </strong>
-      <button
-       className="d-btn"
-       disabled={busy}
+      <Button
+       variant="tertiary"
+       size="sm"
+       isDisabled={busy}
        onClick={() => setReview({...review, pages: review.pages.map(p => ({...p, keep: p.width > 0 && p.height > 0}))})}
       >
        保留全部
-      </button>
-      <button
-       className="d-btn d-btn-primary"
-       disabled={busy || !kept}
+      </Button>
+      <Button
+       variant="primary"
+       size="sm"
+       isDisabled={busy || !kept}
        onClick={() =>
         void run(async () => {
          setProgress('正在生成 PDF')
@@ -228,7 +220,7 @@ export function PptExtract({
        }
       >
        导出 PDF
-      </button>
+      </Button>
      </div>
      <div className="ppt-extract-grid">
       {review.pages.map(p => {
@@ -270,7 +262,7 @@ export function PptExtract({
            {(['left', 'right', 'top', 'bottom'] as const).map((key, i) => (
             <label key={key}>
              {['左边界', '右边界', '上边界', '下边界'][i]} %
-             <input
+             <Input
               type="number"
               step=".1"
               min="0"
@@ -296,9 +288,9 @@ export function PptExtract({
    <section className="ppt-export-history" aria-label="已保存的 PDF">
     <header>
      <h3>已保存的 PDF</h3>
-     <button className="d-btn" onClick={files}>
+     <Button variant="tertiary" size="sm" onClick={files}>
       查看全部课程文件
-     </button>
+     </Button>
     </header>
     {pdfs.length ? (
      pdfs.slice(0, 8).map(f => (
@@ -309,18 +301,18 @@ export function PptExtract({
          {f.course || '未分类'} · {(f.size / 1024 / 1024).toFixed(2)} MB
         </small>
        </div>
-       <button className="d-btn" onClick={() => void openFile(f.path)}>
+       <Button variant="tertiary" size="sm" onClick={() => void openFile(f.path)}>
         打开 PDF
-       </button>
-       <button className="d-btn" onClick={() => void openFile(f.path, true)}>
+       </Button>
+       <Button variant="tertiary" size="sm" onClick={() => void openFile(f.path, true)}>
         定位
-       </button>
+       </Button>
       </article>
      ))
     ) : (
      <p className="hint">导出的 PDF 会保存在这里，重新打开软件后也能找到。</p>
     )}
    </section>
-  </section>
+  </div>
  )
 }

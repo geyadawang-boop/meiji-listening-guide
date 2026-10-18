@@ -142,7 +142,7 @@ export async function executePdfOperation(input: unknown): Promise<PdfBookInfo |
    CA: 0.3,
    F: 4,
    NM: PDFHexString.fromText('meijiang:' + row.id),
-   T: PDFHexString.fromText('梅酱的听课指南'),
+   T: PDFHexString.fromText('摘云'),
    Contents: PDFHexString.fromText(description),
    MeijiangData: PDFHexString.fromText(JSON.stringify(metadata))
   })

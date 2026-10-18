@@ -1,7 +1,10 @@
+import {Button, ScrollShadow} from '@heroui/react'
+import {ConfirmDialog} from '@renderer/ui/ConfirmDialog'
 import {useState} from 'react'
 import type {Course, ChatSession} from '@shared/types'
 import {BookMarked, ChevronDown, MessageSquare, Trash2} from 'lucide-react'
 import {courseLabel, courseYear, courseSubject, sortCoursesForNavigation} from '@shared/course-groups'
+import {AlertBox} from '@renderer/ui/AlertBox'
 export function CourseList({
  courses,
  selected,
@@ -32,7 +35,7 @@ export function CourseList({
   [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
  return (
   <>
-   <nav className="course-list">
+   <ScrollShadow className="course-list" orientation="vertical">
     {sortCoursesForNavigation(courses).map(c => {
      const label = courseLabel(c.name),
       active = c.id === selected,
@@ -40,10 +43,10 @@ export function CourseList({
      return (
       <section className="course-group" key={c.id}>
        <div className={'course-row ' + (active ? 'selected' : '')}>
-        <button
-         disabled={busy}
+        <Button
+         variant="ghost"
+         isDisabled={busy}
          className={'course ' + (active ? 'selected' : '')}
-         title={label}
          aria-label={'打开课程 ' + label}
          onClick={() => {
           select(c.id)
@@ -63,27 +66,28 @@ export function CourseList({
            label
           )}
          </span>
-        </button>
-        <button
+        </Button>
+        <Button
+         variant="ghost"
          className="course-fold"
          aria-label={(folded ? '展开课程 ' : '折叠课程 ') + label}
          aria-expanded={!folded}
          onClick={() => setCollapsed(v => ({...v, [c.id]: !folded}))}
         >
          <ChevronDown size={14} />
-        </button>
-        <button
+        </Button>
+        <Button
+         variant="ghost"
          className="course-delete"
          aria-label={'删除课程 ' + label}
-         title={'删除 ' + label}
-         disabled={busy}
+         isDisabled={busy}
          onClick={() => {
           setPending(c)
           setError('')
          }}
         >
          <Trash2 />
-        </button>
+        </Button>
        </div>
        {!folded && (
         <div className="course-sessions" aria-label={label + ' 的会话'}>
@@ -91,104 +95,80 @@ export function CourseList({
           .filter(s => s.course_id === c.id)
           .map(s => (
            <div className="session-row" key={s.id}>
-            <button
-             disabled={busy}
+            <Button
+             variant="ghost"
+             isDisabled={busy}
              className={'session-card ' + (s.id === selectedSession && active ? 'selected' : '')}
              aria-label={c.name + ' ' + s.title}
              onClick={() => selectSession(c.id, s.id)}
             >
              <MessageSquare />
              <span>{s.title}</span>
-            </button>
-            <button
+            </Button>
+            <Button
+             variant="ghost"
              className="session-delete"
              aria-label={'删除会话 ' + c.name + ' ' + s.title}
-             title="删除会话"
-             disabled={busy}
+             isDisabled={busy}
              onClick={() => {
               setPendingSession(s)
               setError('')
              }}
             >
              <Trash2 />
-            </button>
+            </Button>
            </div>
           ))}
-         <button
+         <Button
+          variant="ghost"
           className="new-session"
-          disabled={busy}
+          isDisabled={busy}
           aria-label={'新建会话 ' + c.name}
           onClick={() => newSession(c.id)}
          >
           <span aria-hidden="true">＋</span>新建会话
-         </button>
+         </Button>
         </div>
        )}
       </section>
      )
     })}
-   </nav>
+   </ScrollShadow>
    {pendingSession && (
-    <div className="confirm-shade">
-     <section role="alertdialog" aria-label="确认删除会话">
-      <h3>删除「{pendingSession.title}」？</h3>
-      <p>此会话及其中的聊天记录会删除。同课程的文件、课次、字幕、笔记和练习保留。</p>
-      {error && (
-       <p className="alert" role="alert">
-        {error}
-       </p>
-      )}
-      <footer>
-       <button className="d-btn d-btn-ghost" disabled={deleting} onClick={() => setPendingSession(null)}>
-        取消
-       </button>
-       <button
-        className="d-btn d-btn-error"
-        disabled={busy || deleting}
-        onClick={() => {
-         setDeleting(true)
-         void removeSession(pendingSession.course_id, pendingSession.id)
-          .then(() => setPendingSession(null))
-          .catch(e => setError(e instanceof Error ? e.message : String(e)))
-          .finally(() => setDeleting(false))
-        }}
-       >
-        删除会话
-       </button>
-      </footer>
-     </section>
-    </div>
+    <ConfirmDialog
+     title={`删除「${pendingSession.title}」？`}
+     confirmLabel="删除会话"
+     busy={busy || deleting}
+     error={error}
+     onCancel={() => setPendingSession(null)}
+     onConfirm={() => {
+      setDeleting(true)
+      void removeSession(pendingSession.course_id, pendingSession.id)
+       .then(() => setPendingSession(null))
+       .catch(e => setError(e instanceof Error ? e.message : String(e)))
+       .finally(() => setDeleting(false))
+     }}
+    >
+     此会话及其中的聊天记录会删除。同课程的文件、课次、字幕、笔记和练习保留。
+    </ConfirmDialog>
    )}
    {pending && (
-    <div className="confirm-shade">
-     <section role="alertdialog" aria-label="确认删除课程">
-      <h3>删除「{pending.name}」？</h3>
-      <p>本课程及全部课次、字幕、笔记、练习和对话记录会删除。资料文件和已导出文件保留。</p>
-      {error && (
-       <p className="alert" role="alert">
-        {error}
-       </p>
-      )}
-      <footer>
-       <button className="d-btn d-btn-ghost" disabled={deleting} onClick={() => setPending(null)}>
-        取消
-       </button>
-       <button
-        className="d-btn d-btn-error"
-        disabled={busy || deleting}
-        onClick={() => {
-         setDeleting(true)
-         void remove(pending.id)
-          .then(() => setPending(null))
-          .catch(e => setError(e instanceof Error ? e.message : String(e)))
-          .finally(() => setDeleting(false))
-        }}
-       >
-        删除课程
-       </button>
-      </footer>
-     </section>
-    </div>
+    <ConfirmDialog
+     title={`删除「${pending.name}」？`}
+     confirmLabel="删除课程"
+     busy={busy || deleting}
+     error={error}
+     onCancel={() => setPending(null)}
+     onConfirm={() => {
+      setDeleting(true)
+      void remove(pending.id)
+       .then(() => setPending(null))
+       .catch(e => setError(e instanceof Error ? e.message : String(e)))
+       .finally(() => setDeleting(false))
+     }}
+    >
+     本课程及全部课次、字幕、笔记、练习和对话记录会删除。资料文件和已导出文件保留。
+    </ConfirmDialog>
    )}
   </>
  )

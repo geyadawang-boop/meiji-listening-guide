@@ -1,8 +1,8 @@
-import {studyEntries, saveStudyEntries} from '../study'
+import {studyEntries, saveStudyEntries} from '@main/learning/study/study'
 import {studyEntrySchema, checkAt} from '@shared/study'
 import {z} from 'zod'
 import {app, dialog, shell} from 'electron'
-import {textbookDirectory} from '../textbook-directory'
+import {textbookDirectory} from '@main/learning/study/textbook-directory'
 import {dirname} from 'node:path'
 import {
  parseDocument,
@@ -10,11 +10,11 @@ import {
  coursewareCacheLimitations,
  serializeCoursewareSourceCache,
  coursewareSourceIdentity
-} from '../documents'
+} from '@main/documents/documents'
 import {readFile} from 'node:fs/promises'
 import {createHash} from 'node:crypto'
-import type {ApplicationContext} from '../main'
-import type {IpcHandler} from './handler'
+import type {ApplicationContext} from '@main/app/context'
+import type {IpcHandler} from '@main/ipc/handler'
 export function createStudyHandler(
  context: Pick<ApplicationContext, 'api' | 'db' | 'highlighter' | 'job' | 'routed' | 'window'>
 ): IpcHandler {

@@ -1,6 +1,10 @@
+import {Button} from '@heroui/react'
 import {useEffect, useRef, useState} from 'react'
+import {AlertBox} from '@renderer/ui/AlertBox'
 const invoke = (action: string, args?: unknown) => window.assistant.invoke(action, args)
-export function ZhiyunLogin({close, exportResources}: {close: () => void; exportResources: () => void}) {
+
+/** 智云登录视图：嵌入「智云课堂」窗口内部，负责网页覆盖层的位置同步。 */
+export function ZhiyunLoginPanel() {
  const slot = useRef<HTMLDivElement>(null),
   [error, setError] = useState('')
  async function navigate(action: string) {
@@ -35,37 +39,21 @@ export function ZhiyunLogin({close, exportResources}: {close: () => void; export
   }
  }, [])
  return (
-  <section className="zhiyun-login-page" aria-label="智云登录页面">
-   <header>
-    <div>
-     <h1>智云登录</h1>
-    </div>
-    <div>
-     <button className="d-btn d-btn-ghost" onClick={close}>
-      返回搜索与导出
-     </button>
-     <button className="d-btn d-btn-primary" onClick={exportResources}>
-      搜索与导出
-     </button>
-    </div>
-   </header>
+  <div className="zhiyun-login-view">
    <div className="zhiyun-login-toolbar">
-    <button className="d-btn d-btn-ghost" onClick={() => void navigate('zhiyun:back')}>
+    <Button variant="ghost" size="sm" onClick={() => void navigate('zhiyun:back')}>
      返回
-    </button>
-    <button className="d-btn d-btn-ghost" onClick={() => void navigate('zhiyun:refresh')}>
+    </Button>
+    <Button variant="ghost" size="sm" onClick={() => void navigate('zhiyun:refresh')}>
      刷新
-    </button>
-    <button className="d-btn" onClick={() => void navigate('zhiyun:login')}>
+    </Button>
+    <Button variant="tertiary" size="sm" onClick={() => void navigate('zhiyun:login')}>
      智云首页
-    </button>
+    </Button>
+    <span>登录完成后切回「搜索与导出」</span>
    </div>
-   {error && (
-    <div className="alert" role="alert">
-     {error}
-    </div>
-   )}
+   {error && <AlertBox>{error}</AlertBox>}
    <div className="zhiyun-login-slot" ref={slot} />
-  </section>
+  </div>
  )
 }

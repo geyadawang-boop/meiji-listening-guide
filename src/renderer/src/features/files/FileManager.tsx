@@ -1,6 +1,11 @@
+import {Button, Input, ToggleButton, ToggleButtonGroup} from '@heroui/react'
 import {useEffect, useState} from 'react'
 import type {Course, LibraryFile} from '@shared/types'
 import {Folder, Trash2} from 'lucide-react'
+import {AlertBox} from '@renderer/ui/AlertBox'
+import {WindowMenuButton, WindowPanel} from '@renderer/ui/WindowPanel'
+import {ConfirmDialog} from '@renderer/ui/ConfirmDialog'
+const categories = ['全部', 'PPT', '语音原文', '笔记', '历年卷']
 export function FileManager({
  busy,
  close,
@@ -71,80 +76,84 @@ export function FileManager({
   f => (filter === '全部' || f.category === filter) && `${f.name} ${f.course}`.includes(search)
  )
  return (
-  <section className="file-management" role="dialog" aria-label="文件管理">
-   <header>
-    <div>
-     <h2>
-      <Folder /> 文件管理
-     </h2>
-    </div>
-    <button className="d-btn d-btn-ghost d-btn-square d-btn-sm" aria-label="关闭文件管理" onClick={close}>
-     ×
-    </button>
-   </header>
-   <div className="course-folder-heading">
-    <strong>课程文件夹</strong>
-    <button className="d-btn" disabled={busy || working} onClick={() => setCreating(true)}>
-     ＋ 新建课程文件夹
-    </button>
-   </div>
+  <WindowPanel
+   visible
+   label="文件管理"
+   title="文件管理"
+   description="管理原始文件：导入、归类、打开与清理。"
+   heading="文件管理"
+   subheading={`${course} · ${visible.length} 个文件`}
+   menu={['全部课程', ...courseNames].map(c => (
+    <WindowMenuButton key={c} active={course === c} icon={<Folder aria-hidden="true" />} onSelect={() => setCourse(c)}>
+     {c} · {files.filter(f => c === '全部课程' || f.course === c).length}
+    </WindowMenuButton>
+   ))}
+   actions={
+    <>
+     <Button variant="tertiary" size="sm" isDisabled={busy || working} onClick={() => setCreating(true)}>
+      新建课程文件夹
+     </Button>
+     <Button variant="ghost" size="sm" onClick={() => void load().catch(e => setError(String(e)))}>
+      刷新
+     </Button>
+     <Button variant="tertiary" size="sm" onClick={() => void window.assistant.invoke('library:open')}>
+      打开资料文件夹
+     </Button>
+    </>
+   }
+   close={close}
+  >
    {creating && (
     <form
-     className="new-folder-form"
+     className="panel-inline-form"
      onSubmit={e => {
       e.preventDefault()
       void create()
      }}
     >
-     <input
+     <Input
       autoFocus
       aria-label="新课程名称"
       placeholder="输入课程名称"
       value={name}
       onChange={e => setName(e.target.value)}
      />
-     <button className="d-btn d-btn-primary" disabled={working || !name.trim()}>
+     <Button type="submit" variant="primary" size="sm" isDisabled={working || !name.trim()}>
       创建
-     </button>
-     <button className="d-btn d-btn-ghost" type="button" disabled={working} onClick={() => setCreating(false)}>
+     </Button>
+     <Button variant="ghost" size="sm" type="button" isDisabled={working} onClick={() => setCreating(false)}>
       取消
-     </button>
+     </Button>
     </form>
    )}
-   <nav className="course-folder-grid" aria-label="课程文件夹">
-    {['全部课程', ...courseNames].map(c => (
-     <button key={c} className={course === c ? 'selected' : ''} onClick={() => setCourse(c)}>
-      <Folder />
-      <span>
-       <strong>{c}</strong>
-       <small>{files.filter(f => c === '全部课程' || f.course === c).length} 个文件</small>
-      </span>
-     </button>
-    ))}
-   </nav>
    <div className="file-management-tools">
-    <input
+    <Input
      aria-label="搜索资料文件"
      placeholder="搜索文件或课程…"
      value={search}
      onChange={e => setSearch(e.target.value)}
     />
-    <button className="d-btn d-btn-ghost" onClick={() => void load().catch(e => setError(String(e)))}>
-     刷新
-    </button>
-    <button className="d-btn" onClick={() => void window.assistant.invoke('library:open')}>
-     打开资料文件夹
-    </button>
    </div>
-   <nav className="file-category-tabs">
-    {['全部', 'PPT', '语音原文', '笔记', '历年卷'].map(c => (
-     <button key={c} className={c === filter ? 'active' : ''} onClick={() => setFilter(c)}>
-      {c}
-      <span>{selectedFiles.filter(f => c === '全部' || f.category === c).length}</span>
-     </button>
+   <ToggleButtonGroup
+    aria-label="文件分类"
+    selectionMode="single"
+    disallowEmptySelection
+    selectedKeys={new Set([filter])}
+    onSelectionChange={keys => {
+     const next = [...keys][0]
+     if (typeof next === 'string') setFilter(next)
+    }}
+    size="sm"
+    className="file-category-group"
+   >
+    {categories.map((c, index) => (
+     <ToggleButton key={c} id={c}>
+      {index > 0 && <ToggleButtonGroup.Separator />}
+      {c} {selectedFiles.filter(f => c === '全部' || f.category === c).length}
+     </ToggleButton>
     ))}
-   </nav>
-   {error && <p className="alert">{error}</p>}
+   </ToggleButtonGroup>
+   {error && <AlertBox>{error}</AlertBox>}
    <div className="file-management-list">
     {visible.map(f => (
      <article key={f.path}>
@@ -158,30 +167,34 @@ export function FileManager({
        </small>
       </div>
       {/\.(pdf|pptx?|docx?|txt|md|srt)$/i.test(f.name) && (
-       <button
-        className="d-btn"
+       <Button
+        variant="tertiary"
+        size="sm"
         aria-label={`打开文件 ${f.name}`}
         onClick={() =>
          void window.assistant.invoke('library:open-file', {path: f.path}).catch(e => setError(String(e)))
         }
        >
         {/\.pdf$/i.test(f.name) ? '打开 PDF' : '打开'}
-       </button>
+       </Button>
       )}
-      <button
-       className="d-btn"
+      <Button
+       variant="tertiary"
+       size="sm"
        onClick={() => void window.assistant.invoke('library:reveal', {path: f.path}).catch(e => setError(String(e)))}
       >
        定位
-      </button>
-      <button
-       className="d-btn d-btn-ghost d-btn-error d-btn-square d-btn-sm"
+      </Button>
+      <Button
+       variant="danger-soft"
+       size="sm"
+       isIconOnly
        aria-label={`删除文件 ${f.name}`}
-       disabled={busy || working}
+       isDisabled={busy || working}
        onClick={() => setPending(f)}
       >
        <Trash2 />
-      </button>
+      </Button>
      </article>
     ))}
     {!visible.length && (
@@ -192,22 +205,17 @@ export function FileManager({
     )}
    </div>
    {pending && (
-    <div className="confirm-shade">
-     <section role="alertdialog" aria-label="确认删除文件">
-      <h3>将文件移入回收站？</h3>
-      <p>{pending.name}</p>
-      <p>相关课次会解除此文件的关联；已经生成的字幕和笔记保留。</p>
-      <footer>
-       <button className="d-btn d-btn-ghost" disabled={working} onClick={() => setPending(null)}>
-        取消
-       </button>
-       <button className="d-btn d-btn-error" disabled={working} onClick={() => void remove()}>
-        移入回收站
-       </button>
-      </footer>
-     </section>
-    </div>
+    <ConfirmDialog
+     title="将文件移入回收站？"
+     confirmLabel="移入回收站"
+     busy={working}
+     onCancel={() => setPending(null)}
+     onConfirm={() => void remove()}
+    >
+     <p>{pending.name}</p>
+     <p>相关课次会解除此文件的关联；已经生成的字幕和笔记保留。</p>
+    </ConfirmDialog>
    )}
-  </section>
+  </WindowPanel>
  )
 }

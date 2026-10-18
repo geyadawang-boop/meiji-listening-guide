@@ -1,4 +1,7 @@
+import {Button, Card, Input} from '@heroui/react'
 import {useState} from 'react'
+import {AlertBox} from '@renderer/ui/AlertBox'
+import {SelectField} from '@renderer/ui/SelectField'
 const invoke = <T,>(action: string, args?: unknown) => window.assistant.invoke<T>(action, args)
 type Item = {
  id: string
@@ -67,7 +70,7 @@ export function Discussion() {
   )
  }
  return (
-  <section className="knowledge-card" aria-label="评论与弹幕">
+  <Card className="knowledge-card" aria-label="评论与弹幕">
    <header>
     <div>
      <h3>评论与弹幕</h3>
@@ -75,7 +78,7 @@ export function Discussion() {
     </div>
    </header>
    <div className="row">
-    <input
+    <Input
      aria-label="讨论视频网址"
      value={url}
      disabled={busy}
@@ -87,7 +90,7 @@ export function Discussion() {
     />
     <label>
      评论页数
-     <input
+     <Input
       aria-label="评论页数"
       type="number"
       min={1}
@@ -97,9 +100,10 @@ export function Discussion() {
       onChange={e => setPages(Number(e.target.value))}
      />
     </label>
-    <button
-     className="d-btn"
-     disabled={busy || !url.trim()}
+    <Button
+     variant="tertiary"
+     size="sm"
+     isDisabled={busy || !url.trim()}
      onClick={() =>
       void run(async () => {
        setPack(await invoke('media:discussion', {url, pages}))
@@ -107,7 +111,7 @@ export function Discussion() {
      }
     >
      读取评论和弹幕
-    </button>
+    </Button>
    </div>
    {pack && (
     <>
@@ -121,8 +125,8 @@ export function Discussion() {
       · 共 {pack.items.length} 条。采集有页数和时段上限，不能当作所有历史讨论。
      </p>
      <div className="row">
-      <input aria-label="筛选讨论" placeholder="筛选文字" value={filter} onChange={e => setFilter(e.target.value)} />
-      <input aria-label="讨论分类" value={category} onChange={e => setCategory(e.target.value)} />
+      <Input aria-label="筛选讨论" placeholder="筛选文字" value={filter} onChange={e => setFilter(e.target.value)} />
+      <Input aria-label="讨论分类" value={category} onChange={e => setCategory(e.target.value)} />
      </div>
      <div className="discussion-list">
       {pack.items
@@ -152,19 +156,14 @@ export function Discussion() {
           {item.parent_id ? ` · 回复 ${item.parent_id}` : ''}
          </p>
          <div className="row">
-          <select
-           aria-label={`分类 ${item.id}`}
-           disabled={busy}
+          <SelectField
+           label={`分类 ${item.id}`}
            value={item.labels[0]}
-           onChange={e => change(item.id, 'labels', [e.target.value])}
-          >
-           {Object.entries(labels).map(([key, label]) => (
-            <option key={key} value={key}>
-             {label}
-            </option>
-           ))}
-          </select>
-          <input
+           isDisabled={busy}
+           onChange={next => change(item.id, 'labels', [next])}
+           options={Object.entries(labels).map(([key, label]) => ({value: key, label}))}
+          />
+          <Input
            aria-label={`备注 ${item.id}`}
            placeholder="核对备注"
            maxLength={500}
@@ -176,9 +175,10 @@ export function Discussion() {
         </article>
        ))}
      </div>
-     <button
-      className="d-btn d-btn-primary"
-      disabled={busy || !pack.items.some(item => item.selected)}
+     <Button
+      variant="primary"
+      size="sm"
+      isDisabled={busy || !pack.items.some(item => item.selected)}
       onClick={() =>
        void run(async () => {
         const result = await invoke<{path: string}>('media:discussion-import', {
@@ -197,7 +197,7 @@ export function Discussion() {
       }
      >
       保存所选讨论
-     </button>
+     </Button>
     </>
    )}
    {busy && (
@@ -210,11 +210,7 @@ export function Discussion() {
      {notice}
     </p>
    )}
-   {error && (
-    <p role="alert" className="alert">
-     {error}
-    </p>
-   )}
-  </section>
+   {error && <AlertBox>{error}</AlertBox>}
+  </Card>
  )
 }

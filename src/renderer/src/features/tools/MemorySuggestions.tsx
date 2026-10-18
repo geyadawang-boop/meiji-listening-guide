@@ -1,4 +1,7 @@
+import {Button, Card, Input, TextArea} from '@heroui/react'
 import {useEffect, useState} from 'react'
+import {AlertBox} from '@renderer/ui/AlertBox'
+import {SelectField} from '@renderer/ui/SelectField'
 type Candidate = {
  candidate_id: string
  kind: string
@@ -44,33 +47,31 @@ export function MemorySuggestions({saved}: {saved: () => Promise<void>}) {
   void run(refresh)
  }, [])
  return (
-  <section className="knowledge-card">
+  <Card className="knowledge-card">
    <h3>待核对的记忆建议</h3>
    <p className="hint">
     研究可建议下次要继续核对的内容。这里显示原句依据；仅在你检查、修改并确认后保存为学习记忆，不自动写入教材或账号聊天。
    </p>
    <div className="row">
-    <select
-     aria-label="选择记忆建议"
+    <SelectField
+     label="选择记忆建议"
+     placeholder="选择建议"
      value={selected}
-     onChange={e => {
-      const item = suggestions.find(item => item.key === e.target.value)
-      setSelected(e.target.value)
+     onChange={next => {
+      const item = suggestions.find(item => item.key === next)
+      setSelected(next)
       setTitle(item?.candidate.title || '')
       setBody(item?.candidate.body || '')
       setKind(item?.candidate.kind || 'progress')
      }}
-    >
-     <option value="">选择建议</option>
-     {suggestions.map(item => (
-      <option key={item.key} value={item.key}>
-       {item.candidate.title} · {item.task.question}
-      </option>
-     ))}
-    </select>
-    <button className="d-btn d-btn-ghost" disabled={busy} onClick={() => void run(refresh)}>
+     options={[
+      {value: '', label: '选择建议'},
+      ...suggestions.map(item => ({value: item.key, label: item.candidate.title + ' · ' + item.task.question}))
+     ]}
+    />
+    <Button variant="ghost" size="sm" isDisabled={busy} onClick={() => void run(refresh)}>
      刷新记忆建议
-    </button>
+    </Button>
    </div>
    {current && (
     <>
@@ -84,17 +85,23 @@ export function MemorySuggestions({saved}: {saved: () => Promise<void>}) {
       }
      </p>
      <div className="row">
-      <select aria-label="记忆建议类型" value={kind} onChange={e => setKind(e.target.value)}>
-       <option value="preference">学习偏好</option>
-       <option value="progress">学习进度</option>
-       <option value="correction">待核实纠错</option>
-      </select>
-      <input aria-label="记忆建议标题" value={title} maxLength={80} onChange={e => setTitle(e.target.value)} />
+      <SelectField
+       label="记忆建议类型"
+       value={kind}
+       onChange={next => setKind(next)}
+       options={[
+        {value: 'preference', label: '学习偏好'},
+        {value: 'progress', label: '学习进度'},
+        {value: 'correction', label: '待核实纠错'}
+       ]}
+      />
+      <Input aria-label="记忆建议标题" value={title} maxLength={80} onChange={e => setTitle(e.target.value)} />
      </div>
-     <textarea aria-label="记忆建议正文" value={body} maxLength={1000} onChange={e => setBody(e.target.value)} />
-     <button
-      className="d-btn d-btn-primary"
-      disabled={busy || !title.trim() || !body.trim()}
+     <TextArea aria-label="记忆建议正文" value={body} maxLength={1000} onChange={e => setBody(e.target.value)} />
+     <Button
+      variant="primary"
+      size="sm"
+      isDisabled={busy || !title.trim() || !body.trim()}
       onClick={() =>
        void run(async () => {
         await request('memory-accept', {
@@ -109,15 +116,11 @@ export function MemorySuggestions({saved}: {saved: () => Promise<void>}) {
       }
      >
       确认保存这条记忆建议
-     </button>
+     </Button>
     </>
    )}
    {notice && <p role="status">{notice}</p>}
-   {error && (
-    <p className="alert" role="alert">
-     {error}
-    </p>
-   )}
-  </section>
+   {error && <AlertBox>{error}</AlertBox>}
+  </Card>
  )
 }

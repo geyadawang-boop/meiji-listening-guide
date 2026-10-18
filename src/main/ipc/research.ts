@@ -1,8 +1,8 @@
 import {z} from 'zod'
 import {dialog} from 'electron'
 import {readFile} from 'node:fs/promises'
-import type {ApplicationContext} from '../main'
-import type {IpcHandler} from './handler'
+import type {ApplicationContext} from '@main/app/context'
+import type {IpcHandler} from '@main/ipc/handler'
 export function createResearchHandler(
  context: Pick<
   ApplicationContext,

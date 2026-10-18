@@ -127,15 +127,12 @@ async function navigation() {
 }
 try {
  const exports = [
-  ['systemProtect', 'system-encryption'],
-  ['NativeMediaAuth', 'media-auth'],
-  ['NativeDownloadJobs', 'media-jobs'],
-  ['NativeDownloads', 'media-downloads'],
-  ['NativeResearchBackend', 'research']
- ].map(
-  ([symbol, file]) =>
-   `export {${symbol}} from ${JSON.stringify(join(root, 'src/main', file + '.ts').replaceAll('\\', '/'))};`
- )
+  ['systemProtect', 'src/main/security/system-encryption'],
+  ['NativeMediaAuth', 'src/main/media/auth/media-auth'],
+  ['NativeDownloadJobs', 'src/main/media/jobs/media-jobs'],
+  ['NativeDownloads', 'src/main/media/download/media-downloads'],
+  ['NativeResearchBackend', 'src/main/research/research']
+ ].map(([symbol, file]) => `export {${symbol}} from ${JSON.stringify(join(root, file + '.ts').replaceAll('\\', '/'))};`)
  exports.push("export {default as Database} from 'better-sqlite3';")
  await build({
   stdin: {contents: exports.join('\n'), resolveDir: root, loader: 'ts'},
@@ -151,6 +148,8 @@ try {
      builder.onResolve({filter: /^[^./]/}, args => {
       if (isAbsolute(args.path)) return
       if (args.path === 'electron' || args.path.startsWith('node:')) return {path: args.path, external: true}
+      // 内部别名交给 esbuild 按 tsconfig paths 打包，第三方包保持外部化。
+      if (args.path.startsWith('@main/') || args.path.startsWith('@shared/')) return
       return {path: import.meta.resolve(args.path), external: true}
      })
     }

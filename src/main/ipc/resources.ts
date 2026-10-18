@@ -1,13 +1,13 @@
 import {z} from 'zod'
 import {dialog, shell, nativeImage} from 'electron'
-import {bilibiliUrl} from '../video-policy'
+import {bilibiliUrl} from '@main/media/bilibili/video-policy'
 import {createHash} from 'node:crypto'
-import {libraryDirectory, folderName} from '../library'
+import {libraryDirectory, folderName} from '@main/library/library'
 import {join} from 'node:path'
 import {readFile, writeFile, lstat} from 'node:fs/promises'
-import type {ApplicationContext} from '../main'
-import type {IpcHandler} from './handler'
-import {biliQrImage} from '../bili-qr'
+import type {ApplicationContext} from '@main/app/context'
+import type {IpcHandler} from '@main/ipc/handler'
+import {biliQrImage} from '@main/media/bilibili/bili-qr'
 export function createResourcesHandler(
  context: Pick<
   ApplicationContext,

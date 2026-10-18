@@ -1,7 +1,10 @@
+import {Button, Label, Slider} from '@heroui/react'
 import {useState, useRef, useEffect, type CSSProperties} from 'react'
 import {defaultAppearance, resolveAppearance, type Appearance, type AppearanceState} from '@shared/appearance'
 import type {Course} from '@shared/types'
 import {ChatMessage} from '@renderer/features/chat/ChatMessage'
+import {AlertBox} from '@renderer/ui/AlertBox'
+import {SelectField} from '@renderer/ui/SelectField'
 const colors = {default: 'var(--blue)', lavender: '#9279c7', rose: '#ca809c', mint: '#5d9e90', blue: '#6497ca'}
 export function chatStyle(value: Appearance) {
  return {
@@ -42,13 +45,15 @@ export function AppearanceEditor({
  courseId,
  courses,
  close,
- saved
+ saved,
+ embedded = false
 }: {
  initial: AppearanceState
  courseId: string
  courses: Course[]
  close: () => void
  saved: (state: AppearanceState) => void
+ embedded?: boolean
 }) {
  const [editingCourseId, setEditingCourseId] = useState(courseId || courses[0]?.id || ''),
   [state, setState] = useState(initial),
@@ -157,31 +162,43 @@ export function AppearanceEditor({
   max: number,
   step = 1
  ) => (
-  <label className="appearance-slider">
-   {label}
-   <output>{Math.round(value[key] * 100) / 100}</output>
-   <input
-    type="range"
-    aria-label={label}
-    min={min}
-    max={max}
-    step={step}
-    value={value[key]}
-    onChange={e => update({[key]: Number(e.target.value)})}
-   />
-  </label>
+  <Slider
+   aria-label={label}
+   className="w-full"
+   value={value[key]}
+   minValue={min}
+   maxValue={max}
+   step={step}
+   isDisabled={busy}
+   formatOptions={{maximumFractionDigits: 2}}
+   onChange={next => typeof next === 'number' && update({[key]: next})}
+  >
+   <Label>{label}</Label>
+   <Slider.Output />
+   <Slider.Track>
+    <Slider.Fill />
+    <Slider.Thumb />
+   </Slider.Track>
+  </Slider>
  )
  return (
-  <section className="appearance-editor" role="dialog" aria-label="聊天外观">
+  <section
+   className={'appearance-editor' + (embedded ? ' appearance-editor--embedded' : '')}
+   role={embedded ? undefined : 'dialog'}
+   aria-label="聊天外观"
+  >
    <header>
     <h2>聊天外观</h2>
     <div>
-     <button className="d-btn d-btn-ghost" disabled={busy} onClick={() => void run(async () => close())}>
-      关闭
-     </button>
-     <button
-      className="d-btn d-btn-primary"
-      disabled={busy}
+     {!embedded && (
+      <Button variant="ghost" size="sm" isDisabled={busy} onClick={() => void run(async () => close())}>
+       关闭
+      </Button>
+     )}
+     <Button
+      variant="primary"
+      size="sm"
+      isDisabled={busy}
       onClick={() =>
        void run(async () =>
         commit(
@@ -194,7 +211,7 @@ export function AppearanceEditor({
       }
      >
       保存
-     </button>
+     </Button>
     </div>
    </header>
    <div className="appearance-layout">
@@ -214,42 +231,39 @@ export function AppearanceEditor({
      {scope === 'global' && courseId && state.courses[courseId] && (
       <div className="appearance-notice">
        {courses.find(c => c.id === courseId)?.name} 使用独立外观。
-       <button
-        className="d-btn"
-        disabled={busy}
+       <Button
+        variant="tertiary"
+        size="sm"
+        isDisabled={busy}
         onClick={() =>
          void run(async () => commit(await window.assistant.invoke<AppearanceState>('appearance:clear', {courseId})))
         }
        >
         让当前课程跟随全局
-       </button>
+       </Button>
       </div>
      )}
      {scope === 'course' && (
       <div className="appearance-course">
        <label>
         选择课程
-        <select
-         aria-label="外观设置课程"
-         disabled={busy}
+        <SelectField
+         label="外观设置课程"
+         isDisabled={busy}
          value={editingCourseId}
-         onChange={e => {
-          setEditingCourseId(e.target.value)
-          setValue(resolveAppearance(stateRef.current, e.target.value))
+         onChange={next => {
+          setEditingCourseId(next)
+          setValue(resolveAppearance(stateRef.current, next))
           setError('')
          }}
-        >
-         {courses.map(c => (
-          <option key={c.id} value={c.id}>
-           {c.name}
-          </option>
-         ))}
-        </select>
+         options={courses.map(c => ({value: c.id, label: c.name}))}
+        />
        </label>
        <span>{state.courses[editingCourseId] ? '独立设置' : '跟随全局'}</span>
-       <button
-        className="d-btn"
-        disabled={busy}
+       <Button
+        variant="tertiary"
+        size="sm"
+        isDisabled={busy}
         onClick={() =>
          void run(async () => {
           const next = await window.assistant.invoke<AppearanceState>('appearance:clear', {courseId: editingCourseId})
@@ -259,29 +273,31 @@ export function AppearanceEditor({
         }
        >
         跟随全局
-       </button>
+       </Button>
       </div>
      )}
      <section>
       <h3>聊天背景</h3>
       <label>
        背景
-       <select
-        aria-label="聊天背景"
+       <SelectField
+        label="聊天背景"
         value={value.background}
-        onChange={e => update({background: e.target.value as Appearance['background']})}
-       >
-        <option value="none">无背景</option>
-        <option value="lavender">薰衣草</option>
-        <option value="rose">樱花</option>
-        <option value="mint">薄荷</option>
-        <option value="image">自选图片</option>
-       </select>
+        onChange={next => update({background: next as Appearance['background']})}
+        options={[
+         {value: 'none', label: '无背景'},
+         {value: 'lavender', label: '薰衣草'},
+         {value: 'rose', label: '樱花'},
+         {value: 'mint', label: '薄荷'},
+         {value: 'image', label: '自选图片'}
+        ]}
+       />
       </label>
       <div className="appearance-actions">
-       <button
-        className="d-btn"
-        disabled={busy}
+       <Button
+        variant="tertiary"
+        size="sm"
+        isDisabled={busy}
         onClick={() =>
          void run(async () => {
           const image = await window.assistant.invoke<string | null>('appearance:image')
@@ -290,10 +306,10 @@ export function AppearanceEditor({
         }
        >
         选择背景图片
-       </button>
-       <button className="d-btn d-btn-ghost" disabled={busy} onClick={() => update({image: '', background: 'none'})}>
+       </Button>
+       <Button variant="ghost" size="sm" isDisabled={busy} onClick={() => update({image: '', background: 'none'})}>
         移除背景
-       </button>
+       </Button>
       </div>
       {slider('背景透明度', 'opacity', 0, 1, 0.05)}
       {slider('背景模糊', 'blur', 0, 24)}
@@ -303,23 +319,19 @@ export function AppearanceEditor({
       <h3>头像与消息</h3>
       <label>
        主题色
-       <select
-        aria-label="聊天主题色"
+       <SelectField
+        label="聊天主题色"
         value={value.accent}
-        onChange={e => update({accent: e.target.value as Appearance['accent']})}
-       >
-        {Object.entries({default: '默认', lavender: '浅紫', rose: '粉樱', mint: '薄荷', blue: '雾蓝'}).map(
-         ([id, name]) => (
-          <option key={id} value={id}>
-           {name}
-          </option>
-         )
+        onChange={next => update({accent: next as Appearance['accent']})}
+        options={Object.entries({default: '默认', lavender: '浅紫', rose: '粉樱', mint: '薄荷', blue: '雾蓝'}).map(
+         ([id, name]) => ({value: id, label: name})
         )}
-       </select>
+       />
       </label>
-      <button
-       className="d-btn"
-       disabled={busy}
+      <Button
+       variant="tertiary"
+       size="sm"
+       isDisabled={busy}
        onClick={() =>
         void run(async () => {
          const next = {...value, accent: 'default' as const}
@@ -334,17 +346,18 @@ export function AppearanceEditor({
        }
       >
        恢复默认主题色
-      </button>
+      </Button>
       <label>
        头像形状
-       <select
-        aria-label="头像形状"
+       <SelectField
+        label="头像形状"
         value={value.avatarShape}
-        onChange={e => update({avatarShape: e.target.value as Appearance['avatarShape']})}
-       >
-        <option value="round">圆形</option>
-        <option value="rounded">圆角方形</option>
-       </select>
+        onChange={next => update({avatarShape: next as Appearance['avatarShape']})}
+        options={[
+         {value: 'round', label: '圆形'},
+         {value: 'rounded', label: '圆角方形'}
+        ]}
+       />
       </label>
       {slider('头像大小', 'avatarSize', 28, 72)}
       {slider('正文字号', 'fontSize', 12, 24)}
@@ -365,9 +378,10 @@ export function AppearanceEditor({
        助手消息使用气泡
       </label>
      </section>
-     <button
-      className="d-btn"
-      disabled={busy}
+     <Button
+      variant="tertiary"
+      size="sm"
+      isDisabled={busy}
       onClick={() =>
        void run(async () => {
         const next = {...defaultAppearance}
@@ -382,12 +396,8 @@ export function AppearanceEditor({
       }
      >
       恢复默认外观
-     </button>
-     {error && (
-      <p role="alert" className="alert">
-       {error}
-      </p>
-     )}
+     </Button>
+     {error && <AlertBox>{error}</AlertBox>}
      {status && <p role="status">{status}</p>}
     </fieldset>
     <aside>

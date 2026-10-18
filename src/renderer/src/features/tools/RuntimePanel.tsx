@@ -1,4 +1,6 @@
+import {Button} from '@heroui/react'
 import {useEffect, useState, useRef} from 'react'
+import {AlertBox} from '@renderer/ui/AlertBox'
 import type {RuntimeStatus} from '@shared/runtime'
 export function RuntimePanel() {
  const [data, setData] = useState<RuntimeStatus>(),
@@ -58,18 +60,14 @@ export function RuntimePanel() {
  return (
   <section aria-label="应用与运行组件">
    <h3>应用与运行组件</h3>
-   <p>梅酱的听课指南 {data?.version || ''}</p>
+   <p>摘云 {data?.version || ''}</p>
    <p className="hint">完整包可离线使用。轻量包可选择同版本组件文件夹安装；不会自动下载或更改你的资料。</p>
    {platform !== undefined && !isWindows && (
     <p className="hint" role="status">
      运行组件目前仅支持 Windows；此平台不可安装 Windows 专属组件。
     </p>
    )}
-   {error && (
-    <p className="alert" role="alert">
-     {error}
-    </p>
-   )}
+   {error && <AlertBox>{error}</AlertBox>}
    {data?.reason && (
     <p className="hint" role="status">
      {data.reason}
@@ -95,18 +93,19 @@ export function RuntimePanel() {
                : '未安装'}
      </span>
      {c.reason && <p className="hint">{c.reason}</p>}
-     <button
-      className="d-btn"
-      disabled={busy || refreshing || c.installed || c.installable === false || platform !== 'win32'}
+     <Button
+      variant="tertiary"
+      size="sm"
+      isDisabled={busy || refreshing || c.installed || c.installable === false || platform !== 'win32'}
       onClick={() => void install(c.id)}
      >
       选择组件文件夹安装
-     </button>
+     </Button>
     </article>
    ))}
-   <button className="d-btn" disabled={busy || refreshing} onClick={() => void refresh()}>
+   <Button variant="tertiary" size="sm" isDisabled={busy || refreshing} onClick={() => void refresh()}>
     {refreshing ? '正在校验组件…' : '刷新组件状态'}
-   </button>
+   </Button>
   </section>
  )
 }
