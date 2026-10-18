@@ -1,0 +1,114 @@
+.study-page {
+ position: fixed;
+ inset: 0 0 0 60px;
+ z-index: 35;
+ background: var(--chat);
+ color: var(--text);
+ padding: 30px 36px;
+ overflow: auto;
+}
+.study-page header {
+ display: flex;
+ justify-content: space-between;
+ align-items: center;
+}
+.study-page header p {
+ color: var(--muted);
+ margin-top: 6px;
+}
+.study-layout {
+ display: grid;
+ grid-template-columns: 340px minmax(0, 1fr);
+ gap: 30px;
+}
+.study-layout aside {
+ padding: 22px;
+ border: 1px solid var(--line);
+ border-radius: 20px;
+ background: var(--surface-raised);
+}
+.study-layout label {
+ display: block;
+ margin: 12px 0;
+}
+.study-layout label input:not([type="checkbox"]),
+.study-layout label select,
+.study-layout textarea {
+ width: 100%;
+ margin-top: 6px;
+}
+.study-layout textarea {
+ min-height: 120px;
+}
+.study-layout small {
+ display: block;
+ overflow-wrap: anywhere;
+ color: var(--muted);
+ margin: 8px 0;
+}
+.study-layout aside > button {
+ margin: 5px 4px;
+}
+.study-layout .row {
+ gap: 10px;
+}
+.study-layout .row label {
+ min-width: 0;
+ flex: 1;
+}
+.study-legend {
+ display: grid;
+ grid-template-columns: 1fr 1fr;
+ gap: 10px;
+ margin: 16px 0;
+}
+.study-legend span {
+ font-size: 13px;
+}
+.study-legend i {
+ display: inline-block;
+ width: 16px;
+ height: 12px;
+ border-radius: 4px;
+ margin-right: 8px;
+}
+.textbook-preview {
+ position: relative;
+ width: 100%;
+ user-select: none;
+ cursor: crosshair;
+ line-height: 0;
+ box-shadow: 0 4px 24px #0001;
+}
+.textbook-preview img {
+ width: 100%;
+ display: block;
+ pointer-events: none;
+}
+.textbook-preview span {
+ position: absolute;
+ background: #fbb5c26b;
+ border: 1px solid #d17498;
+ pointer-events: none;
+}
+.highlight-review {
+ padding: 20px;
+ margin-top: 24px;
+ border: 1px solid var(--line);
+ border-radius: 18px;
+}
+.highlight-review > label {
+ display: flex;
+ gap: 12px;
+ padding: 12px;
+ border-bottom: 1px solid var(--line);
+}
+.highlight-review strong {
+ display: block;
+ margin: 7px 0;
+}
+.study-empty {
+ padding: 100px 20px;
+ text-align: center;
+ color: var(--muted);
+}
