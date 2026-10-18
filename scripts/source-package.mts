@@ -47,6 +47,8 @@ for (const name of [
  'LICENSE',
  'NOTICE',
  'THIRD_PARTY_NOTICES.md',
+ 'licenses/Silero-VAD-LICENSE.txt',
+ 'licenses/.gitattributes',
  'resources/runtime-manifest.json',
  'resources/icon.ico',
  'resources/icon.png',
