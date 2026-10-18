@@ -134,6 +134,155 @@ try {
   if (phaseReport.status !== 'passed') throw new Error('Visual phase report failed')
   report[phase] = phaseReport
  }
+ // Separate baseline: observe the unchanged PPT helper after its real parent dies.
+ await build({
+  entryPoints: [join(root, 'src/main/video-ppt.ts')],
+  outfile: join(work, 'ppt-owner.mjs'),
+  bundle: true,
+  platform: 'node',
+  format: 'esm',
+  packages: 'external',
+  plugins: [
+   {
+    name: 'resolve-native',
+    setup(builder) {
+     builder.onResolve({filter: /^[^./]/}, args => {
+      if (isAbsolute(args.path)) return
+      if (args.path === 'electron' || args.path.startsWith('node:')) return {path: args.path, external: true}
+      return {path: import.meta.resolve(args.path), external: true}
+     })
+    }
+   }
+  ]
+ })
+ await build({
+  entryPoints: [join(root, 'scripts/ppt-parent-exit-electron.mts')],
+  outfile: join(work, 'parent-exit.mjs'),
+  bundle: true,
+  platform: 'node',
+  format: 'esm',
+  packages: 'external'
+ })
+ const baseline: Record<string, unknown> = {
+  scope:
+   'Forced termination of one owned Electron fixture calling the unchanged production PPT helper. An observed exit is not a universal process-tree guarantee.'
+ }
+ const environment: NodeJS.ProcessEnv = {...process.env, MEIJI_VISUAL_WORK: work}
+ delete environment.ELECTRON_RUN_AS_NODE
+ const parent = spawn(require('electron') as string, [join(work, 'parent-exit.mjs')], {
+  env: environment,
+  stdio: ['ignore', 'pipe', 'pipe']
+ })
+ let ownedPid: number | undefined,
+  parentExited = false,
+  diagnostic = ''
+ const exited = new Promise<void>(resolveExit => {
+  const finish = () => {
+   parentExited = true
+   resolveExit()
+  }
+  parent.once('exit', finish)
+  parent.once('close', finish)
+ })
+ const gone = (pid: number) => {
+  try {
+   process.kill(pid, 0)
+   return false
+  } catch (error) {
+   if ((error as NodeJS.ErrnoException).code === 'ESRCH') return true
+   throw error
+  }
+ }
+ const waitGone = async (pid: number) => {
+  const deadline = Date.now() + 3000
+  do {
+   if (gone(pid)) return true
+   await new Promise(r => setTimeout(r, 25))
+  } while (Date.now() < deadline)
+  return gone(pid)
+ }
+ try {
+  await new Promise<void>((ready, fail) => {
+   let buffer = ''
+   const timer = setTimeout(() => fail(new Error('PPT baseline did not report owned PID and frame data')), 20000)
+   const finish = (error?: Error) => {
+    clearTimeout(timer)
+    error ? fail(error) : ready()
+   }
+   parent.once('error', finish)
+   parent.once('exit', () => finish(new Error('PPT baseline parent exited before readiness: ' + diagnostic)))
+   parent.stderr.on('data', bytes => {
+    diagnostic = (diagnostic + bytes.toString()).slice(-4000)
+   })
+   parent.stdout.on('data', bytes => {
+    buffer += bytes.toString()
+    if (buffer.length > 16000) {
+     finish(new Error('Baseline readiness output exceeded limit'))
+     return
+    }
+    for (const line of buffer.split('\n').slice(0, -1)) {
+     try {
+      const message = JSON.parse(line)
+      if (
+       message.kind === 'ppt-owned-started' &&
+       message.parentPid === parent.pid &&
+       Number.isSafeInteger(message.pid) &&
+       message.pid > 0
+      )
+       ownedPid = message.pid
+      if (
+       message.kind === 'ppt-owned-ready' &&
+       message.parentPid === parent.pid &&
+       Number.isSafeInteger(message.pid) &&
+       message.pid > 0 &&
+       message.bytes >= 384 &&
+       message.frameBytes === 384 &&
+       message.pid === ownedPid
+      ) {
+       finish()
+      }
+     } catch {}
+    }
+    buffer = buffer.slice(buffer.lastIndexOf('\n') + 1)
+   })
+  })
+  if (!ownedPid) throw new Error('No owned FFmpeg PID')
+  baseline.parentPid = parent.pid
+  baseline.ownedChildPid = ownedPid
+  baseline.stdoutReady = true
+  baseline.frameBytes = 384
+  if (parentExited || parent.exitCode !== null || parent.signalCode !== null)
+   throw new Error('Fixture parent already exited before forced termination')
+  if (!parent.kill('SIGKILL')) throw new Error('Could not terminate owned fixture parent')
+  await exited
+  if (parent.signalCode !== 'SIGKILL') throw new Error('Fixture parent exit was not SIGKILL')
+  baseline.parentExitSignal = parent.signalCode
+  baseline.parentExitObserved = true
+  baseline.naturalObservationLimitMs = 3000
+  baseline.childAliveAfterParentExit = !(await waitGone(ownedPid))
+ } catch (error) {
+  baseline.error = error instanceof Error ? error.message : 'Parent baseline failed'
+ } finally {
+  try {
+   if (!parentExited) {
+    parent.kill('SIGKILL')
+    await exited
+   }
+   if (ownedPid && !gone(ownedPid)) {
+    process.kill(ownedPid, 'SIGTERM')
+    baseline.ownedChildCleanup = (await waitGone(ownedPid))
+     ? 'SIGTERM then ESRCH confirmed'
+     : 'cleanup failed: still alive'
+    if (baseline.ownedChildCleanup === 'cleanup failed: still alive')
+     baseline.cleanupError = 'Owned FFmpeg cleanup did not complete'
+   }
+  } catch (error) {
+   baseline.cleanupError = error instanceof Error ? error.message : 'Cleanup failed'
+  }
+  await writeFile(join(results, 'parent-exit.json'), JSON.stringify(baseline, null, 2) + '\n')
+ }
+ if (baseline.error || baseline.cleanupError) throw new Error(String(baseline.error || baseline.cleanupError))
+ report.parentExit = baseline
  report.status = 'passed'
 } catch (error) {
  report.status = 'failed'
@@ -153,6 +302,12 @@ try {
      [
       'scripts/visual-runtime-smoke.mts',
       'scripts/visual-runtime-electron.mts',
+      'scripts/ppt-parent-exit-electron.mts',
+      'src/main/video-ppt.ts',
+      'src/main/ppt-extract.ts',
+      'src/main/image-pdf.ts',
+      'src/main/pdf-ppt-cleanup.ts',
+      'src/main/video-policy.ts',
       'scripts/video-candidate-package.mts',
       'src/shared/runtime-descriptor-v2.ts',
       'src/shared/runtime-manifest-v2.ts',
