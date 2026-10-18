@@ -7,7 +7,14 @@ export function RuntimePanel() {
   [notice, setNotice] = useState('')
  const [refreshing, setRefreshing] = useState(false),
   generation = useRef(0)
- const isWindows = navigator.platform.toLowerCase().startsWith('win')
+ const [platform, setPlatform] = useState<string>()
+ const isWindows = platform === 'win32'
+ useEffect(() => {
+  void window.assistant
+   .invoke<{platform: string}>('app:info')
+   .then(info => setPlatform(info.platform))
+   .catch(() => setPlatform(''))
+ }, [])
  const refresh = async () => {
   const current = ++generation.current
   setRefreshing(true)
@@ -53,7 +60,7 @@ export function RuntimePanel() {
    <h3>应用与运行组件</h3>
    <p>梅酱的听课指南 {data?.version || ''}</p>
    <p className="hint">完整包可离线使用。轻量包可选择同版本组件文件夹安装；不会自动下载或更改你的资料。</p>
-   {!isWindows && (
+   {platform !== undefined && !isWindows && (
     <p className="hint" role="status">
      运行组件目前仅支持 Windows；此平台不可安装 Windows 专属组件。
     </p>
@@ -89,7 +96,7 @@ export function RuntimePanel() {
      </span>
      {c.reason && <p className="hint">{c.reason}</p>}
      <button
-      disabled={busy || refreshing || c.installed || c.installable === false || !isWindows}
+      disabled={busy || refreshing || c.installed || c.installable === false || platform !== 'win32'}
       onClick={() => void install(c.id)}
      >
       选择组件文件夹安装

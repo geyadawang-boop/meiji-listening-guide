@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- 媒体工具解析支持白名单系统回退：未打包开发环境在缺少应用内组件时使用系统 FFmpeg/FFprobe（macOS `/opt/homebrew/bin`、`/usr/local/bin`；Linux `/usr/bin`、`/usr/local/bin`），打包应用需显式 `MEIJI_SYSTEM_MEDIA=1`；不搜索 PATH，仍校验真实路径与执行权限。
+- 运行清单与打包过滤按平台化：清单按 `process.platform` 收录 `ffmpeg`/`ffprobe`（Windows 为 `.exe`），portable 只按组件目录是否存在取舍，缺少组件目录时清单生成跳过并告警，`release-info.json` 记录实际跳过项。
+- 运行环境安装入口与会话助手提示改读 `app:info` 的 `platform`（不再使用已废弃的 `navigator.platform`）；登录档案文案改为「当前系统用户加密保存」。
+- macOS 关闭全部窗口保留应用在 Dock，重新激活时恢复主窗口；Windows/Linux 保持关闭即退出。
+
 - 组件服务可只读识别 v2 清单并检查目标、完整性与权限，界面显示缺失或校验失败原因；v2 安装仍在写入前拒绝，旧清单保持原有状态含义。
 
 - 增加仅用于隔离临时目录的 v2 视频安装验证实验及手动 Mac 权限检查，不接正式安装器，不执行组件。

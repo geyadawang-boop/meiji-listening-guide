@@ -544,7 +544,9 @@ app.on('before-quit', event => {
   void shutdownBackends().finally(() => app.quit())
  }
 })
-app.on('window-all-closed', () => app.quit())
+app.on('window-all-closed', () => {
+ if (process.platform !== 'darwin') app.quit()
+})
 app.on('second-instance', showMainWindow)
 app.on('activate', showMainWindow)
 app.on('will-quit', () => {

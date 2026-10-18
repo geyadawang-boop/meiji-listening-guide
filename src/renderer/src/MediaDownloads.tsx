@@ -143,8 +143,8 @@ export function MediaDownloads({visible}: {visible: boolean}) {
    <details className="media-advanced">
     <summary>站点登录档案</summary>
     <p className="hint">
-     只读取你主动选择的 Netscape cookies.txt，不扫描浏览器。档案由 Windows
-     当前用户加密保存；仅发往所填站点域名，不发送给视频 CDN 或其它站点。这里不会显示凭据正文。
+     只读取你主动选择的 Netscape cookies.txt，不扫描浏览器。档案由当前系统用户加密保存；仅发往所填站点域名，不发送给视频
+     CDN 或其它站点。这里不会显示凭据正文。
     </p>
     <div className="media-options">
      <label>

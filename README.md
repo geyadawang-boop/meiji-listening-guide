@@ -16,6 +16,8 @@ pnpm build
 
 开发与构建入口在 macOS/Linux/Windows 均可用（发布产物仍以 Windows 为主）；macOS/Linux 的 lite 安装包由 CI 构建，功能适配现状见 docs/跨平台适配清单.md。
 
+macOS 开发：未放置应用内媒体组件时，会自动回退到白名单系统 FFmpeg/FFprobe（`/opt/homebrew/bin`、`/usr/local/bin`），仍校验真实路径与执行权限；打包应用默认只用应用内组件，需要时显式设置 `MEIJI_SYSTEM_MEDIA=1`。本机微信只读、内置 QQ 后台等 Windows x64 专属功能在 macOS/Linux 上按实际能力禁用并说明。
+
 resources 只包含独立 ONNX 模型、NapCat Node 组件和 FFmpeg/FFprobe 及其许可证。它们是必要第三方资源，不能以 TypeScript 源码代替二进制或权重。源码包不含这些大型文件，需恢复同版本组件。PDF 由应用原生 TypeScript 库处理，不需要 Python。
 
 模型连接在设置中填写千问 API 地址与密钥，并分别选择文本和视觉模型；不再提供 ChatGPT/Codex 账号或 DeepSeek 专用入口，也不需要 Codex 连接组件。
