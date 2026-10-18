@@ -239,6 +239,10 @@ export async function verifySourceCodecs(
   raw.stdout.length === rawDiagnostics.expectedBytes,
   'Gray rawvideo frame size mismatch: ' + JSON.stringify(rawDiagnostics)
  )
+ check(
+  raw.stdout.every(value => Math.abs(value - 76) <= 1),
+  'Uniform red input produced nonuniform gray pixels: ' + JSON.stringify(rawDiagnostics)
+ )
  checks.push('fps/crop/scale/format gray rawvideo pipe')
  const filter = join(work, 'edit.filter'),
   edited = join(work, 'edited.mp4')

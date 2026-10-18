@@ -124,7 +124,8 @@ try {
     'binutils',
     'make',
     'pkg-config',
-    'libarchive-tools'
+    'libarchive-tools',
+    'nasm'
    ],
    {encoding: 'utf8'}
   )
@@ -164,6 +165,7 @@ try {
  report.toolchain = {
   [linux ? 'gcc' : 'clang']: (await execute(env.CC!, ['--version'], prepared.work, env, linux ? 'gcc' : 'clang'))
    .output,
+  nasm: linux ? (await execute('/usr/bin/nasm', ['-v'], prepared.work, env, 'nasm')).output : undefined,
   linker: linux ? (await execute('/usr/bin/ld', ['--version'], prepared.work, env, 'ld')).output : undefined,
   pkgConfig: (await execute(pkg, ['--version'], prepared.work, env, 'pkg-config')).output,
   sdk,
@@ -197,7 +199,6 @@ try {
   ogg: ['--enable-static', '--disable-shared', '--with-pic'],
   vorbis: ['--enable-static', '--disable-shared', '--with-pic', '--disable-docs', '--disable-examples'],
   ffmpeg: [
-   ...(linux ? ['--disable-x86asm'] : []),
    '--disable-autodetect',
    '--enable-gpl',
    '--disable-nonfree',
@@ -275,6 +276,25 @@ try {
     }
    }
   }
+ }
+ if (linux) {
+  const ffmpegSource = prepared.report.receipts.find(r => r.source.id === 'ffmpeg')!
+  const configuration = await readFile(join(prepared.work, ffmpegSource.path, 'config.h'), 'utf8')
+  report.assemblyConfiguration = Object.fromEntries(
+   [
+    ...configuration.matchAll(
+     /^#define (HAVE_(?:X86ASM|INLINE_ASM|MMXEXT_(?:INLINE|EXTERNAL)|SSE3_EXTERNAL|AVX2_EXTERNAL)) ([01])$/gm
+    )
+   ].map(match => [match[1], Number(match[2])])
+  )
+  check(
+   (report.assemblyConfiguration as Record<string, number>).HAVE_X86ASM === 1,
+   'Linux standalone assembly support missing'
+  )
+  check(
+   (report.assemblyConfiguration as Record<string, number>).HAVE_MMXEXT_EXTERNAL === 1,
+   'Linux external MMXEXT implementation missing'
+  )
  }
  const resources = join(prepared.work, 'runtime'),
   video = join(resources, 'video')
@@ -454,6 +474,7 @@ try {
      toolchain: report.toolchain,
      environment: report.environment,
      systemPackages: report.systemPackages,
+     assemblyConfiguration: report.assemblyConfiguration,
      osRelease: report.osRelease,
      commands,
      sourcePatches: report.sourcePatches,

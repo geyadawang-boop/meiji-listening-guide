@@ -105,7 +105,7 @@ jobs:
           node-version: 24
           cache: pnpm
       - name: Install isolated runner build dependencies
-        run: sudo apt-get update && sudo apt-get install -y build-essential pkg-config libarchive-tools zlib1g-dev
+        run: sudo apt-get update && sudo apt-get install -y build-essential pkg-config libarchive-tools zlib1g-dev nasm
       - run: pnpm install --frozen-lockfile
       - name: Build and verify Linux source candidate only
         run: node scripts/media-source-build.mts --output "${{ runner.temp }}/linux-source-build-artifacts"
