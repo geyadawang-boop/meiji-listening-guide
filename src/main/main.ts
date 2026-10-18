@@ -121,6 +121,12 @@ async function startApplication() {
   icon: join(app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'resources'), 'icon.png')
  })
  mainWindow = window
+ window.on('close', event => {
+  if (process.platform === 'darwin' && !quitting) {
+   event.preventDefault()
+   window.hide()
+  }
+ })
  const emit = (e: EventPayload) => {
   if (!window.isDestroyed()) window.webContents.send('assistant:event', e)
  }
@@ -530,9 +536,10 @@ async function startApplication() {
  return context
 }
 app.on('before-quit', event => {
- if (shutdownBackends && !quitting) {
+ if (quitting) return
+ quitting = true
+ if (shutdownBackends) {
   event.preventDefault()
-  quitting = true
   void shutdownBackends().finally(() => app.quit())
  }
 })

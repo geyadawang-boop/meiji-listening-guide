@@ -31,9 +31,7 @@ export async function generate(root: string): Promise<RuntimeManifest> {
    pending: {path: string; source: string}[] = [],
    files: RuntimeFile[] = []
   if (!existsSync(base)) {
-   console.warn('缺少组件目录，清单中跳过：' + directory)
-   components.push({id, label, directory, files, bytes: 0})
-   continue
+   throw new Error('缺少组件目录，未改写运行清单：' + directory + '；使用已审核清单构建 lite/portable 请加 --prepared')
   }
   async function walk(path: string, prefix = ''): Promise<void> {
    for (const entry of await readdir(path, {withFileTypes: true})) {
@@ -53,6 +51,7 @@ export async function generate(root: string): Promise<RuntimeManifest> {
    }
   }
   await walk(base)
+  if (!pending.length) throw new Error('组件没有可用文件，未改写运行清单：' + directory)
   console.log(`校验 ${id}（${pending.length} 个文件）`)
   let cursor = 0
   await Promise.all(

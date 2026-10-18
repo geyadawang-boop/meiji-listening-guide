@@ -1,10 +1,11 @@
-import {utilityProcess, type UtilityProcess} from 'electron'
+import {app, utilityProcess, type UtilityProcess} from 'electron'
 import {fileURLToPath} from 'node:url'
 import {z} from 'zod'
 import {mediaCryptRequest, decodeMediaCrypt} from '@main/security/worker-crypt'
 import {systemProtect} from '@main/security/system-encryption'
 import type {BiliResources} from '@main/media/bilibili/bili-resources'
 import {backendRequest, BACKEND_PROTOCOL} from '@shared/backend-protocol'
+import {mediaFallbackAllowed} from '@main/media/tools/media-executable'
 const apiPaths = ['/x/web-interface/view', '/x/player/wbi/playurl', '/x/player/v2'] as const
 const replySchema = z.discriminatedUnion('kind', [
  mediaCryptRequest,
@@ -46,7 +47,7 @@ export class NativeDownloads {
   if (this.worker) return this.worker
   const worker = utilityProcess.fork(
    fileURLToPath(new URL('./media-download-worker.js', import.meta.url)),
-   [this.resources, this.root],
+   [this.resources, this.root, mediaFallbackAllowed(app.isPackaged) ? 'system-fallback' : 'app-owned'],
    {stdio: 'pipe', serviceName: '原生媒体下载'}
   )
   this.worker = worker

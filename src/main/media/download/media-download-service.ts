@@ -34,7 +34,8 @@ export class NativeDownloadService {
   private root: string,
   api: Pick<BiliResources, 'readMedia'>,
   fetcher: Fetcher,
-  crypt?: MediaCrypt
+  crypt?: MediaCrypt,
+  allowSystemFallback = false
  ) {
   this.jobs = new NativeDownloadJobs(root, crypt)
   this.legacy = new LegacyDownloads(root)
@@ -44,7 +45,7 @@ export class NativeDownloadService {
    this.jobs,
    this.catalog,
    fetcher,
-   new NativeMediaMux(resources),
+   new NativeMediaMux(resources, allowSystemFallback),
    (id, downloaded, total) => this.progress.set(id, {downloaded, ...(total === null ? {} : {total})}),
    this.auth
   )

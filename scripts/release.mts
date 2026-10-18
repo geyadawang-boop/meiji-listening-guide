@@ -1,6 +1,7 @@
 // Full executables are rebuilt by electron-builder; never patch an old EXE.
 import {copyFile, mkdir, readFile, readdir, rm, writeFile} from 'node:fs/promises'
 import {existsSync} from 'node:fs'
+import {createHash} from 'node:crypto'
 import {dirname, join, resolve} from 'node:path'
 import {fileURLToPath} from 'node:url'
 import {build, Platform, type Configuration} from 'electron-builder'
@@ -35,6 +36,17 @@ if (manifest.schema !== 1 || manifest.productVersion !== pkg.version) throw new 
 const output = join(root, 'release', profile)
 if (profile === 'components') {
  if (platform !== Platform.WINDOWS) throw new Error('当前组件包仅支持 Windows，未生成其他平台组件包')
+ const sileroLicense = manifest.components.some(component => component.id === 'asr')
+  ? await readFile(join(root, 'licenses/Silero-VAD-LICENSE.txt')).catch(() => {
+     throw new Error('Silero VAD attribution license is missing or unreadable')
+    })
+  : undefined
+ const sileroSha256 = '2e63e9a38b6e8fc0c7bc37ce174caca1862870856c6daf5697cfb785e925520b'
+ if (
+  sileroLicense &&
+  (sileroLicense.length !== 1075 || createHash('sha256').update(sileroLicense).digest('hex') !== sileroSha256)
+ )
+  throw new Error('Silero VAD attribution license differs from the reviewed fixed source')
  await mkdir(output, {recursive: true})
  for (const component of manifest.components) {
   const directory = join(output, component.id + '-' + pkg.version),
@@ -45,6 +57,26 @@ if (profile === 'components') {
    await mkdir(dirname(target), {recursive: true})
    await copyFile(join(root, 'resources', component.directory, ...file.path.split('/')), target)
   }
+  if (component.id === 'asr') {
+   await writeFile(join(directory, 'LICENSE-Silero-VAD.txt'), sileroLicense!)
+   await writeFile(
+    join(directory, 'silero-license-source.json'),
+    JSON.stringify(
+     {
+      component: 'asr',
+      file: 'LICENSE-Silero-VAD.txt',
+      upstream: 'https://github.com/snakers4/silero-vad',
+      revision: 'fba061dc5559f696e62171e9a0741782b0fdc23c',
+      source: 'https://github.com/snakers4/silero-vad/blob/fba061dc5559f696e62171e9a0741782b0fdc23c/LICENSE',
+      size: 1075,
+      sha256: sileroSha256,
+      retainedNotice: 'payload/onnx-small/VAD-LICENSE.txt remains the separate SYSTRAN MIT notice'
+     },
+     null,
+     2
+    ) + '\n'
+   )
+  }
   await writeFile(
    join(directory, 'component.json'),
    JSON.stringify({schema: 1, id: component.id, productVersion: pkg.version, bytes: component.bytes}, null, 2)
@@ -54,8 +86,8 @@ if (profile === 'components') {
 } else {
  if (profile === 'full' && platform !== Platform.WINDOWS)
   throw new Error('完整发布仅支持 Windows；macOS/Linux 请使用 lite')
- // Optional components are omitted for lite builds and skipped when the local platform has no payload.
- const omitOptional = profile === 'lite'
+ // The v1 optional payload is reviewed for Windows only; directory presence is not a target check.
+ const omitOptional = profile === 'lite' || platform !== Platform.WINDOWS
  const optional = new Set(manifest.components.map(component => component.directory))
  const entries = pkg.build.extraResources
  if (!Array.isArray(entries)) throw new Error('发布资源配置必须为数组')

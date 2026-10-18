@@ -1,6 +1,6 @@
-import {nativeImage} from 'electron'
+import {app, nativeImage} from 'electron'
 import {mediaCommand} from '@main/media/tools/media-command'
-import type {MediaTool} from '@main/media/tools/media-executable'
+import {mediaFallbackAllowed, type MediaTool} from '@main/media/tools/media-executable'
 import {createHash} from 'node:crypto'
 import {createReadStream} from 'node:fs'
 import {mkdir, lstat, readFile, realpath, rm, writeFile} from 'node:fs/promises'
@@ -43,7 +43,7 @@ export class NativeVisualFrames {
   return this.cancels.size > 0
  }
  private command(executable: MediaTool, args: string[], signal: AbortSignal, stream?: (bytes: Buffer) => void) {
-  return mediaCommand(this.resources, executable, args, signal, stream)
+  return mediaCommand(this.resources, executable, args, signal, stream, undefined, mediaFallbackAllowed(app.isPackaged))
  }
  dispose() {
   for (const controller of this.cancels.values()) controller.abort()

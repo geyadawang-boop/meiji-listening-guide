@@ -37,9 +37,12 @@ async function localFile(path: string) {
 }
 /** No remote URL is ever passed to FFmpeg. All downloaded tracks are local owned files. */
 export class NativeMediaMux {
- constructor(private resources: string) {}
+ constructor(
+  private resources: string,
+  private allowSystemFallback = false
+ ) {}
  private command(name: MediaTool, args: string[], signal: AbortSignal) {
-  return mediaCommand(this.resources, name, args, signal)
+  return mediaCommand(this.resources, name, args, signal, undefined, undefined, this.allowSystemFallback)
  }
  async probe(path: string, signal: AbortSignal): Promise<MediaProbe> {
   const source = await localFile(path),

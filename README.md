@@ -37,6 +37,8 @@ node scripts/audit-language-migration.mts --check
 
 ## 发布和恢复组件
 
+`node scripts/asr-model-prepare.mts` 将固定版本的 17 份公开 ASR 模型/许可文件准备到唯一系统临时目录，约 243 MiB，逐项核对应用清单的大小与 SHA256；`--offline <模型目录>` 只读已有文件。不写应用 resources、不推理或读取用户音频，准备通过不等于字幕识别通过。
+
 手动 CI 的 `v2_fixture` 仅以四份无执行内容的合成文件验证 v2 清单复制、POSIX 权限和临时目录内原子发布。它要求实际 macOS arm64，调用方显式选择目标、版本与清单；不是应用安装器，不改原始 payload 权限、不执行工具、不接旧安装 UI。
 
 视频候选工具 `node scripts/video-candidate-package.mts <request.json>` 仅接受显式 `darwin-arm64` 源码构建归档及调用方核准的归档/构建报告 SHA256、提交和 run 身份，生成独立临时候选清单与 descriptor v2。仅复制选中的普通成员并绑定来源/许可/配置；不执行二进制、不接安装或发布，输出不属于可信安装授权。
@@ -53,13 +55,15 @@ CI 手动运行时可选 `media_candidate`，在匹配的 macOS arm64/Linux x64 
 pnpm build
 pnpm release portable
 pnpm release full
-pnpm release lite
+pnpm release lite --prepared
 pnpm release components
 pnpm release:source
 node scripts/restore-runtime.mts knowledge 同版本组件文件夹
 ```
 
 portable 为完整目录，full 为完整安装包，lite 为不含可选离线组件的应用，components 为同版本组件。组件恢复逐文件核对大小、SHA256 和版本，不覆盖改动过的文件；其它组件编号为 asr、video。完整发布须重建 EXE，不能只修改 ASAR。实际安装后验证版本、原生后台、运行资源及课程资料不变后才能清理回退文件。
+
+`--prepared` 使用仓库已审核的同版本运行清单，保留 lite 后续补装所需的文件摘要。不带该参数会从本地资源重新生成清单，缺少组件目录或可用文件时明确失败并保留已有清单。macOS/Linux 的 portable 同样省略尚未审核分发的可选组件；需要时使用上述系统媒体工具回退，不自动夹带 Windows 资源。
 
 ## 代码目录
 

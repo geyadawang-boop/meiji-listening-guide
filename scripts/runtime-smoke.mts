@@ -92,33 +92,56 @@ async function navigation() {
   page.setDefaultTimeout(20000)
   page.on('pageerror', error => errors.push(error.message))
   await page.getByRole('heading', {name: '从一门课程开始'}).waitFor()
-  await page.locator('nav.app-icon-rail').getByRole('button', {name: '模型库', exact: true}).click()
+  await page.locator('nav.app-icon-rail').getByRole('button', {name: '设置', exact: true}).click()
   await page.evaluate(async () => {
    await document.fonts.ready
   })
-  const dialog = page.getByRole('dialog', {name: '设置', exact: true}),
+  const dialog = page.getByRole('region', {name: '设置', exact: true}),
    original = await dialog.boundingBox(),
-   positions = await dialog.getByRole('navigation', {name: '设置导航'}).boundingBox()
-  for (const name of ['搜索与主题', '提示词', '通义千问']) {
+   positions = await dialog.getByRole('complementary', {name: '设置导航'}).boundingBox()
+  if (!original || !positions) throw new Error('Settings layout is not visible')
+  for (const name of ['搜索', '提示词', '通义千问']) {
    await dialog.getByRole('button', {name, exact: true}).click()
-   await dialog.getByRole('heading', {name: name === '通义千问' ? '通义千问连接' : name, exact: true}).waitFor()
+   await dialog.getByRole('heading', {name, exact: true}).waitFor()
    if ((await dialog.getByRole('button', {name, exact: true}).getAttribute('aria-current')) !== 'page')
     throw new Error('Settings section did not become current: ' + name)
    await page.evaluate(
     () => new Promise<void>(resolveFrame => requestAnimationFrame(() => requestAnimationFrame(() => resolveFrame())))
    )
-   if ((await page.locator('.model-settings-window').count()) !== 1 || (await page.locator('.overlay').count()) !== 0)
+   if ((await page.locator('.learning-window:visible').count()) !== 1 || (await page.getByRole('dialog').count()) !== 0)
     throw new Error('Settings section changed into a modal: ' + name)
    if (
     JSON.stringify(await dialog.boundingBox()) !== JSON.stringify(original) ||
-    JSON.stringify(await dialog.getByRole('navigation', {name: '设置导航'}).boundingBox()) !== JSON.stringify(positions)
+    JSON.stringify(await dialog.getByRole('complementary', {name: '设置导航'}).boundingBox()) !==
+     JSON.stringify(positions)
    )
     throw new Error('Settings section or navigation moved: ' + name)
    checks.push(name + ' is current, displays its heading and retains the full-page layout and navigation position')
   }
+  if (process.platform === 'darwin') {
+   await application.evaluate(({app, BrowserWindow}) => {
+    const window = BrowserWindow.getAllWindows()[0],
+     id = window.id,
+     contents = window.webContents.id
+    window.close()
+    if (window.isDestroyed() || window.isVisible()) throw new Error('Mac close must hide the existing window')
+    app.emit('activate', {}, false)
+    const reopened = BrowserWindow.getAllWindows()
+    if (
+     reopened.length !== 1 ||
+     reopened[0].id !== id ||
+     reopened[0].webContents.id !== contents ||
+     !reopened[0].isVisible()
+    )
+     throw new Error('Mac activation must reuse the window and renderer')
+   })
+   await dialog.getByRole('heading', {name: '通义千问', exact: true}).waitFor()
+   checks.push('Mac close hides the window; activation restores the same window, renderer and settings section')
+  }
   await page.screenshot({path: join(results, 'settings.png'), fullPage: true})
-  await dialog.getByRole('button', {name: '关闭', exact: true}).click()
-  if (await page.locator('.model-settings-window').count()) throw new Error('Settings did not close')
+  await dialog.getByRole('button', {name: '返回课程对话', exact: true}).click()
+  if (await dialog.isVisible()) throw new Error('Settings did not close')
+  await page.getByRole('heading', {name: '从一门课程开始'}).waitFor()
   if (errors.length) throw new Error('Renderer reported errors')
   await writeFile(join(results, 'navigation.json'), JSON.stringify({status: 'passed', checks, errors}, null, 2))
  } finally {

@@ -6,13 +6,14 @@ import {dirname, join, resolve} from 'node:path'
 import {tmpdir} from 'node:os'
 import {fileURLToPath} from 'node:url'
 import {z} from 'zod'
+import {inspectExecutable} from './media-source-stage.mts'
 import {buildSources} from './media-build-source-lock.mts'
 import {parseRuntimeManifestV2} from '../src/shared/runtime-manifest-v2.ts'
 import {createVideoDescriptor, validateVideoDescriptor} from '../src/shared/runtime-descriptor-v2.ts'
 const hex = z.string().regex(/^[a-f0-9]{64}$/)
 const requestSchema = z
  .object({
-  target: z.literal('darwin-arm64'),
+  target: z.enum(['darwin-arm64', 'linux-x64']),
   productVersion: z.string().regex(/^[0-9]+\.[0-9]+\.[0-9]+(?:[-+][A-Za-z0-9.-]+)?$/),
   archive: z.string(),
   buildReport: z.string(),
@@ -49,7 +50,7 @@ async function sha(path: string) {
 async function listing(archive: string) {
  return await new Promise<string>((done, fail) =>
   execFile(
-   process.platform === 'darwin' ? '/usr/bin/tar' : 'tar',
+   process.platform === 'darwin' ? '/usr/bin/tar' : process.platform === 'linux' ? '/usr/bin/bsdtar' : 'tar',
    ['-tvf', archive],
    {
     encoding: 'utf8',
@@ -87,10 +88,14 @@ async function extractMember(archive: string, name: string, destination: string,
  let count = 0
  try {
   await new Promise<void>((done, fail) => {
-   const child = spawn(process.platform === 'darwin' ? '/usr/bin/tar' : 'tar', ['-xOf', archive, name], {
-    stdio: ['ignore', 'pipe', 'pipe'],
-    env: {...process.env, LC_ALL: 'C', LANG: 'C', TAR_OPTIONS: ''}
-   })
+   const child = spawn(
+    process.platform === 'darwin' ? '/usr/bin/tar' : process.platform === 'linux' ? '/usr/bin/bsdtar' : 'tar',
+    ['-xOf', archive, name],
+    {
+     stdio: ['ignore', 'pipe', 'pipe'],
+     env: {...process.env, LC_ALL: 'C', LANG: 'C', TAR_OPTIONS: ''}
+    }
+   )
    const timer = setTimeout(() => {
     child.kill()
     fail(new Error('Member read timed out'))
@@ -138,6 +143,8 @@ export async function packageVideoCandidate(value: unknown) {
  check((await lstat(reportPath)).size <= 4 * 1024 * 1024, 'Build report too large')
  check((await sha(archive)) === request.expectedArchiveSha256, 'Caller archive digest mismatch')
  check((await sha(reportPath)) === request.expectedBuildReportSha256, 'Caller build report digest mismatch')
+ const linux = request.target === 'linux-x64'
+ const target = linux ? ({platform: 'linux', arch: 'x64'} as const) : ({platform: 'darwin', arch: 'arm64'} as const)
  const source = JSON.parse(await readFile(reportPath, 'utf8'))
  check(
   source.state === 'source_build_candidate_verified' && source.distribution_status === 'pending',
@@ -146,8 +153,8 @@ export async function packageVideoCandidate(value: unknown) {
  check(
   source.binding?.commit === request.sourceBuildCommit &&
    source.binding?.dirty === false &&
-   source.binding?.platform === 'darwin' &&
-   source.binding?.arch === 'arm64',
+   source.binding?.platform === target.platform &&
+   source.binding?.arch === target.arch,
   'Source build identity/target mismatch'
  )
  check(source.archiveSha256 === request.expectedArchiveSha256, 'Build report archive mismatch')
@@ -167,8 +174,42 @@ export async function packageVideoCandidate(value: unknown) {
   files.push({path, size, sha256: hash, mode: path === 'ffmpeg' || path === 'ffprobe' ? '0755' : '0644'})
  }
  try {
-  for (const tool of ['ffmpeg', 'ffprobe'])
+  for (const tool of ['ffmpeg', 'ffprobe']) {
    await copy('prefix/bin/' + tool, tool, hex.parse(source.diagnostics?.[tool]?.sha256))
+   if (linux) {
+    const bytes = await readFile(join(payload, tool))
+    inspectExecutable(bytes, bytes.length, 'linux')
+    const diagnostic = source.diagnostics[tool]
+    const allowed = new Set([
+     'libc.so.6',
+     'libm.so.6',
+     'libz.so.1',
+     'libpthread.so.0',
+     'libdl.so.2',
+     'librt.so.1',
+     'libstdc++.so.6',
+     'libgcc_s.so.1',
+     'ld-linux-x86-64.so.2'
+    ])
+    check(
+     Array.isArray(diagnostic.needed) &&
+      diagnostic.needed.length > 0 &&
+      diagnostic.needed.every((name: string) => allowed.has(name)),
+     'Unexpected Linux build dependency'
+    )
+    check(
+     Array.isArray(diagnostic.resolved) &&
+      diagnostic.needed.every((name: string) =>
+       diagnostic.resolved.some(
+        (entry: {name: string; realpath: string}) =>
+         entry.name === name && entry.realpath.startsWith('/usr/lib/x86_64-linux-gnu/')
+       )
+      ),
+     'Unresolved Linux build dependency'
+    )
+    check(!/\((?:RPATH|RUNPATH)\)/.test(diagnostic.dynamic), 'Unexpected Linux library search path')
+   }
+  }
   await copy('source-report.json', 'evidence/source-ledger.json')
   const ledger = JSON.parse(await readFile(join(payload, 'evidence/source-ledger.json'), 'utf8'))
   check(ledger.receipts?.length === 7, 'Seven source receipts required')
@@ -187,12 +228,16 @@ export async function packageVideoCandidate(value: unknown) {
    )
   }
   await copy('sources/ffmpeg/ffmpeg-8.1.3/ffbuild/config.mak', 'evidence/ffmpeg-config.mak')
-  for (const file of ['configure', 'configure.ac'])
-   await copy(
-    'sources/vorbis/libvorbis-1.3.7/' + file,
-    'evidence/vorbis-' + file,
-    hex.parse(source.sourcePatches?.patches?.find((p: {file: string}) => p.file === file)?.afterSha256)
-   )
+  if (linux) {
+   await copy('sources/ffmpeg/ffmpeg-8.1.3/config.h', 'evidence/ffmpeg-config.h')
+   await copy('build-evidence.json', 'evidence/build-evidence.json')
+  } else
+   for (const file of ['configure', 'configure.ac'])
+    await copy(
+     'sources/vorbis/libvorbis-1.3.7/' + file,
+     'evidence/vorbis-' + file,
+     hex.parse(source.sourcePatches?.patches?.find((p: {file: string}) => p.file === file)?.afterSha256)
+    )
   const reportBytes = await readFile(reportPath)
   await writeFile(join(payload, 'evidence/build-result.json'), reportBytes, {flag: 'wx', mode: 0o600})
   files.push({
@@ -206,7 +251,6 @@ export async function packageVideoCandidate(value: unknown) {
     (await sha(reportPath)) === request.expectedBuildReportSha256,
    'Input changed during packaging'
   )
-  const target = {platform: 'darwin', arch: 'arm64'} as const
   const manifest = parseRuntimeManifestV2(
    {
     schema: 2,
@@ -260,7 +304,7 @@ export async function packageVideoCandidate(value: unknown) {
    buildReportSha256: request.expectedBuildReportSha256,
    descriptor,
    scope:
-    'Evidence-bound candidate generation only. Caller manifest validation is still required; no installation authority or binary execution.'
+    'ELF headers are inspected without execution; Linux dependency metadata is bound to the supplied build report, not rechecked against this host. Evidence-bound candidate generation only. Caller manifest validation is still required; no installation authority or binary execution.'
   }
   await writeFile(join(stage, 'candidate-report.json'), JSON.stringify(report, null, 2) + '\n', {flag: 'wx'})
   return {stage, report, manifest}
