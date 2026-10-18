@@ -1,7 +1,7 @@
 import {spawn, type ChildProcessWithoutNullStreams} from 'node:child_process'
 import {z} from 'zod'
 import {checkedMediaExecutable, mediaTool} from './media-executable'
-const [resources, name] = process.argv.slice(2)
+const [resources, name, fallback] = process.argv.slice(2)
 if (!process.send || !resources) throw new Error('媒体守护进程启动参数无效')
 const tool = mediaTool(name)
 let child: ChildProcessWithoutNullStreams | undefined,
@@ -30,7 +30,7 @@ process.on('message', raw => {
   }
   if (started || stopped) throw new Error('媒体守护进程重复启动或已停止')
   started = true
-  const path = await checkedMediaExecutable(resources, tool)
+  const path = await checkedMediaExecutable(resources, tool, process.platform, fallback === 'system-fallback')
   if (stopped) return
   child = spawn(path, value.args, {windowsHide: true, stdio: 'pipe'})
   child.once('spawn', () => {

@@ -1,6 +1,7 @@
 import {spawn} from 'node:child_process'
 import {fileURLToPath} from 'node:url'
-import {mediaExecutablePath, type MediaTool} from './media-executable'
+import {app} from 'electron'
+import {mediaExecutablePath, mediaFallbackAllowed, type MediaTool} from './media-executable'
 /** The guardian owns the OS child handle; IPC disconnect kills FFmpeg even if the caller is terminated. */
 export function mediaCommand(
  resources: string,
@@ -12,10 +13,16 @@ export function mediaCommand(
 ) {
  signal.throwIfAborted()
  mediaExecutablePath(resources, name)
+ const fallback = mediaFallbackAllowed(app.isPackaged)
  return new Promise<string>((resolve, reject) => {
   const guardian = spawn(
    process.execPath,
-   [fileURLToPath(new URL('./media-process-guardian.js', import.meta.url)), resources, name],
+   [
+    fileURLToPath(new URL('./media-process-guardian.js', import.meta.url)),
+    resources,
+    name,
+    fallback ? 'system-fallback' : 'app-owned'
+   ],
    {windowsHide: true, stdio: ['ignore', 'pipe', 'pipe', 'ipc'], env: {...process.env, ELECTRON_RUN_AS_NODE: '1'}}
   )
   let output = '',

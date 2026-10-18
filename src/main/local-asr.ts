@@ -1,6 +1,6 @@
 import {app, utilityProcess} from 'electron'
 import {spawn} from 'node:child_process'
-import {checkedMediaExecutable} from './media-executable'
+import {checkedMediaExecutable, mediaFallbackAllowed} from './media-executable'
 import {join, resolve, sep} from 'node:path'
 import {fileURLToPath} from 'node:url'
 import {existsSync} from 'node:fs'
@@ -26,7 +26,12 @@ export async function transcribeLocalVideo(video: string, signal: AbortSignal, p
  if (!existsSync(join(model, 'acquisition.json')))
   throw new Error('本地字幕模型或视频组件未安装，请在运行环境安装同版本组件')
  signal.throwIfAborted()
- const ffmpeg = await checkedMediaExecutable(resources, 'ffmpeg')
+ const ffmpeg = await checkedMediaExecutable(
+  resources,
+  'ffmpeg',
+  process.platform,
+  mediaFallbackAllowed(app.isPackaged)
+ )
  signal.throwIfAborted()
  const root = resolve(app.getPath('userData'), 'asr-tasks'),
   directory = join(root, randomUUID()),
@@ -44,7 +49,7 @@ export async function transcribeLocalVideo(video: string, signal: AbortSignal, p
   })
  )
  progress('正在读取完整视频音频')
- await checkedMediaExecutable(resources, 'ffmpeg')
+ await checkedMediaExecutable(resources, 'ffmpeg', process.platform, mediaFallbackAllowed(app.isPackaged))
  signal.throwIfAborted()
  await new Promise<void>((resolve, reject) => {
   const child = spawn(

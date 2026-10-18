@@ -1,6 +1,6 @@
 import {app, nativeImage} from 'electron'
 import {spawn} from 'node:child_process'
-import {mediaExecutablePath, checkedMediaExecutable} from './media-executable'
+import {mediaExecutablePath, checkedMediaExecutable, mediaFallbackAllowed} from './media-executable'
 import {mkdir, readFile, writeFile, readdir, copyFile, realpath, lstat, unlink, rmdir, rename} from 'node:fs/promises'
 import {join, basename, resolve, dirname} from 'node:path'
 import {randomUUID, createHash} from 'node:crypto'
@@ -17,7 +17,12 @@ const mediaResources = () => (app.isPackaged ? process.resourcesPath : join(app.
 export const ffmpegPath = () => mediaExecutablePath(mediaResources(), 'ffmpeg')
 export async function ffmpeg(args: string[], signal: AbortSignal, onData?: (b: Buffer) => void): Promise<string> {
  signal.throwIfAborted()
- const executable = await checkedMediaExecutable(mediaResources(), 'ffmpeg')
+ const executable = await checkedMediaExecutable(
+  mediaResources(),
+  'ffmpeg',
+  process.platform,
+  mediaFallbackAllowed(app.isPackaged)
+ )
  signal.throwIfAborted()
  return new Promise((resolve, reject) => {
   const child = spawn(executable, ['-hide_banner', '-nostdin', ...args], {
