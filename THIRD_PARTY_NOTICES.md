@@ -6868,6 +6868,35 @@ entities：由 pnpm-lock.yaml 固定版本，BSD-2-Clause，包内保留许可�
 saxes 6.0.0 / xmlchars 2.2.0：ISC，包内保留版权和许可声明；XML 解析只读取文本，不加载外部实体。官方来源 https://github.com/lddubeau/saxes 和 https://github.com/lddubeau/xmlchars 。
 esbuild 0.25.12：MIT，固定开发依赖，用于集成测试源码构建，许可随包保留。官方来源 https://github.com/evanw/esbuild 。
 Transformers.js 4.3.1：Apache-2.0；onnxruntime-node 1.30.0：MIT。包内保留许可证和原生运行库说明。Whisper Small ONNX 修订及权重 SHA256 见 resources/asr/onnx-small/acquisition.json；上游模型 openai/whisper-small 声明 Apache-2.0，模型目录保留说明和许可全文。Silero V6 权重来自现有 faster-whisper 1.2.1 运行资源；VAD 实现改写为 TypeScript，保留原 MIT 署名和许可证。模型推理仅使用本地文件。
+
+### Silero VAD V6 上游归属
+
+Silero Team，MIT。固定上游版本 v6.0，commit `fba061dc5559f696e62171e9a0741782b0fdc23c`：https://github.com/snakers4/silero-vad/blob/fba061dc5559f696e62171e9a0741782b0fdc23c/LICENSE 。完整原文保存在 `licenses/Silero-VAD-LICENSE.txt`（1075 bytes，SHA256 `2e63e9a38b6e8fc0c7bc37ce174caca1862870856c6daf5697cfb785e925520b`）。模型仍来自 SYSTRAN/faster-whisper v1.2.1；模型目录原有 `VAD-LICENSE.txt` 的 SYSTRAN MIT 许可同时保留，本声明不替换该许可。
+
+```text
+MIT License
+
+Copyright (c) 2020-present Silero Team
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
 BGE Small 中文 ONNX：Xenova/bge-small-zh-v1.5 固定修订及哈希见 resources/knowledge/onnx-bge/acquisition.json。上游 BAAI/bge-small-zh-v1.5 声明 MIT；保存模型说明和官方 FlagEmbedding 的 MIT 许可全文及署名。
 
 Undici 8.12.1：MIT，Copyright (c) Matteo Collina and Undici contributors。固定运行依赖，用于原生下载的 HTTP(S)/SOCKS5 代理、IPv4 和连接超时；保留包内 LICENSE。官方来源 https://github.com/nodejs/undici 。Node 内置 fetch 使用官方 Dispatcher1Wrapper 兼容层。
