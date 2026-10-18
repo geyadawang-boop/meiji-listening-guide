@@ -56,11 +56,12 @@ export function RecognitionTools({
    })}
    close={close}
   >
-   {view === 'ppt' ? (
-    <PptExtractPanel visible={visible} courseId={courseId} courseName={courseName} files={files} />
-   ) : (
-    <VisualAnalysisPanel visible={visible} />
-   )}
+   <div hidden={view !== 'ppt'}>
+    <PptExtractPanel visible={visible && view === 'ppt'} courseId={courseId} courseName={courseName} files={files} />
+   </div>
+   <div hidden={view !== 'visual'}>
+    <VisualAnalysisPanel visible={visible && view === 'visual'} />
+   </div>
   </WindowPanel>
  )
 }
