@@ -54,8 +54,8 @@ if (profile === 'components') {
 } else {
  if (profile === 'full' && platform !== Platform.WINDOWS)
   throw new Error('完整发布仅支持 Windows；macOS/Linux 请使用 lite')
- // Current optional component payloads target Windows, including local portable builds.
- const omitOptional = profile === 'lite' || platform !== Platform.WINDOWS
+ // Optional components are omitted for lite builds and skipped when the local platform has no payload.
+ const omitOptional = profile === 'lite'
  const optional = new Set(manifest.components.map(component => component.directory))
  const entries = pkg.build.extraResources
  if (!Array.isArray(entries)) throw new Error('发布资源配置必须为数组')
@@ -65,11 +65,16 @@ if (profile === 'components') {
    .filter(directory => !existsSync(join(root, 'resources', directory)))
  )
  if (profile === 'full' && missing.size) throw new Error('完整发布缺少组件目录：' + [...missing].join('、'))
+ const skipped = new Set<string>()
  const resources = entries.filter(entry => {
   if (typeof entry === 'string' || !entry.from) return true
   if (entry.to && optional.has(entry.to)) {
-   if (omitOptional) return false
+   if (omitOptional) {
+    skipped.add(entry.to)
+    return false
+   }
    if (missing.has(entry.to)) {
+    skipped.add(entry.to)
     console.warn('缺少组件目录，已跳过：' + entry.to)
     return false
    }
@@ -109,7 +114,7 @@ if (profile === 'components') {
     electronVersion: pkg.devDependencies.electron,
     profile,
     platform: active,
-    optionalComponents: omitOptional ? manifest.components.map(component => component.id) : [],
+    optionalComponents: [...skipped],
     artifacts: files.filter(file => /\.(?:exe|dmg|zip|AppImage|deb)$/.test(file))
    },
    null,

@@ -125,6 +125,8 @@
     "filter": [
      "ffmpeg.exe",
      "ffprobe.exe",
+     "ffmpeg",
+     "ffprobe",
      "LICENSE-ffmpeg-static.txt",
      "LICENSE-ffprobe.txt"
     ]
