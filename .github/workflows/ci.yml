@@ -7,6 +7,11 @@ on:
   pull_request:
   workflow_dispatch:
     inputs:
+      linux_source_build:
+        description: Build isolated Ubuntu 24.04 x64 source candidate (not a release)
+        required: false
+        type: boolean
+        default: false
       asr_runtime:
         description: Verify actual local Chinese ASR using fixed public models and installed Mandarin voice
         required: false
@@ -44,8 +49,34 @@ on:
         default: false
 
 jobs:
+  linux-source-build:
+    if: github.event_name == 'workflow_dispatch' && inputs.linux_source_build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install isolated runner build dependencies
+        run: sudo apt-get update && sudo apt-get install -y build-essential pkg-config libarchive-tools zlib1g-dev
+      - run: pnpm install --frozen-lockfile
+      - name: Build and verify Linux source candidate only
+        run: node scripts/media-source-build.mts --output "${{ runner.temp }}/linux-source-build-artifacts"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: linux-source-build-candidate-not-release
+          path: ${{ runner.temp }}/linux-source-build-artifacts
+          retention-days: 7
+          if-no-files-found: warn
+
   asr-runtime:
-    if: github.event_name == 'workflow_dispatch' && inputs.asr_runtime
+    if: github.event_name == 'workflow_dispatch' && !inputs.linux_source_build && inputs.asr_runtime
     runs-on: macos-latest
     timeout-minutes: 25
     permissions:
@@ -81,7 +112,7 @@ jobs:
           if-no-files-found: warn
 
   visual-runtime:
-    if: github.event_name == 'workflow_dispatch' && inputs.visual_runtime && !inputs.asr_runtime
+    if: github.event_name == 'workflow_dispatch' && !inputs.linux_source_build && inputs.visual_runtime && !inputs.asr_runtime
     runs-on: macos-latest
     timeout-minutes: 20
     permissions:
@@ -117,7 +148,7 @@ jobs:
           if-no-files-found: warn
 
   v2-status:
-    if: github.event_name == 'workflow_dispatch' && inputs.v2_status && !inputs.visual_runtime && !inputs.asr_runtime
+    if: github.event_name == 'workflow_dispatch' && !inputs.linux_source_build && inputs.v2_status && !inputs.visual_runtime && !inputs.asr_runtime
     runs-on: macos-latest
     timeout-minutes: 15
     steps:
@@ -137,7 +168,7 @@ jobs:
           if-no-files-found: warn
 
   v2-fixture:
-    if: github.event_name == 'workflow_dispatch' && inputs.v2_fixture && !inputs.v2_status && !inputs.visual_runtime && !inputs.asr_runtime
+    if: github.event_name == 'workflow_dispatch' && !inputs.linux_source_build && inputs.v2_fixture && !inputs.v2_status && !inputs.visual_runtime && !inputs.asr_runtime
     runs-on: macos-latest
     timeout-minutes: 15
     steps:
@@ -159,7 +190,7 @@ jobs:
           if-no-files-found: warn
 
   source-build:
-    if: github.event_name == 'workflow_dispatch' && inputs.source_build && !inputs.v2_fixture && !inputs.v2_status && !inputs.visual_runtime && !inputs.asr_runtime
+    if: github.event_name == 'workflow_dispatch' && !inputs.linux_source_build && inputs.source_build && !inputs.v2_fixture && !inputs.v2_status && !inputs.visual_runtime && !inputs.asr_runtime
     runs-on: macos-latest
     timeout-minutes: 60
     steps:
@@ -183,7 +214,7 @@ jobs:
           if-no-files-found: warn
 
   source-prepare:
-    if: github.event_name == 'workflow_dispatch' && inputs.source_prepare && !inputs.source_build && !inputs.v2_fixture && !inputs.v2_status && !inputs.visual_runtime && !inputs.asr_runtime
+    if: github.event_name == 'workflow_dispatch' && !inputs.linux_source_build && inputs.source_prepare && !inputs.source_build && !inputs.v2_fixture && !inputs.v2_status && !inputs.visual_runtime && !inputs.asr_runtime
     runs-on: macos-latest
     timeout-minutes: 20
     steps:
@@ -206,7 +237,7 @@ jobs:
           if-no-files-found: warn
 
   media-candidate:
-    if: github.event_name == 'workflow_dispatch' && inputs.media_candidate && !inputs.source_prepare && !inputs.source_build && !inputs.v2_fixture && !inputs.v2_status && !inputs.visual_runtime && !inputs.asr_runtime
+    if: github.event_name == 'workflow_dispatch' && !inputs.linux_source_build && inputs.media_candidate && !inputs.source_prepare && !inputs.source_build && !inputs.v2_fixture && !inputs.v2_status && !inputs.visual_runtime && !inputs.asr_runtime
     strategy:
       fail-fast: false
       matrix:
@@ -253,7 +284,7 @@ jobs:
         run: pnpm build
 
   runtime-smoke:
-    if: github.event_name == 'workflow_dispatch' && !inputs.media_candidate && !inputs.source_prepare && !inputs.source_build && !inputs.v2_fixture && !inputs.v2_status && !inputs.visual_runtime && !inputs.asr_runtime
+    if: github.event_name == 'workflow_dispatch' && !inputs.linux_source_build && !inputs.media_candidate && !inputs.source_prepare && !inputs.source_build && !inputs.v2_fixture && !inputs.v2_status && !inputs.visual_runtime && !inputs.asr_runtime
     strategy:
       fail-fast: false
       matrix:

@@ -1,6 +1,6 @@
 import {spawn, execFileSync} from 'node:child_process'
 import {createHash} from 'node:crypto'
-import {copyFile, mkdir, open, readFile, writeFile} from 'node:fs/promises'
+import {copyFile, mkdir, open, readFile, realpath, writeFile} from 'node:fs/promises'
 import {join, dirname, resolve} from 'node:path'
 import {fileURLToPath} from 'node:url'
 import {release} from 'node:os'
@@ -10,6 +10,7 @@ import {buildSources} from './media-build-source-lock.mts'
 import {verifySourceCodecs} from './media-source-codecs.mts'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const linux = process.platform === 'linux'
 function check(value: unknown, message: string): asserts value {
  if (!value) throw new Error(message)
 }
@@ -19,8 +20,9 @@ check(
  'Usage: node scripts/media-source-build.mts --output <new artifact directory>'
 )
 check(
- process.platform === 'darwin' && process.arch === 'arm64' && process.env.GITHUB_ACTIONS === 'true',
- 'Source build runs only on isolated macOS arm64 GitHub runners'
+ ((process.platform === 'darwin' && process.arch === 'arm64') || (linux && process.arch === 'x64')) &&
+  process.env.GITHUB_ACTIONS === 'true',
+ 'Source build runs only on isolated macOS arm64 or Ubuntu 24.04 x64 GitHub runners'
 )
 const artifacts = resolve(process.argv[3])
 await mkdir(artifacts, {recursive: false})
@@ -29,8 +31,10 @@ await mkdir(logs)
 const report: Record<string, unknown> = {
  state: 'building',
  distribution_status: 'pending',
- scope:
-  'Source-build candidate only, not installed or released. GPL corresponding-source review, Developer ID signing and notarization remain pending.',
+ target: linux ? {platform: 'linux', arch: 'x64', distribution: 'Ubuntu 24.04'} : {platform: 'darwin', arch: 'arm64'},
+ scope: linux
+  ? 'Ubuntu 24.04 x64 source-build candidate with dynamic system libraries, not installed or released. Corresponding-source/distribution review and other Linux compatibility remain pending; old 7.0.2 binaries remain unverified for distribution.'
+  : 'Source-build candidate only, not installed or released. GPL corresponding-source review, Developer ID signing and notarization remain pending.',
  commands: []
 }
 const commands = report.commands as unknown[]
@@ -47,7 +51,7 @@ async function execute(
   timedOut = false
  try {
   return await new Promise<{code: number | null; output: string}>((done, fail) => {
-   // This Mac-only runner creates and owns this process group; never adopt external PIDs.
+   // This isolated POSIX runner creates and owns this process group; never adopt external PIDs.
    const child = spawn(file, args, {cwd, env, detached: true, stdio: ['ignore', 'pipe', 'pipe']})
    let escalation: ReturnType<typeof setTimeout> | undefined
    const stopOwnedGroup = (signal: NodeJS.Signals) => {
@@ -97,6 +101,34 @@ async function execute(
  }
 }
 try {
+ if (linux) {
+  const osRelease = await readFile('/etc/os-release', 'utf8')
+  check(
+   /^ID=ubuntu$/m.test(osRelease) && /^VERSION_ID="24\.04"$/m.test(osRelease),
+   'Only Ubuntu 24.04 is in the Linux candidate scope'
+  )
+  report.osRelease = osRelease
+  report.systemPackages = execFileSync(
+   '/usr/bin/dpkg-query',
+   [
+    '-W',
+    '-f=${binary:Package}\t${Version}\t${Architecture}\n',
+    'libc6',
+    'libc6-dev',
+    'zlib1g',
+    'zlib1g-dev',
+    'libstdc++6',
+    'libgcc-s1',
+    'gcc',
+    'g++',
+    'binutils',
+    'make',
+    'pkg-config',
+    'libarchive-tools'
+   ],
+   {encoding: 'utf8'}
+  )
+ }
  const prepared = await prepareBuildSources({sourceIds: buildSources.map(s => s.id)})
  report.preparation = prepared.report
  await writeFile(join(artifacts, 'source-report.json'), JSON.stringify(prepared.report, null, 2) + '\n')
@@ -104,19 +136,21 @@ try {
  await mkdir(prefix)
  const pkg = execFileSync('/usr/bin/which', ['pkg-config'], {encoding: 'utf8'}).trim()
  check(pkg.startsWith('/') && !pkg.includes('\n'), 'pkg-config path unavailable')
- const sdk = execFileSync('/usr/bin/xcrun', ['--sdk', 'macosx', '--show-sdk-path'], {encoding: 'utf8'}).trim()
+ const sdk = linux
+  ? undefined
+  : execFileSync('/usr/bin/xcrun', ['--sdk', 'macosx', '--show-sdk-path'], {encoding: 'utf8'}).trim()
  const env: NodeJS.ProcessEnv = {
   PATH: '/usr/bin:/bin:/usr/sbin:/sbin',
   HOME: process.env.HOME,
   TMPDIR: process.env.TMPDIR,
   LC_ALL: 'C',
   LANG: 'C',
-  CC: '/usr/bin/clang',
-  CXX: '/usr/bin/clang++',
+  CC: linux ? '/usr/bin/gcc' : '/usr/bin/clang',
+  CXX: linux ? '/usr/bin/g++' : '/usr/bin/clang++',
   AR: '/usr/bin/ar',
   RANLIB: '/usr/bin/ranlib',
   SDKROOT: sdk,
-  MACOSX_DEPLOYMENT_TARGET: '14.0',
+  MACOSX_DEPLOYMENT_TARGET: linux ? undefined : '14.0',
   CFLAGS: '-O2 -fPIC',
   CXXFLAGS: '-O2 -fPIC',
   CPPFLAGS: '-I' + prefix + '/include',
@@ -128,7 +162,9 @@ try {
  }
  report.environment = {...env, HOME: '<runner-home>', TMPDIR: '<runner-temp>'}
  report.toolchain = {
-  clang: (await execute('/usr/bin/clang', ['--version'], prepared.work, env, 'clang')).output,
+  [linux ? 'gcc' : 'clang']: (await execute(env.CC!, ['--version'], prepared.work, env, linux ? 'gcc' : 'clang'))
+   .output,
+  linker: linux ? (await execute('/usr/bin/ld', ['--version'], prepared.work, env, 'ld')).output : undefined,
   pkgConfig: (await execute(pkg, ['--version'], prepared.work, env, 'pkg-config')).output,
   sdk,
   platform: process.platform,
@@ -138,7 +174,7 @@ try {
   x264: ['--enable-static', '--enable-pic', '--disable-cli', '--disable-opencl', '--disable-asm'],
   vpx: [
    // In libvpx 1.17, unversioned arm64-darwin selects iphoneos; darwin20+ selects macOS.
-   '--target=arm64-darwin20-gcc',
+   linux ? '--target=generic-gnu' : '--target=arm64-darwin20-gcc',
    '--enable-vp9',
    '--enable-static',
    '--disable-shared',
@@ -161,6 +197,7 @@ try {
   ogg: ['--enable-static', '--disable-shared', '--with-pic'],
   vorbis: ['--enable-static', '--disable-shared', '--with-pic', '--disable-docs', '--disable-examples'],
   ffmpeg: [
+   ...(linux ? ['--disable-x86asm'] : []),
    '--disable-autodetect',
    '--enable-gpl',
    '--disable-nonfree',
@@ -186,7 +223,7 @@ try {
   const receipt = prepared.report.receipts.find(r => r.source.id === id)!
   const cwd = join(prepared.work, receipt.path)
   console.log('Building source: ' + id)
-  if (id === 'vorbis') {
+  if (id === 'vorbis' && !linux) {
    // libvorbis 1.3.7 unconditionally appends obsolete PowerPC-era Darwin flags,
    // including to explicit CFLAGS. Modern arm64 ld rejects this flag.
    const patches = []
@@ -257,53 +294,190 @@ try {
    version = await execute(path, ['-version'], prepared.work, env, tool + '-version'),
    config = await execute(path, ['-buildconf'], prepared.work, env, tool + '-buildconf')
   check(!/(?:^|\s)--enable-nonfree(?:\s|$)/.test(config.output), 'Nonfree build forbidden')
-  const deps = await execute('/usr/bin/otool', ['-L', path], prepared.work, env, tool + '-dependencies')
-  const dependencies = deps.output
-   .split('\n')
-   .slice(1)
-   .map(line => line.trim())
-   .filter(Boolean)
-  check(
-   dependencies.every(line => line.startsWith('/usr/lib/') || line.startsWith('/System/Library/')),
-   'Non-system dynamic dependency detected'
-  )
-  const arch = await execute('/usr/bin/lipo', ['-archs', path], prepared.work, env, tool + '-arch')
-  check(arch.output.trim() === 'arm64', 'Wrong binary architecture')
-  diagnostics[tool] = {
-   version: version.output,
-   buildconf: config.output,
-   dependencies: deps.output,
-   arch: arch.output,
-   sha256: createHash('sha256')
-    .update(await readFile(path))
-    .digest('hex'),
-   signature: await execute(
-    '/usr/bin/codesign',
-    ['-d', '--verbose=4', path],
-    prepared.work,
-    env,
-    tool + '-signature',
-    true
-   ),
-   gatekeeper: await execute(
-    '/usr/sbin/spctl',
-    ['--assess', '--type', 'execute', '--verbose=4', path],
-    prepared.work,
-    env,
-    tool + '-gatekeeper',
-    true
+  if (linux) {
+   const header = await execute('/usr/bin/readelf', ['-h', path], prepared.work, env, tool + '-elf-header')
+   check(
+    /Class:\s+ELF64/.test(header.output) &&
+     /Data:\s+2's complement, little endian/.test(header.output) &&
+     /Machine:\s+Advanced Micro Devices X86-64/.test(header.output),
+    'Wrong Linux ELF architecture'
    )
+   const dynamic = await execute('/usr/bin/readelf', ['-d', path], prepared.work, env, tool + '-dynamic')
+   const needed = [...dynamic.output.matchAll(/\(NEEDED\).*\[([^\]]+)\]/g)].map(match => match[1])
+   const allowed = new Set([
+    'libc.so.6',
+    'libm.so.6',
+    'libz.so.1',
+    'libpthread.so.0',
+    'libdl.so.2',
+    'librt.so.1',
+    'libstdc++.so.6',
+    'libgcc_s.so.1',
+    'ld-linux-x86-64.so.2'
+   ])
+   check(needed.length > 0 && needed.every(name => allowed.has(name)), 'Unexpected dynamic library')
+   check(!/\((?:RPATH|RUNPATH)\)/.test(dynamic.output), 'Candidate must not embed runtime library search paths')
+   const deps = await execute('/usr/bin/ldd', [path], prepared.work, env, tool + '-dependencies')
+   check(!deps.output.includes('not found'), 'Unresolved dynamic dependency')
+   const resolved: Array<{name: string; path: string; realpath: string; sha256: string}> = []
+   for (const line of deps.output
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean)) {
+    if (/^linux-vdso\.so\.1 \(0x[0-9a-f]+\)$/.test(line)) continue
+    const match = /^(?:(\S+) => )?(\/\S+) \(0x[0-9a-f]+\)$/.exec(line)
+    check(match, 'Unexpected ldd line: ' + line)
+    const name = match[1] || match[2].split('/').at(-1)!
+    check(allowed.has(name), 'Unexpected transitive dependency: ' + name)
+    const actual = await realpath(match[2])
+    check(
+     actual.startsWith('/usr/lib/x86_64-linux-gnu/') &&
+      (actual.split('/').at(-1) === name ||
+       (actual
+        .split('/')
+        .at(-1)!
+        .startsWith(name + '.') &&
+        /^[0-9.]+$/.test(
+         actual
+          .split('/')
+          .at(-1)!
+          .slice(name.length + 1)
+        ))),
+     'Unexpected system dependency path: ' + actual
+    )
+    resolved.push({
+     name,
+     path: match[2],
+     realpath: actual,
+     sha256: createHash('sha256')
+      .update(await readFile(actual))
+      .digest('hex')
+    })
+   }
+   check(
+    needed.every(name => resolved.some(item => item.name === name)),
+    'Not all ELF dependencies resolved'
+   )
+   const versions = await execute(
+    '/usr/bin/readelf',
+    ['--version-info', path],
+    prepared.work,
+    env,
+    tool + '-symbol-versions'
+   )
+   const compare = (a: string, b: string) => {
+    const left = a.split('.').map(Number),
+     right = b.split('.').map(Number)
+    for (let i = 0; i < Math.max(left.length, right.length); i++) {
+     const delta = (left[i] || 0) - (right[i] || 0)
+     if (delta) return delta
+    }
+    return 0
+   }
+   const symbolRequirements = Object.fromEntries(
+    ['GLIBC', 'GLIBCXX', 'CXXABI'].map(family => {
+     const values = [
+      ...new Set(
+       [...versions.output.matchAll(new RegExp('Name: ' + family + '_([0-9]+(?:\\.[0-9]+)*)', 'g'))].map(
+        match => match[1]
+       )
+      )
+     ].sort(compare)
+     return [family, {versions: values, maximumRequired: values.at(-1) ?? null}]
+    })
+   )
+   diagnostics[tool] = {
+    version: version.output,
+    buildconf: config.output,
+    elfHeader: header.output,
+    dynamic: dynamic.output,
+    needed,
+    dependencies: deps.output,
+    resolved,
+    symbolVersionInfo: versions.output,
+    symbolRequirements,
+    compatibility: 'Maximum required symbol versions are dependency evidence only, not a full compatibility guarantee.',
+    sha256: createHash('sha256')
+     .update(await readFile(path))
+     .digest('hex')
+   }
+  } else {
+   const deps = await execute('/usr/bin/otool', ['-L', path], prepared.work, env, tool + '-dependencies')
+   const dependencies = deps.output
+    .split('\n')
+    .slice(1)
+    .map(line => line.trim())
+    .filter(Boolean)
+   check(
+    dependencies.every(line => line.startsWith('/usr/lib/') || line.startsWith('/System/Library/')),
+    'Non-system dynamic dependency detected'
+   )
+   const arch = await execute('/usr/bin/lipo', ['-archs', path], prepared.work, env, tool + '-arch')
+   check(arch.output.trim() === 'arm64', 'Wrong binary architecture')
+   diagnostics[tool] = {
+    version: version.output,
+    buildconf: config.output,
+    dependencies: deps.output,
+    arch: arch.output,
+    sha256: createHash('sha256')
+     .update(await readFile(path))
+     .digest('hex'),
+    signature: await execute(
+     '/usr/bin/codesign',
+     ['-d', '--verbose=4', path],
+     prepared.work,
+     env,
+     tool + '-signature',
+     true
+    ),
+    gatekeeper: await execute(
+     '/usr/sbin/spctl',
+     ['--assess', '--type', 'execute', '--verbose=4', path],
+     prepared.work,
+     env,
+     tool + '-gatekeeper',
+     true
+    )
+   }
   }
  }
  report.diagnostics = diagnostics
  const fixtures = join(prepared.work, 'fixtures')
  await mkdir(fixtures)
  report.codecs = await verifySourceCodecs(entry, resources, fixtures, env)
+ if (linux)
+  await writeFile(
+   join(prepared.work, 'build-evidence.json'),
+   JSON.stringify(
+    {
+     target: report.target,
+     toolchain: report.toolchain,
+     environment: report.environment,
+     systemPackages: report.systemPackages,
+     osRelease: report.osRelease,
+     commands,
+     sourcePatches: report.sourcePatches,
+     diagnostics
+    },
+    null,
+    2
+   ) + '\n'
+  )
  const archive = join(artifacts, 'source-build-candidate.tar.gz')
  // Explicit isolated candidate archive: fixed source tarballs, full sources/configuration and built prefix.
  await execute(
   '/usr/bin/tar',
-  ['-czf', archive, '-C', prepared.work, 'archives', 'sources', 'prefix', 'source-report.json'],
+  [
+   '-czf',
+   archive,
+   '-C',
+   prepared.work,
+   'archives',
+   'sources',
+   'prefix',
+   'source-report.json',
+   ...(linux ? ['build-evidence.json'] : [])
+  ],
   prepared.work,
   env,
   'archive'
@@ -322,7 +496,9 @@ try {
   platform: process.platform,
   arch: process.arch,
   osRelease: release(),
-  osProductVersion: execFileSync('/usr/bin/sw_vers', ['-productVersion'], {encoding: 'utf8'}).trim(),
+  osProductVersion: linux
+   ? 'Ubuntu 24.04'
+   : execFileSync('/usr/bin/sw_vers', ['-productVersion'], {encoding: 'utf8'}).trim(),
   commit: execFileSync('git', ['rev-parse', 'HEAD'], {cwd: root, encoding: 'utf8'}).trim(),
   dirty: !!execFileSync('git', ['status', '--porcelain'], {cwd: root, encoding: 'utf8'}).trim(),
   sourceHashes: Object.fromEntries(

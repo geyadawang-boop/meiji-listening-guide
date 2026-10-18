@@ -93,7 +93,7 @@ export async function downloadSource(source: Source, destination: string) {
 async function tar(args: string[]) {
  return await new Promise<string>((done, fail) => {
   execFile(
-   process.platform === 'darwin' ? '/usr/bin/tar' : 'tar',
+   process.platform === 'darwin' ? '/usr/bin/tar' : process.platform === 'linux' ? '/usr/bin/bsdtar' : 'tar',
    args,
    {
     encoding: 'utf8',
