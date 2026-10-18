@@ -84,7 +84,7 @@ async function run() {
     for (const frame of capture.frames) {
      assert.equal(await digest(frame.path), frame.hash)
      assert(!nativeImage.createFromPath(frame.path).isEmpty())
-     if (capture.id === '9'.repeat(32)) await assertRed(frame.path)
+     if (capture.id === 'a'.repeat(32)) await assertRed(frame.path)
     }
    }
    checks.push(
@@ -179,7 +179,7 @@ async function run() {
     new AbortController().signal
    )
    const redCapture: Capture = await owner.request('visual-frames', {
-    id: '9'.repeat(32),
+    id: 'a'.repeat(32),
     path: redVideo,
     expectedHash: await digest(redVideo),
     cap: 1,

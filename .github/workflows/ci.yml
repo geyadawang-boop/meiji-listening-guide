@@ -83,6 +83,14 @@ jobs:
           cache: pnpm
       - run: sudo apt-get update && sudo apt-get install -y libarchive-tools xvfb
       - run: pnpm install --frozen-lockfile
+      - name: Configure owned Electron sandbox helper
+        shell: bash
+        run: |
+          set -euo pipefail
+          helper=$(node -e "const fs=require('node:fs'),p=require('node:path');const e=fs.realpathSync(require('electron'));const h=p.join(p.dirname(e),'chrome-sandbox');const root=fs.realpathSync('node_modules');if(!h.startsWith(root+p.sep)||fs.lstatSync(h).isSymbolicLink()||!fs.statSync(h).isFile())throw Error('Unexpected sandbox helper');console.log(h)")
+          sudo chown root:root "$helper"
+          sudo chmod 4755 "$helper"
+          test "$(stat -c '%u:%g:%a' "$helper")" = "0:0:4755"
       - name: Obtain fixed Linux visual candidate
         shell: bash
         env:
