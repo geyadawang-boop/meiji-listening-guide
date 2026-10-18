@@ -29,11 +29,12 @@ async function run() {
   )
   const cues = parseSrt(speech.srt) as Array<{start: number; end: number; text: string}>
   assert(cues.length > 0)
+  assert.equal(speech.count, cues.length)
   let lastEnd = 0
   for (const cue of cues) {
    assert(cue.text.trim())
    assert(Number.isFinite(cue.start) && Number.isFinite(cue.end))
-   assert(cue.start >= lastEnd && cue.end > cue.start && cue.end <= audio.duration * 1000 + 1000)
+   assert(cue.start >= lastEnd && cue.end > cue.start && cue.end <= audio.duration * 1000 + 1)
    lastEnd = cue.end
   }
   const text = cues
@@ -50,7 +51,7 @@ async function run() {
    /未检测到语音/
   )
   report.status = 'passed'
-  report.fullChinesePath = 'verified'
+  report.chineseTranscription = 'verified'
   report.cues = cues
   report.keywordMatches = matched
   report.inputDuration = audio.duration

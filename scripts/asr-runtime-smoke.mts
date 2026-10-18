@@ -5,7 +5,7 @@ import {createHash} from 'node:crypto'
 import {chmod, copyFile, cp, mkdir, mkdtemp, readFile, realpath, writeFile} from 'node:fs/promises'
 import {dirname, isAbsolute, join, resolve} from 'node:path'
 import {tmpdir, release} from 'node:os'
-import {fileURLToPath, pathToFileURL} from 'node:url'
+import {fileURLToPath} from 'node:url'
 import {prepareAsrModel} from './asr-model-prepare.mts'
 import {packageVideoCandidate} from './video-candidate-package.mts'
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..'),
@@ -19,10 +19,37 @@ const results = resolve(outputDirectory),
 await mkdir(results, {recursive: true})
 const report: Record<string, unknown> = {
  status: 'running',
- fullChinesePath: 'unverified',
+ chineseTranscription: 'unverified',
  scope:
   'Isolated actual Electron inference with fixed public model and system-installed Mandarin TTS; no voice downloads, application installation or user audio.'
 }
+const sourceFiles = [
+ 'scripts/asr-runtime-smoke.mts',
+ 'scripts/asr-runtime-electron.mts',
+ 'scripts/asr-model-prepare.mts',
+ 'scripts/video-candidate-package.mts',
+ 'src/main/local-asr.ts',
+ 'src/main/asr-worker.ts',
+ 'src/main/asr-inference.ts',
+ 'src/main/silero-vad.ts',
+ 'src/main/media-executable.ts',
+ 'src/shared/srt.ts'
+]
+const bundleFiles = ['owner.mjs', 'asr-worker.js', 'fixture.mjs']
+async function hashes(directory: string, files: string[]) {
+ return Object.fromEntries(
+  await Promise.all(
+   files.map(async file => [
+    file,
+    createHash('sha256')
+     .update(await readFile(join(directory, file)))
+     .digest('hex')
+   ])
+  )
+ )
+}
+const sourceBefore = await hashes(root, sourceFiles)
+let bundleBefore: Record<string, string> | undefined
 try {
  const voices = execFileSync('/usr/bin/say', ['-v', '?'], {encoding: 'utf8', timeout: 15000})
  const voice = voices
@@ -127,6 +154,18 @@ try {
    .update(await readFile(join(work, 'speech.wav')))
    .digest('hex')
  }
+ report.silenceAudio = {
+  sha256: (await hashes(work, ['silence.wav']))['silence.wav'],
+  duration: Number(
+   JSON.parse(
+    execFileSync(
+     ffprobe,
+     ['-v', 'error', '-show_entries', 'format=duration', '-of', 'json', join(work, 'silence.wav')],
+     {encoding: 'utf8', timeout: 15000}
+    )
+   ).format.duration
+  )
+ }
  report.audio = audio
  await writeFile(join(work, 'audio.json'), JSON.stringify(audio))
  const model = await prepareAsrModel({
@@ -182,6 +221,7 @@ try {
   format: 'esm',
   packages: 'external'
  })
+ bundleBefore = await hashes(work, bundleFiles)
  const env: NodeJS.ProcessEnv = {...process.env, MEIJI_ASR_WORK: work, MEIJI_ASR_RESULTS: results}
  delete env.ELECTRON_RUN_AS_NODE
  await new Promise<void>((done, fail) => {
@@ -190,9 +230,12 @@ try {
    stdio: ['ignore', 'pipe', 'pipe']
   })
   let log = ''
+  let timedOut = false
+  let forceTimer: ReturnType<typeof setTimeout> | undefined
   const timer = setTimeout(() => {
+   timedOut = true
    child.kill()
-   fail(new Error('Real ASR inference timed out'))
+   forceTimer = setTimeout(() => child.kill('SIGKILL'), 5000)
   }, 300000)
   child.stdout.on('data', bytes => {
    log = (log + bytes.toString()).slice(-32000)
@@ -202,14 +245,16 @@ try {
   })
   child.once('error', error => {
    clearTimeout(timer)
+   clearTimeout(forceTimer)
    fail(error)
   })
   child.once('close', code => {
    clearTimeout(timer)
+   clearTimeout(forceTimer)
    void (async () => {
-    if (code !== 0) {
+    if (timedOut || code !== 0) {
      await writeFile(join(results, 'inference-failure.log'), log)
-     throw new Error('Real ASR inference failed')
+     throw new Error(timedOut ? 'Real ASR inference timed out; fixture closed' : 'Real ASR inference failed')
     }
     done()
    })().catch(fail)
@@ -218,7 +263,7 @@ try {
  const inference = JSON.parse(await readFile(join(results, 'inference.json'), 'utf8'))
  if (inference.status !== 'passed') throw new Error('Inference report not passed')
  report.status = 'passed'
- report.fullChinesePath = 'verified'
+ report.chineseTranscription = 'verified'
  report.inference = inference
 } catch (error) {
  if (report.status !== 'unverified') report.status = 'failed'
@@ -233,33 +278,27 @@ try {
    arch: process.arch,
    osRelease: release(),
    osProductVersion: execFileSync('/usr/bin/sw_vers', ['-productVersion'], {encoding: 'utf8'}).trim(),
-   sourceHashes: Object.fromEntries(
-    await Promise.all(
-     [
-      'scripts/asr-runtime-smoke.mts',
-      'scripts/asr-runtime-electron.mts',
-      'scripts/asr-model-prepare.mts',
-      'scripts/video-candidate-package.mts',
-      'src/main/local-asr.ts',
-      'src/main/asr-worker.ts',
-      'src/main/asr-inference.ts',
-      'src/main/silero-vad.ts',
-      'src/main/media-executable.ts',
-      'src/shared/srt.ts'
-     ].map(async file => [
-      file,
-      createHash('sha256')
-       .update(await readFile(join(root, file)))
-       .digest('hex')
-     ])
-    )
-   )
+   sourceBefore,
+   sourceAfter: await hashes(root, sourceFiles),
+   bundleBefore,
+   bundleAfter: bundleBefore ? await hashes(work, bundleFiles) : undefined
+  }
+  const binding = report.binding as {sourceAfter: Record<string, string>; bundleAfter?: Record<string, string>}
+  if (
+   JSON.stringify(sourceBefore) !== JSON.stringify(binding.sourceAfter) ||
+   JSON.stringify(bundleBefore) !== JSON.stringify(binding.bundleAfter)
+  ) {
+   report.chineseTranscription = 'unverified'
+   report.bindingError = 'Source or execution bundle changed during verification'
+   report.status = 'failed'
+   process.exitCode = 1
   }
  } catch (error) {
+  report.chineseTranscription = 'unverified'
   report.bindingError = String(error)
   report.status = 'failed'
   process.exitCode = 1
  }
  await writeFile(join(results, 'summary.json'), JSON.stringify(report, null, 2) + '\n')
- console.log(JSON.stringify({status: report.status, fullChinesePath: report.fullChinesePath, results}))
+ console.log(JSON.stringify({status: report.status, chineseTranscription: report.chineseTranscription, results}))
 }
