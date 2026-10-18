@@ -7,6 +7,11 @@ on:
   pull_request:
   workflow_dispatch:
     inputs:
+      linux_visual_runtime:
+        description: Verify actual Linux Electron visual capture using the fixed source candidate
+        required: false
+        type: boolean
+        default: false
       linux_source_build:
         description: Build isolated Ubuntu 24.04 x64 source candidate (not a release)
         required: false
@@ -62,8 +67,52 @@ on:
         default: false
 
 jobs:
+  linux-visual-runtime:
+    if: github.event_name == 'workflow_dispatch' && inputs.linux_visual_runtime
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: sudo apt-get update && sudo apt-get install -y libarchive-tools xvfb
+      - run: pnpm install --frozen-lockfile
+      - name: Configure owned Electron sandbox helper
+        shell: bash
+        run: |
+          set -euo pipefail
+          helper=$(node -e "const fs=require('node:fs'),p=require('node:path');const e=fs.realpathSync(require('electron'));const h=p.join(p.dirname(e),'chrome-sandbox');const root=fs.realpathSync('node_modules');if(!h.startsWith(root+p.sep)||fs.lstatSync(h).isSymbolicLink()||!fs.statSync(h).isFile())throw Error('Unexpected sandbox helper');console.log(h)")
+          sudo chown root:root "$helper"
+          sudo chmod 4755 "$helper"
+          test "$(stat -c '%u:%g:%a' "$helper")" = "0:0:4755"
+      - name: Obtain fixed Linux visual candidate
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          metadata=$(gh api repos/geyadawang-boop/meiji-listening-guide/actions/artifacts/12129619803)
+          test "$(printf '%s' "$metadata" | jq -r '.workflow_run.id')" = "39109258520"
+          test "$(printf '%s' "$metadata" | jq -r '.expired')" = "false"
+          mkdir "$RUNNER_TEMP/linux-visual-input"
+          gh api repos/geyadawang-boop/meiji-listening-guide/actions/artifacts/12129619803/zip > "$RUNNER_TEMP/linux-visual-input.zip"
+          unzip -j "$RUNNER_TEMP/linux-visual-input.zip" source-build-candidate.tar.gz build-result.json -d "$RUNNER_TEMP/linux-visual-input"
+      - run: xvfb-run --auto-servernum node scripts/visual-runtime-smoke.mts "${{ runner.temp }}/linux-visual-input" "${{ runner.temp }}/linux-visual-results"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: linux-visual-runtime-results
+          path: ${{ runner.temp }}/linux-visual-results
+          if-no-files-found: warn
+
   linux-pixel-diagnostics:
-    if: github.event_name == 'workflow_dispatch' && inputs.linux_pixel_diagnostics
+    if: github.event_name == 'workflow_dispatch' && !inputs.linux_visual_runtime && inputs.linux_pixel_diagnostics
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
@@ -108,7 +157,7 @@ jobs:
           if-no-files-found: warn
 
   linux-source-build:
-    if: github.event_name == 'workflow_dispatch' && inputs.linux_source_build && !inputs.linux_pixel_diagnostics
+    if: github.event_name == 'workflow_dispatch' && !inputs.linux_visual_runtime && inputs.linux_source_build && !inputs.linux_pixel_diagnostics
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     permissions:
@@ -134,7 +183,7 @@ jobs:
           if-no-files-found: warn
 
   asr-runtime:
-    if: github.event_name == 'workflow_dispatch' && !inputs.linux_pixel_diagnostics && !inputs.linux_source_build && inputs.asr_runtime
+    if: github.event_name == 'workflow_dispatch' && !inputs.linux_visual_runtime && !inputs.linux_pixel_diagnostics && !inputs.linux_source_build && inputs.asr_runtime
     runs-on: macos-latest
     timeout-minutes: 25
     permissions:
@@ -170,7 +219,7 @@ jobs:
           if-no-files-found: warn
 
   visual-runtime:
-    if: github.event_name == 'workflow_dispatch' && !inputs.linux_pixel_diagnostics && !inputs.linux_source_build && inputs.visual_runtime && !inputs.asr_runtime
+    if: github.event_name == 'workflow_dispatch' && !inputs.linux_visual_runtime && !inputs.linux_pixel_diagnostics && !inputs.linux_source_build && inputs.visual_runtime && !inputs.asr_runtime
     runs-on: macos-latest
     timeout-minutes: 20
     permissions:
@@ -206,7 +255,7 @@ jobs:
           if-no-files-found: warn
 
   v2-status:
-    if: github.event_name == 'workflow_dispatch' && !inputs.linux_pixel_diagnostics && !inputs.linux_source_build && inputs.v2_status && !inputs.visual_runtime && !inputs.asr_runtime
+    if: github.event_name == 'workflow_dispatch' && !inputs.linux_visual_runtime && !inputs.linux_pixel_diagnostics && !inputs.linux_source_build && inputs.v2_status && !inputs.visual_runtime && !inputs.asr_runtime
     runs-on: macos-latest
     timeout-minutes: 15
     steps:
@@ -226,7 +275,7 @@ jobs:
           if-no-files-found: warn
 
   v2-fixture:
-    if: github.event_name == 'workflow_dispatch' && !inputs.linux_pixel_diagnostics && !inputs.linux_source_build && inputs.v2_fixture && !inputs.v2_status && !inputs.visual_runtime && !inputs.asr_runtime
+    if: github.event_name == 'workflow_dispatch' && !inputs.linux_visual_runtime && !inputs.linux_pixel_diagnostics && !inputs.linux_source_build && inputs.v2_fixture && !inputs.v2_status && !inputs.visual_runtime && !inputs.asr_runtime
     runs-on: macos-latest
     timeout-minutes: 15
     steps:
@@ -248,7 +297,7 @@ jobs:
           if-no-files-found: warn
 
   source-build:
-    if: github.event_name == 'workflow_dispatch' && !inputs.linux_pixel_diagnostics && !inputs.linux_source_build && inputs.source_build && !inputs.v2_fixture && !inputs.v2_status && !inputs.visual_runtime && !inputs.asr_runtime
+    if: github.event_name == 'workflow_dispatch' && !inputs.linux_visual_runtime && !inputs.linux_pixel_diagnostics && !inputs.linux_source_build && inputs.source_build && !inputs.v2_fixture && !inputs.v2_status && !inputs.visual_runtime && !inputs.asr_runtime
     runs-on: macos-latest
     timeout-minutes: 60
     steps:
@@ -272,7 +321,7 @@ jobs:
           if-no-files-found: warn
 
   source-prepare:
-    if: github.event_name == 'workflow_dispatch' && !inputs.linux_pixel_diagnostics && !inputs.linux_source_build && inputs.source_prepare && !inputs.source_build && !inputs.v2_fixture && !inputs.v2_status && !inputs.visual_runtime && !inputs.asr_runtime
+    if: github.event_name == 'workflow_dispatch' && !inputs.linux_visual_runtime && !inputs.linux_pixel_diagnostics && !inputs.linux_source_build && inputs.source_prepare && !inputs.source_build && !inputs.v2_fixture && !inputs.v2_status && !inputs.visual_runtime && !inputs.asr_runtime
     runs-on: macos-latest
     timeout-minutes: 20
     steps:
@@ -295,7 +344,7 @@ jobs:
           if-no-files-found: warn
 
   media-candidate:
-    if: github.event_name == 'workflow_dispatch' && !inputs.linux_pixel_diagnostics && !inputs.linux_source_build && inputs.media_candidate && !inputs.source_prepare && !inputs.source_build && !inputs.v2_fixture && !inputs.v2_status && !inputs.visual_runtime && !inputs.asr_runtime
+    if: github.event_name == 'workflow_dispatch' && !inputs.linux_visual_runtime && !inputs.linux_pixel_diagnostics && !inputs.linux_source_build && inputs.media_candidate && !inputs.source_prepare && !inputs.source_build && !inputs.v2_fixture && !inputs.v2_status && !inputs.visual_runtime && !inputs.asr_runtime
     strategy:
       fail-fast: false
       matrix:
@@ -342,7 +391,7 @@ jobs:
         run: pnpm build
 
   runtime-smoke:
-    if: github.event_name == 'workflow_dispatch' && !inputs.linux_pixel_diagnostics && !inputs.linux_source_build && !inputs.media_candidate && !inputs.source_prepare && !inputs.source_build && !inputs.v2_fixture && !inputs.v2_status && !inputs.visual_runtime && !inputs.asr_runtime
+    if: github.event_name == 'workflow_dispatch' && !inputs.linux_visual_runtime && !inputs.linux_pixel_diagnostics && !inputs.linux_source_build && !inputs.media_candidate && !inputs.source_prepare && !inputs.source_build && !inputs.v2_fixture && !inputs.v2_status && !inputs.visual_runtime && !inputs.asr_runtime
     strategy:
       fail-fast: false
       matrix:

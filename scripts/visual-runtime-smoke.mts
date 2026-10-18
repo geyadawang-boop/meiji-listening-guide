@@ -12,27 +12,76 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..'),
 const [artifactDirectory, outputDirectory] = process.argv.slice(2)
 if (!artifactDirectory || !outputDirectory)
  throw new Error('Usage: node scripts/visual-runtime-smoke.mts <fixed artifact directory> <results directory>')
-if (process.platform !== 'darwin' || process.arch !== 'arm64')
- throw new Error('Visual candidate runtime requires actual macOS arm64')
+const linux = process.platform === 'linux' && process.arch === 'x64'
+if (!linux && (process.platform !== 'darwin' || process.arch !== 'arm64'))
+ throw new Error('Visual candidate runtime requires actual macOS arm64 or Linux x64')
 const results = resolve(outputDirectory),
  work = await mkdtemp(join(await realpath(tmpdir()), 'meiji-visual-runtime-'))
 await mkdir(results, {recursive: true})
 const report: Record<string, unknown> = {
  status: 'running',
- artifact: {id: '12108250900', run: '39051917827'},
+ artifact: linux ? {id: '12129619803', run: '39109258520'} : {id: '12108250900', run: '39051917827'},
  scope:
   'Real Electron production media facade and nativeImage, isolated synthetic files only; no installation or distribution approval.'
 }
+const sourceFiles = [
+ 'scripts/visual-runtime-smoke.mts',
+ 'scripts/media-source-stage.mts',
+ 'scripts/visual-runtime-electron.mts',
+ 'scripts/ppt-parent-exit-electron.mts',
+ 'src/main/video-ppt.ts',
+ 'src/main/ppt-extract.ts',
+ 'src/main/image-pdf.ts',
+ 'src/main/pdf-ppt-cleanup.ts',
+ 'src/main/video-policy.ts',
+ 'scripts/video-candidate-package.mts',
+ 'src/shared/runtime-descriptor-v2.ts',
+ 'src/shared/runtime-manifest-v2.ts',
+ 'scripts/media-build-source-lock.mts',
+ 'src/main/media.ts',
+ 'src/main/media-downloads.ts',
+ 'src/main/visual-frames.ts',
+ 'src/main/media-command.ts',
+ 'src/main/media-executable.ts',
+ 'src/main/media-process-guardian.ts'
+]
+const sourceBefore = Object.fromEntries(
+ await Promise.all(
+  sourceFiles.map(async file => [
+   file,
+   createHash('sha256')
+    .update(await readFile(join(root, file)))
+    .digest('hex')
+  ])
+ )
+)
+const executionBindings: Array<{files: string[]; before: Record<string, string>; after?: Record<string, string>}> = []
+async function bundleHashes(files: string[]) {
+ return Object.fromEntries(
+  await Promise.all(
+   files.map(async file => [
+    file,
+    createHash('sha256')
+     .update(await readFile(join(work, file)))
+     .digest('hex')
+   ])
+  )
+ )
+}
 try {
  const candidate = await packageVideoCandidate({
-  target: 'darwin-arm64',
+  target: linux ? 'linux-x64' : 'darwin-arm64',
   productVersion: '0.1.85',
   archive: join(resolve(artifactDirectory), 'source-build-candidate.tar.gz'),
   buildReport: join(resolve(artifactDirectory), 'build-result.json'),
-  expectedArchiveSha256: '81375a75e36d74db16e18ead0de7e61e9d067eb9db434df442559790a2ca8bb4',
-  expectedBuildReportSha256: '5acba42ea6367ba002f4fb5d107a1ba04322af9211cb13e05765a9adf47447b4',
-  sourceBuildCommit: '4a53801d5485983742ff48fc9d547e8e0077f774',
-  sourceBuildRun: '39051917827'
+  expectedArchiveSha256: linux
+   ? 'ef851d22918a28b5cf04343a7e5016b1de9cad27fd41020b001f4ffd2646a06d'
+   : '81375a75e36d74db16e18ead0de7e61e9d067eb9db434df442559790a2ca8bb4',
+  expectedBuildReportSha256: linux
+   ? 'a6e74fac28111961075ab62d5dbb7598a7adfa3767953f424fea36903bb8b1e3'
+   : '5acba42ea6367ba002f4fb5d107a1ba04322af9211cb13e05765a9adf47447b4',
+  sourceBuildCommit: linux ? '3b0682b0f21a1a2c4d90aefbf913df83df982919' : '4a53801d5485983742ff48fc9d547e8e0077f774',
+  sourceBuildRun: linux ? '39109258520' : '39051917827'
  })
  const resources = join(work, 'resources')
  await mkdir(join(resources, 'video'), {recursive: true})
@@ -49,6 +98,59 @@ try {
   await chmod(path, 0o755)
  }
  report.candidate = candidate.report
+ if (linux) {
+  const fixed = JSON.parse(await readFile(join(resolve(artifactDirectory), 'build-result.json'), 'utf8'))
+  const dependencies = []
+  for (const tool of ['ffmpeg', 'ffprobe']) {
+   const path = join(resources, 'video', tool),
+    diagnostic = fixed.diagnostics[tool]
+   const dynamic = execFileSync('/usr/bin/readelf', ['-d', path], {encoding: 'utf8', timeout: 15000})
+   const needed = [...dynamic.matchAll(/\(NEEDED\).*\[([^\]]+)\]/g)].map(match => match[1]).sort()
+   if (
+    JSON.stringify(needed) !== JSON.stringify([...diagnostic.needed].sort()) ||
+    /\((?:RPATH|RUNPATH)\)/.test(dynamic)
+   )
+    throw new Error('Linux ELF dependency mismatch')
+   const versions = execFileSync('/usr/bin/readelf', ['--version-info', path], {encoding: 'utf8', timeout: 15000})
+   for (const family of ['GLIBC', 'GLIBCXX', 'CXXABI']) {
+    const actual = [
+     ...new Set(
+      [...versions.matchAll(new RegExp('Name: ' + family + '_([0-9]+(?:\\.[0-9]+)*)', 'g'))].map(match => match[1])
+     )
+    ].sort()
+    if (JSON.stringify(actual) !== JSON.stringify([...diagnostic.symbolRequirements[family].versions].sort()))
+     throw new Error('Linux symbol requirements mismatch')
+   }
+   const ldd = execFileSync('/usr/bin/ldd', [path], {encoding: 'utf8', timeout: 15000})
+   if (ldd.includes('not found')) throw new Error('Missing Linux system dependency')
+   for (const line of ldd
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean)) {
+    if (/^linux-vdso\.so\.1 \(0x[0-9a-f]+\)$/.test(line)) continue
+    const match = /^(?:(\S+) => )?(\/\S+) \(0x[0-9a-f]+\)$/.exec(line)
+    if (!match) throw new Error('Unexpected Linux dependency line')
+    const name = match[1] || match[2].split('/').at(-1),
+     actual = await realpath(match[2])
+    if (
+     !actual.startsWith('/usr/lib/x86_64-linux-gnu/') ||
+     !diagnostic.resolved.some((entry: {name: string; realpath: string}) => entry.name === name)
+    )
+     throw new Error('Unexpected Linux dependency location')
+   }
+   dependencies.push({tool, dynamic, versions, ldd})
+  }
+  report.linuxDependencies = {
+   scope:
+    'Current runner readelf/ldd observations; names and symbol requirements matched fixed build evidence, current system library bytes may differ.',
+   dependencies,
+   packages: execFileSync(
+    '/usr/bin/dpkg-query',
+    ['-W', '-f=${binary:Package}\t${Version}\n', 'libc6', 'zlib1g', 'libstdc++6', 'libgcc-s1'],
+    {encoding: 'utf8', timeout: 15000}
+   )
+  }
+ }
  const exports =
   'export {MediaBackend} from ' +
   JSON.stringify(join(root, 'src/main/media.ts').replaceAll('\\', '/')) +
@@ -91,10 +193,13 @@ try {
   format: 'esm',
   packages: 'external'
  })
+ const visualFiles = ['owners.mjs', 'media-process-guardian.js', 'fixture.mjs']
+ executionBindings.push({files: visualFiles, before: await bundleHashes(visualFiles)})
  for (const phase of ['capture', 'restart']) {
   const env: NodeJS.ProcessEnv = {
    ...process.env,
    MEIJI_VISUAL_WORK: work,
+   MEIJI_VISUAL_SOURCE_ROOT: root,
    MEIJI_VISUAL_RESULTS: results,
    MEIJI_VISUAL_PHASE: phase
   }
@@ -163,6 +268,8 @@ try {
   format: 'esm',
   packages: 'external'
  })
+ const parentFiles = ['ppt-owner.mjs', 'parent-exit.mjs']
+ executionBindings.push({files: parentFiles, before: await bundleHashes(parentFiles)})
  const baseline: Record<string, unknown> = {
   scope:
    'Forced termination of one owned Electron fixture calling the unchanged production PPT helper. An observed exit is not a universal process-tree guarantee.'
@@ -290,35 +397,29 @@ try {
  process.exitCode = 1
 } finally {
  try {
+  for (const binding of executionBindings) {
+   binding.after = await bundleHashes(binding.files)
+   if (JSON.stringify(binding.before) !== JSON.stringify(binding.after))
+    report.executionBindingError = 'Execution bundle changed'
+  }
+  report.executionBindings = executionBindings
+  report.sourceBefore = sourceBefore
+  if (report.executionBindingError) {
+   report.status = 'failed'
+   process.exitCode = 1
+  }
   report.binding = {
    commit: execFileSync('git', ['rev-parse', 'HEAD'], {cwd: root, encoding: 'utf8'}).trim(),
    dirty: !!execFileSync('git', ['status', '--porcelain'], {cwd: root, encoding: 'utf8'}).trim(),
    platform: process.platform,
    arch: process.arch,
    osRelease: release(),
-   osProductVersion: execFileSync('/usr/bin/sw_vers', ['-productVersion'], {encoding: 'utf8'}).trim(),
+   osProductVersion: linux
+    ? await readFile('/etc/os-release', 'utf8')
+    : execFileSync('/usr/bin/sw_vers', ['-productVersion'], {encoding: 'utf8'}).trim(),
    sourceHashes: Object.fromEntries(
     await Promise.all(
-     [
-      'scripts/visual-runtime-smoke.mts',
-      'scripts/visual-runtime-electron.mts',
-      'scripts/ppt-parent-exit-electron.mts',
-      'src/main/video-ppt.ts',
-      'src/main/ppt-extract.ts',
-      'src/main/image-pdf.ts',
-      'src/main/pdf-ppt-cleanup.ts',
-      'src/main/video-policy.ts',
-      'scripts/video-candidate-package.mts',
-      'src/shared/runtime-descriptor-v2.ts',
-      'src/shared/runtime-manifest-v2.ts',
-      'scripts/media-build-source-lock.mts',
-      'src/main/media.ts',
-      'src/main/media-downloads.ts',
-      'src/main/visual-frames.ts',
-      'src/main/media-command.ts',
-      'src/main/media-executable.ts',
-      'src/main/media-process-guardian.ts'
-     ].map(async path => [
+     sourceFiles.map(async path => [
       path,
       createHash('sha256')
        .update(await readFile(join(root, path)))
@@ -326,6 +427,11 @@ try {
      ])
     )
    )
+  }
+  if (JSON.stringify(sourceBefore) !== JSON.stringify((report.binding as {sourceHashes: unknown}).sourceHashes)) {
+   report.status = 'failed'
+   report.bindingError = 'Source changed'
+   process.exitCode = 1
   }
  } catch (error) {
   report.bindingError = error instanceof Error ? error.message : 'Source binding failed'

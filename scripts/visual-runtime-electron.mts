@@ -4,7 +4,7 @@ import {createHash} from 'node:crypto'
 import {mkdir, readFile, writeFile, copyFile, access} from 'node:fs/promises'
 import fsPromises from 'node:fs/promises'
 import childProcess from 'node:child_process'
-import {syncBuiltinESMExports} from 'node:module'
+import {createRequire, syncBuiltinESMExports} from 'node:module'
 import {join} from 'node:path'
 import {pathToFileURL} from 'node:url'
 const work = process.env.MEIJI_VISUAL_WORK!,
@@ -24,6 +24,26 @@ type Capture = {
  duration: number
  frames: Array<{path: string; time: number; hash: string}>
  gaps: unknown[]
+}
+const fixtureRequire = createRequire(join(process.env.MEIJI_VISUAL_SOURCE_ROOT!, 'package.json'))
+const canvasRequire = createRequire(fixtureRequire.resolve('pdfjs-dist/package.json'))
+const canvas = canvasRequire('@napi-rs/canvas')
+async function assertRed(path: string) {
+ const image = nativeImage.createFromPath(path)
+ assert.deepEqual(image.getSize(), {width: 1600, height: 1200})
+ const bitmap = image.toBitmap()
+ assert.equal(bitmap.length, 1600 * 1200 * 4)
+ const decoded = await canvas.loadImage(image.toPNG()),
+  surface = canvas.createCanvas(decoded.width, decoded.height),
+  context = surface.getContext('2d')
+ context.drawImage(decoded, 0, 0)
+ const rgba = context.getImageData(0, 0, decoded.width, decoded.height).data
+ // Independent PNG decoder exposes RGBA, avoiding platform-specific native bitmap channel assumptions.
+ for (let i = 0; i < rgba.length; i += 4)
+  assert(
+   rgba[i] >= 250 && rgba[i + 1] <= 3 && rgba[i + 2] <= 3 && rgba[i + 3] === 255,
+   'Uniform red frame pixel mismatch'
+  )
 }
 async function run() {
  await app.whenReady()
@@ -64,6 +84,7 @@ async function run() {
     for (const frame of capture.frames) {
      assert.equal(await digest(frame.path), frame.hash)
      assert(!nativeImage.createFromPath(frame.path).isEmpty())
+     if (capture.id === 'a'.repeat(32)) await assertRed(frame.path)
     }
    }
    checks.push(
@@ -136,6 +157,39 @@ async function run() {
      'production ' + policy + ' capture: source identity, sorted times, nativeImage dimensions, pixel data and hashes'
     )
    }
+   const redVideo = join(work, 'red.mp4')
+   await mediaCommand(
+    resources,
+    'ffmpeg',
+    [
+     '-v',
+     'error',
+     '-f',
+     'lavfi',
+     '-i',
+     'color=c=red:s=64x48:r=5',
+     '-t',
+     '2',
+     '-c:v',
+     'libx264',
+     '-pix_fmt',
+     'yuv420p',
+     redVideo
+    ],
+    new AbortController().signal
+   )
+   const redCapture: Capture = await owner.request('visual-frames', {
+    id: 'a'.repeat(32),
+    path: redVideo,
+    expectedHash: await digest(redVideo),
+    cap: 1,
+    policy: 'coverage'
+   })
+   assert.equal(redCapture.frames.length, 1)
+   await assertRed(redCapture.frames[0].path)
+   await copyFile(redCapture.frames[0].path, join(results, 'uniform-red.png'))
+   captures.push(redCapture)
+   checks.push('production scale output contains only expected red pixels; retained for restart verification')
    const imagePath = join(work, 'oversized.png')
    await writeFile(
     imagePath,
