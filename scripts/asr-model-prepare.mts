@@ -133,7 +133,7 @@ async function download(entry: Entry, path: string) {
   )
   let response: Response
   try {
-   response = await fetch(url, {redirect: 'manual', signal})
+   response = await fetch(url, {redirect: 'manual', signal, headers: {'accept-encoding': 'identity'}})
   } catch {
    throw new Error('Model request failed: ' + entry.path + ' at ' + parsed.hostname)
   }
