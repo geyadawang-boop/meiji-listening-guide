@@ -17,6 +17,14 @@ on:
         required: false
         type: boolean
         default: false
+      pixel_candidate_run:
+        description: Fixed candidate run for Linux pixel diagnostics (old baseline remains the default)
+        required: false
+        type: choice
+        default: '39107720545'
+        options:
+          - '39107720545'
+          - '39109258520'
       asr_runtime:
         description: Verify actual local Chinese ASR using fixed public models and installed Mandarin voice
         required: false
@@ -74,16 +82,24 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          PIXEL_CANDIDATE_RUN: ${{ inputs.pixel_candidate_run }}
         run: |
           set -euo pipefail
-          metadata=$(gh api repos/geyadawang-boop/meiji-listening-guide/actions/artifacts/12128894879)
-          test "$(printf '%s' "$metadata" | jq -r '.workflow_run.id')" = "39107720545"
+          case "$PIXEL_CANDIDATE_RUN" in
+            39107720545) artifact_id=12128894879 ;;
+            39109258520) artifact_id=12129619803 ;;
+            *) echo "Unknown fixed candidate run ID" >&2; exit 1 ;;
+          esac
+          metadata=$(gh api "repos/geyadawang-boop/meiji-listening-guide/actions/artifacts/$artifact_id")
+          test "$(printf '%s' "$metadata" | jq -r '.workflow_run.id')" = "$PIXEL_CANDIDATE_RUN"
           test "$(printf '%s' "$metadata" | jq -r '.expired')" = "false"
           mkdir "$RUNNER_TEMP/pixel-input"
-          gh api repos/geyadawang-boop/meiji-listening-guide/actions/artifacts/12128894879/zip > "$RUNNER_TEMP/pixel-input.zip"
+          gh api "repos/geyadawang-boop/meiji-listening-guide/actions/artifacts/$artifact_id/zip" > "$RUNNER_TEMP/pixel-input.zip"
           unzip -j "$RUNNER_TEMP/pixel-input.zip" source-build-candidate.tar.gz build-result.json -d "$RUNNER_TEMP/pixel-input"
       - name: Compare actual candidate pixel paths
-        run: node scripts/media-pixel-diagnostics.mts "${{ runner.temp }}/pixel-input" "${{ runner.temp }}/pixel-results"
+        env:
+          PIXEL_CANDIDATE_RUN: ${{ inputs.pixel_candidate_run }}
+        run: node scripts/media-pixel-diagnostics.mts "${{ runner.temp }}/pixel-input" "${{ runner.temp }}/pixel-results" "$PIXEL_CANDIDATE_RUN"
       - uses: actions/upload-artifact@v4
         if: always()
         with:

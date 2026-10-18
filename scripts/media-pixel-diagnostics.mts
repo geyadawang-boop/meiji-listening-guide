@@ -10,14 +10,38 @@ import {build} from 'esbuild'
 import {selectedMemberSize} from './video-candidate-package.mts'
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..'),
  require = createRequire(import.meta.url)
-const [input, destination] = process.argv.slice(2)
+const profiles = {
+ '39107720545': {
+  artifact: '12128894879',
+  archiveSha256: '2f4080d1643839e42e8ab2b9291e9bc84b7de51b3145da7c7d4ce471956277ba',
+  reportSha256: 'e6c51891e751bb910aadffdd5679e839d692c97d5a174f86d66a6bcd48317c05',
+  commit: '2a6f16c09c80ded635fae20e9f076823b84466d5',
+  tools: {
+   ffmpeg: '16b4d908f4fd11e6bb1b2d46d7bce39eae57ce24431dd5473a381f0bea1fb894',
+   ffprobe: '7e955d1ec7c2488733676b50358764ba99f0a32f3ca2ba93625c56e7d4b1275e'
+  }
+ },
+ '39109258520': {
+  artifact: '12129619803',
+  archiveSha256: 'ef851d22918a28b5cf04343a7e5016b1de9cad27fd41020b001f4ffd2646a06d',
+  reportSha256: 'a6e74fac28111961075ab62d5dbb7598a7adfa3767953f424fea36903bb8b1e3',
+  commit: '3b0682b0f21a1a2c4d90aefbf913df83df982919',
+  tools: {
+   ffmpeg: 'f5c900558c777cb6e9a33f8b3b425a79f2d9c19662bfb2f68cdd14fb8f02cd1f',
+   ffprobe: '437ed76ecac601052e065cc62346e1de0485b4167233424303e75a139190d0ff'
+  }
+ }
+} as const
+const [input, destination, run = '39107720545'] = process.argv.slice(2)
 function check(value: unknown, message: string): asserts value {
  if (!value) throw new Error(message)
 }
 check(
- input && destination && process.argv.length === 4,
- 'Usage: media-pixel-diagnostics.mts <fixed artifact directory> <new results directory>'
+ input && destination && (process.argv.length === 4 || process.argv.length === 5),
+ 'Usage: media-pixel-diagnostics.mts <fixed artifact directory> <new results directory> [fixed run ID]'
 )
+check(run === '39107720545' || run === '39109258520', 'Unknown fixed candidate run ID')
+const profile = profiles[run]
 check(
  process.platform === 'linux' && process.arch === 'x64' && process.env.GITHUB_ACTIONS === 'true',
  'Isolated Linux x64 runner required'
@@ -146,17 +170,11 @@ try {
  report.osRelease = osRelease
  const archive = join(resolve(input), 'source-build-candidate.tar.gz'),
   buildReport = join(resolve(input), 'build-result.json')
- check(
-  (await fileHash(archive)) === '2f4080d1643839e42e8ab2b9291e9bc84b7de51b3145da7c7d4ce471956277ba',
-  'Fixed archive mismatch'
- )
- check(
-  (await fileHash(buildReport)) === 'e6c51891e751bb910aadffdd5679e839d692c97d5a174f86d66a6bcd48317c05',
-  'Fixed build report mismatch'
- )
+ check((await fileHash(archive)) === profile.archiveSha256, 'Fixed archive mismatch')
+ check((await fileHash(buildReport)) === profile.reportSha256, 'Fixed build report mismatch')
  const candidate = JSON.parse(await readFile(buildReport, 'utf8'))
  check(
-  candidate.binding?.commit === '2a6f16c09c80ded635fae20e9f076823b84466d5' &&
+  candidate.binding?.commit === profile.commit &&
    candidate.binding?.dirty === false &&
    candidate.binding?.platform === 'linux' &&
    candidate.binding?.arch === 'x64' &&
@@ -169,8 +187,9 @@ try {
    'Production probe source differs from fixed candidate: ' + file
   )
  report.candidate = {
-  run: '39107720545',
-  artifact: '12128894879',
+  run,
+  artifact: profile.artifact,
+  reportSha256: profile.reportSha256,
   archiveSha256: candidate.archiveSha256,
   binding: candidate.binding
  }
@@ -178,10 +197,7 @@ try {
  const resources = join(work, 'resources')
  await mkdir(join(resources, 'video'), {recursive: true})
  const listing = (await execute('/usr/bin/bsdtar', ['-tvf', archive], 32 * 1024 * 1024)).stdout.toString('utf8')
- for (const [tool, expected] of [
-  ['ffmpeg', '16b4d908f4fd11e6bb1b2d46d7bce39eae57ce24431dd5473a381f0bea1fb894'],
-  ['ffprobe', '7e955d1ec7c2488733676b50358764ba99f0a32f3ca2ba93625c56e7d4b1275e']
- ]) {
+ for (const [tool, expected] of Object.entries(profile.tools)) {
   const member = 'prefix/bin/' + tool,
    size = selectedMemberSize(listing, member),
    path = join(resources, 'video', tool)
