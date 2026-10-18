@@ -35,6 +35,8 @@ node scripts/audit-language-migration.mts --check
 
 ## 发布和恢复组件
 
+`node scripts/asr-model-prepare.mts` 将固定版本的 17 份公开 ASR 模型/许可文件准备到唯一系统临时目录，约 243 MiB，逐项核对应用清单的大小与 SHA256；`--offline <模型目录>` 只读已有文件。不写应用 resources、不推理或读取用户音频，准备通过不等于字幕识别通过。
+
 手动 CI 的 `v2_fixture` 仅以四份无执行内容的合成文件验证 v2 清单复制、POSIX 权限和临时目录内原子发布。它要求实际 macOS arm64，调用方显式选择目标、版本与清单；不是应用安装器，不改原始 payload 权限、不执行工具、不接旧安装 UI。
 
 视频候选工具 `node scripts/video-candidate-package.mts <request.json>` 仅接受显式 `darwin-arm64` 源码构建归档及调用方核准的归档/构建报告 SHA256、提交和 run 身份，生成独立临时候选清单与 descriptor v2。仅复制选中的普通成员并绑定来源/许可/配置；不执行二进制、不接安装或发布，输出不属于可信安装授权。
