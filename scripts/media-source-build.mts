@@ -444,7 +444,7 @@ try {
  report.diagnostics = diagnostics
  const fixtures = join(prepared.work, 'fixtures')
  await mkdir(fixtures)
- report.codecs = await verifySourceCodecs(entry, resources, fixtures, env)
+ report.codecs = await verifySourceCodecs(entry, resources, fixtures, env, join(artifacts, 'codec-diagnostics.json'))
  if (linux)
   await writeFile(
    join(prepared.work, 'build-evidence.json'),

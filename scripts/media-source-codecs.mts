@@ -1,5 +1,6 @@
 import {fork} from 'node:child_process'
 import {once} from 'node:events'
+import {createHash} from 'node:crypto'
 import {join} from 'node:path'
 import {readFile, writeFile} from 'node:fs/promises'
 function check(value: unknown, message: string): asserts value {
@@ -26,12 +27,13 @@ async function guardian(
  stop?: 'cancel' | 'disconnect',
  env?: NodeJS.ProcessEnv
 ) {
- return await new Promise<{code: number; stdout: string; stderr: string; stop?: string; childExited?: boolean}>(
+ return await new Promise<{code: number; stdout: Buffer; stderr: string; stop?: string; childExited?: boolean}>(
   (done, fail) => {
    const child = fork(entry, [resources, tool], {stdio: ['ignore', 'pipe', 'pipe', 'ipc'], windowsHide: true, env})
    const streamsClosed = Promise.all([once(child.stdout!, 'close'), once(child.stderr!, 'close')])
-   let stdout = '',
-    stderr = '',
+   const stdoutChunks: Buffer[] = [],
+    stderrChunks: Buffer[] = []
+   let outputBytes = 0,
     pid: number | undefined,
     stopping = false,
     failure = ''
@@ -46,12 +48,13 @@ async function guardian(
    }, 30000)
    const capture = (target: 'stdout' | 'stderr', data: Buffer) => {
     if (failure) return
-    if (target === 'stdout') stdout += data.toString()
-    else stderr += data.toString()
-    if (stdout.length + stderr.length > 256000) {
+    outputBytes += data.length
+    if (outputBytes > 256000) {
      failure = 'Guardian output exceeded budget'
      if (child.connected) child.disconnect()
+     return
     }
+    ;(target === 'stdout' ? stdoutChunks : stderrChunks).push(data)
    }
    child.stdout!.on('data', data => capture('stdout', data))
    child.stderr!.on('data', data => capture('stderr', data))
@@ -86,6 +89,8 @@ async function guardian(
     void (async () => {
      await streamsClosed
      clearTimeout(timer)
+     const stdout = Buffer.concat(stdoutChunks),
+      stderr = Buffer.concat(stderrChunks).toString('utf8')
      check(!failure, failure)
      check(pid, 'Guardian did not confirm starting the real binary')
      check(
@@ -104,14 +109,21 @@ async function guardian(
  )
 }
 
-export async function verifySourceCodecs(entry: string, resources: string, work: string, env: NodeJS.ProcessEnv) {
+export async function verifySourceCodecs(
+ entry: string,
+ resources: string,
+ work: string,
+ env: NodeJS.ProcessEnv,
+ diagnosticsPath = join(work, 'codec-diagnostics.json')
+) {
  const invoke = (tool: 'ffmpeg' | 'ffprobe', args: string[], stop?: 'cancel' | 'disconnect') =>
   guardian(entry, resources, tool, args, stop, env)
  const run = (args: string[]) => invoke('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-nostdin', ...args])
  const probe = async (file: string) =>
   JSON.parse(
-   (await invoke('ffprobe', ['-v', 'error', '-show_streams', '-show_format', '-show_chapters', '-of', 'json', file]))
-    .stdout
+   (
+    await invoke('ffprobe', ['-v', 'error', '-show_streams', '-show_format', '-show_chapters', '-of', 'json', file])
+   ).stdout.toString('utf8')
   )
  const checks: string[] = []
  for (const [flag, names] of [
@@ -144,7 +156,7 @@ export async function verifySourceCodecs(entry: string, resources: string, work:
   ['-protocols', ['file', 'pipe']]
  ] as const) {
   const capabilities = await invoke('ffmpeg', ['-hide_banner', flag])
-  const tokens = (capabilities.stdout + '\n' + capabilities.stderr).split(/[\s,]+/)
+  const tokens = (capabilities.stdout.toString('utf8') + '\n' + capabilities.stderr).split(/[\s,]+/)
   for (const name of names) check(tokens.includes(name), 'Missing capability ' + flag + ': ' + name)
  }
  checks.push('application encoder/filter/demuxer/muxer/protocol capability matrix')
@@ -213,8 +225,20 @@ export async function verifySourceCodecs(entry: string, resources: string, work:
   'rawvideo',
   'pipe:1'
  ])
- // Black/red grayscale values remain single-byte UTF-8 in this synthetic fixture.
- check(Buffer.byteLength(raw.stdout) === 2 * 32 * 18, 'Gray rawvideo frame size mismatch')
+ const rawDiagnostics = {
+  expectedBytes: 2 * 32 * 18,
+  actualBytes: raw.stdout.length,
+  sha256: createHash('sha256').update(raw.stdout).digest('hex'),
+  minimumByte: Math.min(...raw.stdout),
+  maximumByte: Math.max(...raw.stdout),
+  utf8RoundtripBytes: Buffer.byteLength(raw.stdout.toString('utf8'))
+ }
+ await writeFile(diagnosticsPath, JSON.stringify({grayRawvideo: rawDiagnostics}, null, 2) + '\n')
+ console.log(JSON.stringify({grayRawvideo: rawDiagnostics}))
+ check(
+  raw.stdout.length === rawDiagnostics.expectedBytes,
+  'Gray rawvideo frame size mismatch: ' + JSON.stringify(rawDiagnostics)
+ )
  checks.push('fps/crop/scale/format gray rawvideo pipe')
  const filter = join(work, 'edit.filter'),
   edited = join(work, 'edited.mp4')
@@ -302,8 +326,9 @@ export async function verifySourceCodecs(entry: string, resources: string, work:
   disconnect = await invoke('ffmpeg', infinite, 'disconnect')
  return {
   checks,
-  cancel,
-  disconnect,
+  rawDiagnostics,
+  cancel: {...cancel, stdout: cancel.stdout.toString('utf8')},
+  disconnect: {...disconnect, stdout: disconnect.stdout.toString('utf8')},
   scope: 'Synthetic application codec paths, not real account, model vision quality or ASR model inference.'
  }
 }
