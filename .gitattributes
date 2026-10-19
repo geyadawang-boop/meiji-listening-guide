@@ -1,0 +1,5 @@
+# 全仓库文本文件统一 LF：Windows 检出（core.autocrlf=true）不得转换为 CRLF，
+# 否则 Windows 上 `pnpm check`（Biome 行尾为 lf）会对全部文件报格式错误。
+* text=auto eol=lf
+*.png binary
+*.ico binary
