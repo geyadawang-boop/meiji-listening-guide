@@ -427,14 +427,6 @@
 .rail-spacer {
  flex: 1;
 }
-.rail-logo {
- display: grid;
- place-items: center;
- width: 40px;
- height: 40px;
- flex: none;
- margin-bottom: 15px;
-}
 .course-row .button.course,
 .session-row .button.session-card,
 .button.new-session {
@@ -685,6 +677,7 @@ details.knowledge-card {
 }
 .titlebar-controls .button {
  -webkit-app-region: no-drag;
+ border: 0;
 }
 .titlebar-close:hover {
  color: var(--danger);
@@ -694,4 +687,19 @@ details.knowledge-card {
 }
 .busy-indicator {
  top: calc(var(--titlebar-height) + 8px);
+}
+
+/* Linux 无边框窗口：透明窗口下由 CSS 提供与 Ubuntu 一致的圆角，最大化后恢复直角。 */
+html[data-platform="linux"],
+html[data-platform="linux"] body {
+ background: transparent;
+}
+html[data-platform="linux"] #root {
+ height: 100vh;
+ background: var(--shell-backdrop);
+ border-radius: var(--window-radius);
+ overflow: hidden;
+}
+html[data-platform="linux"][data-maximized="true"] #root {
+ border-radius: 0;
 }
