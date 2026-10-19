@@ -7,6 +7,39 @@ on:
   pull_request:
   workflow_dispatch:
     inputs:
+      linux_visual_runtime:
+        description: Verify actual Linux Electron visual capture using the fixed source candidate
+        required: false
+        type: boolean
+        default: false
+      linux_source_build:
+        description: Build isolated Ubuntu 24.04 x64 source candidate (not a release)
+        required: false
+        type: boolean
+        default: false
+      linux_pixel_diagnostics:
+        description: Diagnose pixels from the fixed Linux candidate without recompilation
+        required: false
+        type: boolean
+        default: false
+      pixel_candidate_run:
+        description: Fixed candidate run for Linux pixel diagnostics (old baseline remains the default)
+        required: false
+        type: choice
+        default: '39107720545'
+        options:
+          - '39107720545'
+          - '39109258520'
+      asr_runtime:
+        description: Verify actual local Chinese ASR using fixed public models and installed Mandarin voice
+        required: false
+        type: boolean
+        default: false
+      visual_runtime:
+        description: Verify real Electron visual capture with the fixed reviewed Mac candidate
+        required: false
+        type: boolean
+        default: false
       v2_status:
         description: Verify production read-only v2 component status on macOS arm64
         required: false
@@ -34,8 +67,197 @@ on:
         default: false
 
 jobs:
+  linux-visual-runtime:
+    if: github.event_name == 'workflow_dispatch' && inputs.linux_visual_runtime
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: sudo apt-get update && sudo apt-get install -y libarchive-tools xvfb
+      - run: pnpm install --frozen-lockfile
+      - name: Configure owned Electron sandbox helper
+        shell: bash
+        run: |
+          set -euo pipefail
+          helper=$(node -e "const fs=require('node:fs'),p=require('node:path');const e=fs.realpathSync(require('electron'));const h=p.join(p.dirname(e),'chrome-sandbox');const root=fs.realpathSync('node_modules');if(!h.startsWith(root+p.sep)||fs.lstatSync(h).isSymbolicLink()||!fs.statSync(h).isFile())throw Error('Unexpected sandbox helper');console.log(h)")
+          sudo chown root:root "$helper"
+          sudo chmod 4755 "$helper"
+          test "$(stat -c '%u:%g:%a' "$helper")" = "0:0:4755"
+      - name: Obtain fixed Linux visual candidate
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          metadata=$(gh api repos/geyadawang-boop/meiji-listening-guide/actions/artifacts/12129619803)
+          test "$(printf '%s' "$metadata" | jq -r '.workflow_run.id')" = "39109258520"
+          test "$(printf '%s' "$metadata" | jq -r '.expired')" = "false"
+          mkdir "$RUNNER_TEMP/linux-visual-input"
+          gh api repos/geyadawang-boop/meiji-listening-guide/actions/artifacts/12129619803/zip > "$RUNNER_TEMP/linux-visual-input.zip"
+          unzip -j "$RUNNER_TEMP/linux-visual-input.zip" source-build-candidate.tar.gz build-result.json -d "$RUNNER_TEMP/linux-visual-input"
+      - run: xvfb-run --auto-servernum node scripts/visual-runtime-smoke.mts "${{ runner.temp }}/linux-visual-input" "${{ runner.temp }}/linux-visual-results"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: linux-visual-runtime-results
+          path: ${{ runner.temp }}/linux-visual-results
+          if-no-files-found: warn
+
+  linux-pixel-diagnostics:
+    if: github.event_name == 'workflow_dispatch' && !inputs.linux_visual_runtime && inputs.linux_pixel_diagnostics
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: sudo apt-get update && sudo apt-get install -y libarchive-tools
+      - run: pnpm install --frozen-lockfile
+      - name: Obtain exact Linux source candidate
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PIXEL_CANDIDATE_RUN: ${{ inputs.pixel_candidate_run }}
+        run: |
+          set -euo pipefail
+          case "$PIXEL_CANDIDATE_RUN" in
+            39107720545) artifact_id=12128894879 ;;
+            39109258520) artifact_id=12129619803 ;;
+            *) echo "Unknown fixed candidate run ID" >&2; exit 1 ;;
+          esac
+          metadata=$(gh api "repos/geyadawang-boop/meiji-listening-guide/actions/artifacts/$artifact_id")
+          test "$(printf '%s' "$metadata" | jq -r '.workflow_run.id')" = "$PIXEL_CANDIDATE_RUN"
+          test "$(printf '%s' "$metadata" | jq -r '.expired')" = "false"
+          mkdir "$RUNNER_TEMP/pixel-input"
+          gh api "repos/geyadawang-boop/meiji-listening-guide/actions/artifacts/$artifact_id/zip" > "$RUNNER_TEMP/pixel-input.zip"
+          unzip -j "$RUNNER_TEMP/pixel-input.zip" source-build-candidate.tar.gz build-result.json -d "$RUNNER_TEMP/pixel-input"
+      - name: Compare actual candidate pixel paths
+        env:
+          PIXEL_CANDIDATE_RUN: ${{ inputs.pixel_candidate_run }}
+        run: node scripts/media-pixel-diagnostics.mts "${{ runner.temp }}/pixel-input" "${{ runner.temp }}/pixel-results" "$PIXEL_CANDIDATE_RUN"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: linux-pixel-diagnostics
+          path: ${{ runner.temp }}/pixel-results
+          if-no-files-found: warn
+
+  linux-source-build:
+    if: github.event_name == 'workflow_dispatch' && !inputs.linux_visual_runtime && inputs.linux_source_build && !inputs.linux_pixel_diagnostics
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install isolated runner build dependencies
+        run: sudo apt-get update && sudo apt-get install -y build-essential pkg-config libarchive-tools zlib1g-dev nasm
+      - run: pnpm install --frozen-lockfile
+      - name: Build and verify Linux source candidate only
+        run: node scripts/media-source-build.mts --output "${{ runner.temp }}/linux-source-build-artifacts"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: linux-source-build-candidate-not-release
+          path: ${{ runner.temp }}/linux-source-build-artifacts
+          retention-days: 7
+          if-no-files-found: warn
+
+  asr-runtime:
+    if: github.event_name == 'workflow_dispatch' && !inputs.linux_visual_runtime && !inputs.linux_pixel_diagnostics && !inputs.linux_source_build && inputs.asr_runtime
+    runs-on: macos-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Obtain the fixed reviewed media candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          metadata=$(gh api repos/geyadawang-boop/meiji-listening-guide/actions/artifacts/12108250900)
+          test "$(printf '%s' "$metadata" | jq -r '.workflow_run.id')" = "39051917827"
+          test "$(printf '%s' "$metadata" | jq -r '.expired')" = "false"
+          mkdir "$RUNNER_TEMP/asr-input"
+          gh api repos/geyadawang-boop/meiji-listening-guide/actions/artifacts/12108250900/zip > "$RUNNER_TEMP/asr-input.zip"
+          unzip -j "$RUNNER_TEMP/asr-input.zip" source-build-candidate.tar.gz build-result.json -d "$RUNNER_TEMP/asr-input"
+      - name: Verify local inference without user audio
+        run: node scripts/asr-runtime-smoke.mts "${{ runner.temp }}/asr-input" "${{ runner.temp }}/asr-results"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: asr-runtime-results
+          path: ${{ runner.temp }}/asr-results
+          if-no-files-found: warn
+
+  visual-runtime:
+    if: github.event_name == 'workflow_dispatch' && !inputs.linux_visual_runtime && !inputs.linux_pixel_diagnostics && !inputs.linux_source_build && inputs.visual_runtime && !inputs.asr_runtime
+    runs-on: macos-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Obtain the fixed reviewed source-build artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          metadata=$(gh api repos/geyadawang-boop/meiji-listening-guide/actions/artifacts/12108250900)
+          test "$(printf '%s' "$metadata" | jq -r '.workflow_run.id')" = "39051917827"
+          test "$(printf '%s' "$metadata" | jq -r '.expired')" = "false"
+          mkdir "$RUNNER_TEMP/visual-input"
+          gh api repos/geyadawang-boop/meiji-listening-guide/actions/artifacts/12108250900/zip > "$RUNNER_TEMP/visual-input.zip"
+          unzip -j "$RUNNER_TEMP/visual-input.zip" source-build-candidate.tar.gz build-result.json -d "$RUNNER_TEMP/visual-input"
+      - name: Exercise production visual capture in real Electron
+        run: node scripts/visual-runtime-smoke.mts "${{ runner.temp }}/visual-input" "${{ runner.temp }}/visual-results"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: visual-runtime-results
+          path: ${{ runner.temp }}/visual-results
+          if-no-files-found: warn
+
   v2-status:
-    if: github.event_name == 'workflow_dispatch' && inputs.v2_status
+    if: github.event_name == 'workflow_dispatch' && !inputs.linux_visual_runtime && !inputs.linux_pixel_diagnostics && !inputs.linux_source_build && inputs.v2_status && !inputs.visual_runtime && !inputs.asr_runtime
     runs-on: macos-latest
     timeout-minutes: 15
     steps:
@@ -55,7 +277,7 @@ jobs:
           if-no-files-found: warn
 
   v2-fixture:
-    if: github.event_name == 'workflow_dispatch' && inputs.v2_fixture && !inputs.v2_status
+    if: github.event_name == 'workflow_dispatch' && !inputs.linux_visual_runtime && !inputs.linux_pixel_diagnostics && !inputs.linux_source_build && inputs.v2_fixture && !inputs.v2_status && !inputs.visual_runtime && !inputs.asr_runtime
     runs-on: macos-latest
     timeout-minutes: 15
     steps:
@@ -77,7 +299,7 @@ jobs:
           if-no-files-found: warn
 
   source-build:
-    if: github.event_name == 'workflow_dispatch' && inputs.source_build && !inputs.v2_fixture && !inputs.v2_status
+    if: github.event_name == 'workflow_dispatch' && !inputs.linux_visual_runtime && !inputs.linux_pixel_diagnostics && !inputs.linux_source_build && inputs.source_build && !inputs.v2_fixture && !inputs.v2_status && !inputs.visual_runtime && !inputs.asr_runtime
     runs-on: macos-latest
     timeout-minutes: 60
     steps:
@@ -101,7 +323,7 @@ jobs:
           if-no-files-found: warn
 
   source-prepare:
-    if: github.event_name == 'workflow_dispatch' && inputs.source_prepare && !inputs.source_build && !inputs.v2_fixture && !inputs.v2_status
+    if: github.event_name == 'workflow_dispatch' && !inputs.linux_visual_runtime && !inputs.linux_pixel_diagnostics && !inputs.linux_source_build && inputs.source_prepare && !inputs.source_build && !inputs.v2_fixture && !inputs.v2_status && !inputs.visual_runtime && !inputs.asr_runtime
     runs-on: macos-latest
     timeout-minutes: 20
     steps:
@@ -124,7 +346,7 @@ jobs:
           if-no-files-found: warn
 
   media-candidate:
-    if: github.event_name == 'workflow_dispatch' && inputs.media_candidate && !inputs.source_prepare && !inputs.source_build && !inputs.v2_fixture && !inputs.v2_status
+    if: github.event_name == 'workflow_dispatch' && !inputs.linux_visual_runtime && !inputs.linux_pixel_diagnostics && !inputs.linux_source_build && inputs.media_candidate && !inputs.source_prepare && !inputs.source_build && !inputs.v2_fixture && !inputs.v2_status && !inputs.visual_runtime && !inputs.asr_runtime
     strategy:
       fail-fast: false
       matrix:
@@ -171,7 +393,7 @@ jobs:
         run: pnpm build
 
   runtime-smoke:
-    if: github.event_name == 'workflow_dispatch' && !inputs.media_candidate && !inputs.source_prepare && !inputs.source_build && !inputs.v2_fixture && !inputs.v2_status
+    if: github.event_name == 'workflow_dispatch' && !inputs.linux_visual_runtime && !inputs.linux_pixel_diagnostics && !inputs.linux_source_build && !inputs.media_candidate && !inputs.source_prepare && !inputs.source_build && !inputs.v2_fixture && !inputs.v2_status && !inputs.visual_runtime && !inputs.asr_runtime
     strategy:
       fail-fast: false
       matrix:

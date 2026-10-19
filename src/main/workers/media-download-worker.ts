@@ -5,8 +5,9 @@ import {NativeDownloadService} from '@main/media/download/media-download-service
 import {BACKEND_PROTOCOL} from '@shared/backend-protocol'
 import {MediaEncryptionClient} from '@main/security/worker-crypt'
 const port = (process as NodeJS.Process & {parentPort: ParentPort}).parentPort
-const [resources, root] = process.argv.slice(2)
-if (!port || !resources || !root) throw new Error('下载工作进程参数无效')
+const [resources, root, mediaPermission] = process.argv.slice(2)
+if (!port || !resources || !root || !['system-fallback', 'app-owned'].includes(mediaPermission))
+ throw new Error('下载工作进程参数无效')
 const ownerReady = acquireDownloadQueue(root)
 void ownerReady.catch(() => {})
 let sequence = 0
@@ -38,7 +39,14 @@ const api = {
  }
 }
 const encryption = new MediaEncryptionClient(message => port.postMessage(message))
-const service = new NativeDownloadService(resources, root, api, fetch, encryption.protect)
+const service = new NativeDownloadService(
+ resources,
+ root,
+ api,
+ fetch,
+ encryption.protect,
+ mediaPermission === 'system-fallback'
+)
 process.once('exit', () => encryption.close())
 port.on('message', event => {
  void (async () => {
