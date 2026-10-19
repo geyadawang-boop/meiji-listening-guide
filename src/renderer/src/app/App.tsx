@@ -393,9 +393,6 @@ export default function App() {
      </div>
     )}
     <nav className="app-icon-rail">
-     <span className="rail-logo">
-      <AppLogo size={30} />
-     </span>
      {railItems.map(item => (
       <Tooltip key={item.label} delay={0} closeDelay={0}>
        <Button

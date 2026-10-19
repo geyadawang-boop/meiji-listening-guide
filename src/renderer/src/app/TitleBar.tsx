@@ -23,6 +23,12 @@ export function TitleBar() {
    off()
   }
  }, [])
+ useEffect(() => {
+  if (platform) document.documentElement.dataset.platform = platform
+ }, [platform])
+ useEffect(() => {
+  document.documentElement.dataset.maximized = maximized ? 'true' : 'false'
+ }, [maximized])
  const isMac = platform === 'darwin'
  return (
   <header
