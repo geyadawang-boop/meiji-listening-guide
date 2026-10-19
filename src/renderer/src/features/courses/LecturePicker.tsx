@@ -53,23 +53,22 @@ export function LecturePicker({
          <Button
           variant="ghost"
           size="sm"
-          isIconOnly
-          aria-selected={l.id === value}
+          className="lecture-choice-main"
+          aria-current={l.id === value ? 'true' : undefined}
           onClick={() => {
            select(l.id)
            setOpen(false)
           }}
          >
           <CalendarDays />
-          <span>
-           <strong>{l.title}</strong>
-           <small>{l.status}</small>
-          </span>
+          <strong>{l.title}</strong>
+          <small className="lecture-choice-status">{l.status}</small>
          </Button>
          <Button
-          variant="danger-soft"
+          variant="ghost"
           size="sm"
           isIconOnly
+          className="lecture-choice-delete"
           aria-label={`删除课次 ${l.title}`}
           onClick={() => {
            setPending(l)

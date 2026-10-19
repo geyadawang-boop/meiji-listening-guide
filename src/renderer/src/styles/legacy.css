@@ -532,7 +532,7 @@ a {
  overflow: hidden;
 }
 .sidebar {
- width: 228px;
+ width: 280px;
  flex: none;
  background: var(--list);
  border-right: 1px solid var(--line);
@@ -984,7 +984,7 @@ a {
 }
 @media (max-width: 1200px) {
  .sidebar {
-  width: 190px;
+  width: 240px;
   padding: 24px 12px;
  }
  .workspace {
@@ -1000,7 +1000,7 @@ a {
 
 /* ===== model-desktop.css ===== */
 .app > .sidebar {
- width: 260px;
+ width: 280px;
  padding: 18px 16px;
 }
 .sidebar .brand-mark {
@@ -1015,9 +1015,9 @@ a {
 .sidebar .brand small {
  display: none;
 }
-@media (max-width: 1450px) {
+@media (max-width: 1100px) {
  .app > .sidebar {
-  width: 230px;
+  width: 240px;
  }
 }
 

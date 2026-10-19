@@ -185,6 +185,7 @@ export function Study({
  return (
   <WindowPanel
    visible
+   className="study-window"
    label="课表与教材"
    title="课表与教材"
    description="选择章节、预览建议，再保存可编辑划线。"
@@ -193,246 +194,256 @@ export function Study({
    close={close}
    menu={
     <div className="study-menu">
-     <h3>课表</h3>
-     <label>
-      粘贴课表
-      <TextArea value={text} onChange={e => setText(e.target.value)} placeholder="请包含日期、课程、章节和结束时间" />
-     </label>
-     <label>
-      课表时区
-      <Input value={timezone} onChange={e => setTimezone(e.target.value)} />
-     </label>
-     <div className="row">
+     <section className="study-menu__section">
+      <h3>课表</h3>
+      <label>
+       粘贴课表
+       <TextArea value={text} onChange={e => setText(e.target.value)} placeholder="请包含日期、课程、章节和结束时间" />
+      </label>
+      <label>
+       课表时区
+       <Input value={timezone} onChange={e => setTimezone(e.target.value)} />
+      </label>
+      <div className="study-menu__actions">
+       <Button
+        variant="tertiary"
+        size="sm"
+        isDisabled={busy || !text.trim()}
+        onClick={() =>
+         void run(async () => {
+          const rows = await invoke<StudyEntry[]>('study:parse', {text, timezone})
+          if (!rows.length) throw new Error('课表缺少明确的日期、结束时间或章节，或课程无法匹配，请补充后重试')
+          setEntries(rows)
+          setSelected(rows[0].id)
+          setNotice('已识别，请核对后保存课表')
+         })
+        }
+       >
+        识别课表
+       </Button>
+       <Button
+        variant="tertiary"
+        size="sm"
+        isDisabled={busy || !courses.length}
+        onClick={() => {
+         const row: StudyEntry = {
+          id: crypto.randomUUID(),
+          courseId: courses[0].id,
+          title: '',
+          chapter: '',
+          endsAt: new Date().toISOString()
+         }
+         setEntries([...entries, row])
+         setSelected(row.id)
+        }}
+       >
+        手动添加
+       </Button>
+      </div>
+      <label>
+       课表条目
+       <SelectField
+        label="课表条目"
+        placeholder="请选择"
+        options={[{value: '', label: '请选择'}, ...entries.map(e => ({value: e.id, label: e.title || '待填写课次'}))]}
+        value={selected}
+        onChange={next => setSelected(next)}
+       />
+      </label>
+      {entry && (
+       <div className="study-menu__detail">
+        <label>
+         课程
+         <SelectField
+          label="课程"
+          value={entry.courseId}
+          onChange={next => update({courseId: next, lectureId: undefined})}
+          options={courses.map(c => ({value: c.id, label: c.name}))}
+         />
+        </label>
+        <label>
+         课次名称
+         <Input value={entry.title} onChange={e => update({title: e.target.value})} />
+        </label>
+        <label>
+         教材章节
+         <Input value={entry.chapter} onChange={e => update({chapter: e.target.value})} />
+        </label>
+        <label className="study-menu__check">
+         <input
+          type="checkbox"
+          checked={!entry.endsAt}
+          onChange={e => update({endsAt: e.target.checked ? '' : new Date().toISOString()})}
+         />
+         时间待定
+        </label>
+        <label>
+         课程结束时间（含时区）
+         <Input
+          value={entry.endsAt}
+          onChange={e => update({endsAt: e.target.value})}
+          placeholder="2026-10-08T12:00:00+08:00"
+         />
+        </label>
+        <small>
+         核验时间：
+         {Number.isFinite(Date.parse(entry.endsAt))
+          ? new Date(checkAt(entry.endsAt)).toLocaleString()
+          : entry.endsAt
+            ? '请填写有效时间'
+            : '补课时间待定，不安排核验'}
+         （结束后 4 小时）
+        </small>
+        <label>
+         关联已有课次
+         <SelectField
+          label="关联已有课次"
+          placeholder="暂不关联"
+          value={entry.lectureId || ''}
+          onChange={next => update({lectureId: next || undefined})}
+          options={[
+           {value: '', label: '暂不关联'},
+           ...(detail?.lectures || []).map(l => ({value: l.id, label: l.title}))
+          ]}
+         />
+        </label>
+        <label>
+         智云课程编号
+         <Input
+          value={entry.zhiyunCourseId || ''}
+          onChange={e => update({zhiyunCourseId: e.target.value || undefined})}
+         />
+        </label>
+        <label>
+         智云课次编号
+         <Input value={entry.subId || ''} onChange={e => update({subId: e.target.value || undefined})} />
+        </label>
+        <Button
+         variant="ghost"
+         size="sm"
+         isDisabled={busy}
+         onClick={() => {
+          setEntries(entries.filter(e => e.id !== selected))
+          setSelected('')
+         }}
+        >
+         删除此条目
+        </Button>
+       </div>
+      )}
       <Button
-       variant="tertiary"
+       variant="primary"
        size="sm"
-       isDisabled={busy || !text.trim()}
+       isDisabled={busy}
        onClick={() =>
         void run(async () => {
-         const rows = await invoke<StudyEntry[]>('study:parse', {text, timezone})
-         if (!rows.length) throw new Error('课表缺少明确的日期、结束时间或章节，或课程无法匹配，请补充后重试')
-         setEntries(rows)
-         setSelected(rows[0].id)
-         setNotice('已识别，请核对后保存课表')
+         setEntries(await invoke('study:save', {entries}))
+         await refresh()
+         setNotice('课表已保存，关联课次已按课表改名。核验时间已计算。请手动检查课程资料，再生成并保存教材划线建议。')
         })
        }
       >
-       识别课表
+       保存课表与课次名称
       </Button>
+     </section>
+     <section className="study-menu__section">
+      <h3>教材划线</h3>
+      <p className="study-menu__hint">只有点击保存划线，才会修改原教材。分析和预览不会添加批注。</p>
+      <p className="study-menu__hint">重复区域优先级：老师重点 → 学长学姐重点 → 老师讲授内容 → PPT 内容</p>
+      <div className="study-legend">
+       {Object.entries(highlightLabels).map(([key, label]) => (
+        <span key={key}>
+         <i style={{background: `rgb(${highlightColors[key as Highlight['source']].map(v => v * 255).join(',')})`}} />
+         {label}
+        </span>
+       ))}
+      </div>
       <Button
        variant="tertiary"
        size="sm"
-       isDisabled={busy || !courses.length}
-       onClick={() => {
-        const row: StudyEntry = {
-         id: crypto.randomUUID(),
-         courseId: courses[0].id,
-         title: '',
-         chapter: '',
-         endsAt: new Date().toISOString()
-        }
-        setEntries([...entries, row])
-        setSelected(row.id)
-       }}
-      >
-       手动添加
-      </Button>
-     </div>
-     <label>
-      课表条目
-      <SelectField
-       label="课表条目"
-       placeholder="请选择"
-       options={[{value: '', label: '请选择'}, ...entries.map(e => ({value: e.id, label: e.title || '待填写课次'}))]}
-       value={selected}
-       onChange={next => setSelected(next)}
-      />
-     </label>
-     {entry && (
-      <>
-       <label>
-        课程
-        <SelectField
-         label="课程"
-         value={entry.courseId}
-         onChange={next => update({courseId: next, lectureId: undefined})}
-         options={courses.map(c => ({value: c.id, label: c.name}))}
-        />
-       </label>
-       <label>
-        课次名称
-        <Input value={entry.title} onChange={e => update({title: e.target.value})} />
-       </label>
-       <label>
-        教材章节
-        <Input value={entry.chapter} onChange={e => update({chapter: e.target.value})} />
-       </label>
-       <label>
-        <input
-         type="checkbox"
-         checked={!entry.endsAt}
-         onChange={e => update({endsAt: e.target.checked ? '' : new Date().toISOString()})}
-        />
-        时间待定
-       </label>
-       <label>
-        课程结束时间（含时区）
-        <Input
-         value={entry.endsAt}
-         onChange={e => update({endsAt: e.target.value})}
-         placeholder="2026-10-08T12:00:00+08:00"
-        />
-       </label>
-       <small>
-        核验时间：
-        {Number.isFinite(Date.parse(entry.endsAt))
-         ? new Date(checkAt(entry.endsAt)).toLocaleString()
-         : entry.endsAt
-           ? '请填写有效时间'
-           : '补课时间待定，不安排核验'}
-        （结束后 4 小时）
-       </small>
-       <label>
-        关联已有课次
-        <SelectField
-         label="关联已有课次"
-         placeholder="暂不关联"
-         value={entry.lectureId || ''}
-         onChange={next => update({lectureId: next || undefined})}
-         options={[
-          {value: '', label: '暂不关联'},
-          ...(detail?.lectures || []).map(l => ({value: l.id, label: l.title}))
-         ]}
-        />
-       </label>
-       <label>
-        智云课程编号
-        <Input
-         value={entry.zhiyunCourseId || ''}
-         onChange={e => update({zhiyunCourseId: e.target.value || undefined})}
-        />
-       </label>
-       <label>
-        智云课次编号
-        <Input value={entry.subId || ''} onChange={e => update({subId: e.target.value || undefined})} />
-       </label>
-       <Button
-        variant="ghost"
-        size="sm"
-        isDisabled={busy}
-        onClick={() => {
-         setEntries(entries.filter(e => e.id !== selected))
-         setSelected('')
-        }}
-       >
-        删除此条目
-       </Button>
-      </>
-     )}
-     <Button
-      variant="primary"
-      size="sm"
-      isDisabled={busy}
-      onClick={() =>
-       void run(async () => {
-        setEntries(await invoke('study:save', {entries}))
-        await refresh()
-        setNotice('课表已保存，关联课次已按课表改名。核验时间已计算。请手动检查课程资料，再生成并保存教材划线建议。')
-       })
-      }
-     >
-      保存课表与课次名称
-     </Button>
-     <h3>教材划线</h3>
-     <p>只有点击保存划线，才会修改原教材。分析和预览不会添加批注。</p>
-     <small>重复区域优先级：老师重点 → 学长学姐重点 → 老师讲授内容 → PPT 内容</small>
-     <div className="study-legend">
-      {Object.entries(highlightLabels).map(([key, label]) => (
-       <span key={key}>
-        <i style={{background: `rgb(${highlightColors[key as Highlight['source']].map(v => v * 255).join(',')})`}} />
-        {label}
-       </span>
-      ))}
-     </div>
-     <Button
-      variant="tertiary"
-      size="sm"
-      isDisabled={busy}
-      onClick={() =>
-       void run(async () => {
-        const result = await invoke<Book | null>('textbook:pick')
-        if (result) {
-         setBook(result)
-         setPageNumber(1)
-         setDraft(null)
-         setLast(1)
-        }
-       })
-      }
-     >
-      选择原教材 PDF
-     </Button>
-     {book && (
-      <>
-       <small>
-        {book.path} · {book.pages} 页
-       </small>
-       <div className="row">
-        <label>
-         章节起始页
-         <Input type="number" min={1} max={book.pages} value={first} onChange={e => setFirst(Number(e.target.value))} />
-        </label>
-        <label>
-         结束页
-         <Input
-          type="number"
-          min={first}
-          max={book.pages}
-          value={last}
-          onChange={e => setLast(Number(e.target.value))}
-         />
-        </label>
-       </div>
-       <Button
-        variant="tertiary"
-        size="sm"
-        isDisabled={busy || !entry?.lectureId}
-        onClick={() =>
-         void run(async () => {
-          await analyzeBook()
-         })
-        }
-       >
-        按课堂资料生成划线建议
-       </Button>
-       <Button
-        variant="tertiary"
-        size="sm"
-        isDisabled={busy}
-        onClick={() =>
-         void run(async () => {
-          await invoke('textbook:open', {id: book.id})
-         })
-        }
-       >
-        打开原教材
-       </Button>
-       <Button
-        variant="tertiary"
-        size="sm"
-        isDisabled={busy}
-        onClick={() =>
-         void run(async () => {
-          await invoke('textbook:clear', {id: book.id})
+       isDisabled={busy}
+       onClick={() =>
+        void run(async () => {
+         const result = await invoke<Book | null>('textbook:pick')
+         if (result) {
+          setBook(result)
+          setPageNumber(1)
           setDraft(null)
-          setNotice('已撤销本软件添加的划线，原有批注保留 · ' + new Date().toLocaleTimeString())
-         })
-        }
-       >
-        撤销本软件的划线
-       </Button>
-      </>
-     )}
+          setLast(1)
+         }
+        })
+       }
+      >
+       选择原教材 PDF
+      </Button>
+      {book && (
+       <>
+        <small className="study-menu__meta">
+         {book.path} · {book.pages} 页
+        </small>
+        <div className="row">
+         <label>
+          章节起始页
+          <Input
+           type="number"
+           min={1}
+           max={book.pages}
+           value={first}
+           onChange={e => setFirst(Number(e.target.value))}
+          />
+         </label>
+         <label>
+          结束页
+          <Input
+           type="number"
+           min={first}
+           max={book.pages}
+           value={last}
+           onChange={e => setLast(Number(e.target.value))}
+          />
+         </label>
+        </div>
+        <Button
+         variant="tertiary"
+         size="sm"
+         isDisabled={busy || !entry?.lectureId}
+         onClick={() =>
+          void run(async () => {
+           await analyzeBook()
+          })
+         }
+        >
+         按课堂资料生成划线建议
+        </Button>
+        <Button
+         variant="tertiary"
+         size="sm"
+         isDisabled={busy}
+         onClick={() =>
+          void run(async () => {
+           await invoke('textbook:open', {id: book.id})
+          })
+         }
+        >
+         打开原教材
+        </Button>
+        <Button
+         variant="tertiary"
+         size="sm"
+         isDisabled={busy}
+         onClick={() =>
+          void run(async () => {
+           await invoke('textbook:clear', {id: book.id})
+           setDraft(null)
+           setNotice('已撤销本软件添加的划线，原有批注保留 · ' + new Date().toLocaleTimeString())
+          })
+         }
+        >
+         撤销本软件的划线
+        </Button>
+       </>
+      )}
+     </section>
      {busy && (
       <Button variant="ghost" size="sm" onClick={() => void invoke('cancel')}>
        取消处理

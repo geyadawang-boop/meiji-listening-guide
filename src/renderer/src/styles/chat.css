@@ -240,6 +240,15 @@
  font-size: 16px;
  line-height: 24px;
 }
+.composer-box textarea:focus,
+.composer-box textarea:focus-visible,
+.composer-box textarea[data-focused="true"],
+.composer-box textarea[data-focus-visible="true"] {
+ border: 0;
+ outline: none;
+ box-shadow: none;
+ background: transparent;
+}
 .composer-box textarea::placeholder {
  color: var(--muted);
 }
@@ -281,6 +290,7 @@
  width: 100%;
  justify-content: flex-start;
  gap: 10px;
+ border: 0;
  border-radius: 7px;
  padding: 8px 10px;
  font-size: 12px;
@@ -394,11 +404,14 @@
  font-size: 14px;
  line-height: 20px;
 }
+.composer-model-anchor {
+ position: relative;
+ margin-left: auto;
+}
 .composer-model-trigger {
  display: flex;
  align-items: center;
  gap: 8px;
- margin-left: auto;
  padding: 6px 8px;
  border: 0;
  border-radius: 8px;
@@ -414,6 +427,34 @@
  height: 16px;
  margin-left: 6px;
  flex: none;
+}
+.composer-model-menu {
+ right: 0;
+ left: auto;
+ width: 250px;
+ max-height: 320px;
+ overflow-y: auto;
+}
+.composer-model-option-name {
+ flex: 1;
+ min-width: 0;
+ overflow: hidden;
+ text-overflow: ellipsis;
+ white-space: nowrap;
+ text-align: left;
+}
+.composer-model-option > svg {
+ flex: none;
+ color: var(--blue);
+}
+.composer-model-option.selected .composer-model-option-name {
+ color: var(--blue);
+ font-weight: 500;
+}
+.composer-model-empty {
+ margin: 4px 2px;
+ color: var(--muted);
+ font-size: 12px;
 }
 .agent-workspace .tab-content {
  min-height: 0;
@@ -496,14 +537,122 @@
  font-size: 12px;
  color: var(--muted);
 }
+.lecture-source-status {
+ display: flex;
+ flex-wrap: wrap;
+ gap: 6px;
+ margin: 0 0 10px;
+}
 .lecture-source-actions {
  display: flex;
  gap: 8px;
  margin: 8px 0 12px;
 }
+.blocked-action {
+ display: inline-flex;
+}
 .lecture-source-card details {
  font-size: 12px;
  margin-top: 12px;
+}
+.lecture-transcript {
+ margin-top: 12px;
+}
+.lecture-transcript-trigger {
+ display: flex;
+ align-items: center;
+ gap: 8px;
+ width: 100%;
+ height: auto;
+ padding: 9px 12px;
+ border: 1px solid var(--line);
+ border-radius: 11px;
+ background: var(--surface-subtle);
+ color: var(--muted);
+ font-size: 12px;
+ text-align: left;
+ cursor: pointer;
+}
+.lecture-transcript-trigger:hover {
+ background: var(--surface-muted);
+ color: var(--text);
+}
+.lecture-transcript .disclosure__body {
+ padding: 0;
+}
+.lecture-transcript .srt-editor {
+ min-height: 200px;
+ margin: 8px 0 0;
+}
+/* 课次下拉条目：与侧栏会话行同形（整行圆角、右侧删除、状态跟在标题后）。 */
+.lecture-choice {
+ position: relative;
+ display: block;
+ border-radius: 11px;
+ margin: 2px 0;
+}
+.lecture-choice.selected {
+ background: var(--active);
+}
+.lecture-choice-main {
+ display: flex;
+ align-items: center;
+ justify-content: flex-start;
+ gap: 8px;
+ width: 100%;
+ min-width: 0;
+ height: auto;
+ padding: 10px 40px 10px 12px;
+ border-radius: 11px;
+ color: var(--muted);
+ font-size: 13px;
+ text-align: left;
+}
+.lecture-choice.selected .lecture-choice-main {
+ color: var(--text);
+}
+.lecture-choice-main strong {
+ flex: 0 1 auto;
+ min-width: 0;
+ overflow: hidden;
+ text-overflow: ellipsis;
+ white-space: nowrap;
+ font-weight: 500;
+}
+.lecture-choice-status {
+ flex: none;
+ color: var(--muted);
+ font-size: 11px;
+ white-space: nowrap;
+}
+.lecture-choice-delete {
+ position: absolute;
+ top: 50%;
+ right: 6px;
+ transform: translateY(-50%);
+ display: grid;
+ place-items: center;
+ width: 26px;
+ height: 26px;
+ min-width: 0;
+ padding: 0;
+ border: 0;
+ border-radius: 8px;
+ background: transparent;
+ color: var(--muted);
+ opacity: 0.65;
+}
+.lecture-choice:hover .lecture-choice-delete,
+.lecture-choice:focus-within .lecture-choice-delete {
+ opacity: 1;
+}
+.lecture-choice-delete:hover {
+ color: var(--danger);
+ background: var(--active);
+}
+.lecture-choice-delete svg {
+ width: 16px;
+ height: 16px;
 }
 .subtitle > div {
  flex: 1;
