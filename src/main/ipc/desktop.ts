@@ -371,7 +371,9 @@ export function createDesktopHandler(
     case 'settings:models':
      return job('qwen-models', async () => {
       const profile = settings.draft(object.profile as any)
-      return new Api(settings, net.fetch.bind(net)).models(profile)
+      const models = await new Api(settings, net.fetch.bind(net)).models(profile)
+      if (object.persist === true) settings.cacheModels(models)
+      return models
      })
     case 'settings:probe':
      return job('test-qwen', async signal => {

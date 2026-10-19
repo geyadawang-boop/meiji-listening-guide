@@ -103,119 +103,121 @@ export function FileManager({
    }
    close={close}
   >
-   {creating && (
-    <form
-     className="panel-inline-form"
-     onSubmit={e => {
-      e.preventDefault()
-      void create()
-     }}
-    >
+   <div className="panel-section">
+    {creating && (
+     <form
+      className="panel-inline-form"
+      onSubmit={e => {
+       e.preventDefault()
+       void create()
+      }}
+     >
+      <Input
+       autoFocus
+       aria-label="新课程名称"
+       placeholder="输入课程名称"
+       value={name}
+       onChange={e => setName(e.target.value)}
+      />
+      <Button type="submit" variant="primary" size="sm" isDisabled={working || !name.trim()}>
+       创建
+      </Button>
+      <Button variant="ghost" size="sm" type="button" isDisabled={working} onClick={() => setCreating(false)}>
+       取消
+      </Button>
+     </form>
+    )}
+    <div className="file-management-tools">
      <Input
-      autoFocus
-      aria-label="新课程名称"
-      placeholder="输入课程名称"
-      value={name}
-      onChange={e => setName(e.target.value)}
+      aria-label="搜索资料文件"
+      placeholder="搜索文件或课程…"
+      value={search}
+      onChange={e => setSearch(e.target.value)}
      />
-     <Button type="submit" variant="primary" size="sm" isDisabled={working || !name.trim()}>
-      创建
-     </Button>
-     <Button variant="ghost" size="sm" type="button" isDisabled={working} onClick={() => setCreating(false)}>
-      取消
-     </Button>
-    </form>
-   )}
-   <div className="file-management-tools">
-    <Input
-     aria-label="搜索资料文件"
-     placeholder="搜索文件或课程…"
-     value={search}
-     onChange={e => setSearch(e.target.value)}
-    />
-   </div>
-   <ToggleButtonGroup
-    aria-label="文件分类"
-    selectionMode="single"
-    disallowEmptySelection
-    selectedKeys={new Set([filter])}
-    onSelectionChange={keys => {
-     const next = [...keys][0]
-     if (typeof next === 'string') setFilter(next)
-    }}
-    size="sm"
-    className="file-category-group"
-   >
-    {categories.map((c, index) => (
-     <ToggleButton key={c} id={c}>
-      {index > 0 && <ToggleButtonGroup.Separator />}
-      {c} {selectedFiles.filter(f => c === '全部' || f.category === c).length}
-     </ToggleButton>
-    ))}
-   </ToggleButtonGroup>
-   {error && <AlertBox>{error}</AlertBox>}
-   <div className="file-management-list">
-    {visible.map(f => (
-     <article key={f.path}>
-      <span className="file-type-icon">
-       <Folder />
-      </span>
-      <div>
-       <strong title={f.name}>{f.name}</strong>
-       <small>
-        {f.category} · {f.course || '未分类'} · {(f.size / 1024 / 1024).toFixed(2)} MB
-       </small>
-      </div>
-      {/\.(pdf|pptx?|docx?|txt|md|srt)$/i.test(f.name) && (
+    </div>
+    <ToggleButtonGroup
+     aria-label="文件分类"
+     selectionMode="single"
+     disallowEmptySelection
+     selectedKeys={new Set([filter])}
+     onSelectionChange={keys => {
+      const next = [...keys][0]
+      if (typeof next === 'string') setFilter(next)
+     }}
+     size="sm"
+     className="file-category-group"
+    >
+     {categories.map((c, index) => (
+      <ToggleButton key={c} id={c}>
+       {index > 0 && <ToggleButtonGroup.Separator />}
+       {c} {selectedFiles.filter(f => c === '全部' || f.category === c).length}
+      </ToggleButton>
+     ))}
+    </ToggleButtonGroup>
+    {error && <AlertBox>{error}</AlertBox>}
+    <div className="file-management-list">
+     {visible.map(f => (
+      <article key={f.path}>
+       <span className="file-type-icon">
+        <Folder />
+       </span>
+       <div>
+        <strong title={f.name}>{f.name}</strong>
+        <small>
+         {f.category} · {f.course || '未分类'} · {(f.size / 1024 / 1024).toFixed(2)} MB
+        </small>
+       </div>
+       {/\.(pdf|pptx?|docx?|txt|md|srt)$/i.test(f.name) && (
+        <Button
+         variant="tertiary"
+         size="sm"
+         aria-label={`打开文件 ${f.name}`}
+         onClick={() =>
+          void window.assistant.invoke('library:open-file', {path: f.path}).catch(e => setError(String(e)))
+         }
+        >
+         {/\.pdf$/i.test(f.name) ? '打开 PDF' : '打开'}
+        </Button>
+       )}
        <Button
         variant="tertiary"
         size="sm"
-        aria-label={`打开文件 ${f.name}`}
-        onClick={() =>
-         void window.assistant.invoke('library:open-file', {path: f.path}).catch(e => setError(String(e)))
-        }
+        onClick={() => void window.assistant.invoke('library:reveal', {path: f.path}).catch(e => setError(String(e)))}
        >
-        {/\.pdf$/i.test(f.name) ? '打开 PDF' : '打开'}
+        定位
        </Button>
-      )}
-      <Button
-       variant="tertiary"
-       size="sm"
-       onClick={() => void window.assistant.invoke('library:reveal', {path: f.path}).catch(e => setError(String(e)))}
-      >
-       定位
-      </Button>
-      <Button
-       variant="danger-soft"
-       size="sm"
-       isIconOnly
-       aria-label={`删除文件 ${f.name}`}
-       isDisabled={busy || working}
-       onClick={() => setPending(f)}
-      >
-       <Trash2 />
-      </Button>
-     </article>
-    ))}
-    {!visible.length && (
-     <div className="empty">
-      <h3>这里还没有文件</h3>
-      <p>导入或导出资料后会显示在这里。</p>
-     </div>
+       <Button
+        variant="danger-soft"
+        size="sm"
+        isIconOnly
+        aria-label={`删除文件 ${f.name}`}
+        isDisabled={busy || working}
+        onClick={() => setPending(f)}
+       >
+        <Trash2 />
+       </Button>
+      </article>
+     ))}
+     {!visible.length && (
+      <div className="empty">
+       <h3>这里还没有文件</h3>
+       <p>导入或导出资料后会显示在这里。</p>
+      </div>
+     )}
+    </div>
+    {pending && (
+     <ConfirmDialog
+      title="将文件移入回收站？"
+      confirmLabel="移入回收站"
+      busy={working}
+      onCancel={() => setPending(null)}
+      onConfirm={() => void remove()}
+     >
+      <p>{pending.name}</p>
+      <p>相关课次会解除此文件的关联；已经生成的字幕和笔记保留。</p>
+     </ConfirmDialog>
     )}
    </div>
-   {pending && (
-    <ConfirmDialog
-     title="将文件移入回收站？"
-     confirmLabel="移入回收站"
-     busy={working}
-     onCancel={() => setPending(null)}
-     onConfirm={() => void remove()}
-    >
-     <p>{pending.name}</p>
-     <p>相关课次会解除此文件的关联；已经生成的字幕和笔记保留。</p>
-    </ConfirmDialog>
-   )}
   </WindowPanel>
  )
 }

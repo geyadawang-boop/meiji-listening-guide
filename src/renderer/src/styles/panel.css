@@ -10,7 +10,7 @@
  color: var(--text);
 }
 .learning-menu {
- width: 220px;
+ width: 280px;
  flex: none;
  padding: 28px 16px 14px;
  background: var(--list);
@@ -76,9 +76,23 @@
  flex: none;
 }
 .window-menu-item__label {
+ display: flex;
+ align-items: center;
+ gap: 6px;
+ min-width: 0;
+}
+.window-menu-item__name {
+ flex: 1 1 auto;
+ min-width: 0;
  overflow: hidden;
  text-overflow: ellipsis;
  white-space: nowrap;
+}
+.window-menu-item__note {
+ flex: none;
+ color: var(--muted);
+ font-size: 11px;
+ font-weight: 400;
 }
 .window-menu-item--active {
  color: var(--accent);
@@ -91,7 +105,7 @@
 }
 @media (max-width: 1100px) {
  .learning-menu {
-  width: 180px;
+  width: 240px;
   padding: 24px 12px;
  }
  .learning-content__body {
@@ -116,6 +130,109 @@
  }
 }
 
+/* 课表与教材：滚动容器预留焦点环空间，避免选中边框被裁切。 */
+.study-window .learning-menu__items {
+ padding: 4px;
+ margin: -4px;
+}
+.study-menu {
+ display: flex;
+ flex-direction: column;
+ gap: 18px;
+ padding-bottom: 4px;
+}
+.study-menu__section {
+ display: flex;
+ flex-direction: column;
+ gap: 14px;
+ min-width: 0;
+}
+.study-menu__section + .study-menu__section {
+ border-top: 1px solid var(--line);
+ padding-top: 18px;
+}
+.study-menu h3 {
+ margin: 0;
+ font-size: 15px;
+ line-height: 1.45;
+}
+.study-menu label {
+ display: flex;
+ flex-direction: column;
+ gap: 6px;
+ min-width: 0;
+ margin: 0;
+}
+.study-window .study-menu label input:not([type="checkbox"]),
+.study-window .study-menu label textarea {
+ margin-top: 0;
+}
+.study-window .study-menu textarea {
+ min-height: 110px;
+}
+.study-window .study-menu small {
+ margin: 0;
+ line-height: 1.65;
+}
+.study-window .study-menu .button {
+ width: 100%;
+ margin: 0;
+}
+.study-menu__actions {
+ display: grid;
+ grid-template-columns: repeat(2, minmax(0, 1fr));
+ gap: 8px;
+}
+.study-menu__detail {
+ display: flex;
+ flex-direction: column;
+ gap: 12px;
+ padding: 12px;
+ border: 1px solid var(--line);
+ border-radius: var(--radius-xl);
+ background: var(--surface-subtle);
+}
+.study-menu label.study-menu__check {
+ flex-direction: row;
+ align-items: center;
+ gap: 8px;
+ font-size: 13px;
+ color: var(--muted);
+ cursor: pointer;
+}
+.study-menu__hint {
+ margin: 0;
+ color: var(--muted);
+ font-size: 12px;
+ line-height: 1.7;
+}
+.study-menu__meta {
+ overflow-wrap: anywhere;
+}
+.study-window .study-menu .row {
+ display: flex;
+ align-items: flex-end;
+ gap: 8px;
+}
+.study-window .study-menu .row label {
+ flex: 1;
+ min-width: 0;
+}
+.study-window .study-menu .study-legend {
+ gap: 8px;
+ margin: 0;
+}
+.study-window .study-menu .study-legend span {
+ display: flex;
+ align-items: center;
+ gap: 6px;
+ min-width: 0;
+ line-height: 1.5;
+}
+.study-window .study-menu .study-legend i {
+ flex: none;
+ margin-right: 0;
+}
 /* 设置中心：各分区共用同一排版节奏。 */
 .panel-section {
  display: flex;
@@ -137,6 +254,10 @@
  font-size: 12px;
  color: var(--muted);
  margin: 6px 0 0;
+}
+/* 智云课次/学期并列选择：各占一半，窄屏自动换行。 */
+.panel-section .zhiyun-picks > label {
+ flex: 1 1 220px;
 }
 .panel-section label,
 .ppt-extract-form label,
@@ -630,8 +751,7 @@
  gap: 9px;
 }
 /* HeroUI Card 承载既有知识卡面板：保留旧面板形态。 */
-.card.knowledge-card,
-details.knowledge-card {
+.card.knowledge-card {
  display: block;
  padding: 20px 22px;
  margin: 18px 0;
@@ -643,6 +763,35 @@ details.knowledge-card {
 }
 .card.knowledge-card > * + * {
  margin-top: 14px;
+}
+/* 知识库「内容分类与标签」：HeroUI Disclosure 的标题与内容节奏。 */
+.knowledge-classification-trigger {
+ display: flex;
+ align-items: center;
+ gap: 8px;
+ width: 100%;
+ min-height: 24px;
+ padding: 0;
+ border: 0;
+ border-radius: 6px;
+ background: transparent;
+ color: var(--text);
+ font-size: 15px;
+ font-weight: 600;
+ text-align: left;
+}
+.knowledge-classification-trigger:hover {
+ background: transparent;
+ color: var(--accent);
+}
+.knowledge-classification-trigger .disclosure__indicator {
+ color: var(--muted);
+}
+.knowledge-classification-trigger[aria-expanded="true"] .disclosure__indicator {
+ color: var(--accent);
+}
+.knowledge-classification-body {
+ padding: 12px 0 0;
 }
 
 /* ===== titlebar.css（并入 panel.css） ===== */

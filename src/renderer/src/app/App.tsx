@@ -1,4 +1,4 @@
-import {Button, Input, Kbd, ScrollShadow, Surface, TextArea, Tooltip} from '@heroui/react'
+import {Button, Chip, Disclosure, Input, Kbd, ScrollShadow, Surface, TextArea, Tooltip} from '@heroui/react'
 import {learningViews, type LearningView} from '@renderer/features/video/LearningNav'
 import {Wallpaper, chatStyle} from '@renderer/features/appearance/Appearance'
 import {defaultAppearanceState, resolveAppearance, type AppearanceState} from '@shared/appearance'
@@ -18,6 +18,7 @@ import {
  ArrowUp,
  BookOpen,
  Boxes,
+ Check,
  ChevronDown,
  CirclePlay,
  CloudDownload,
@@ -29,6 +30,7 @@ import {
  MessagesSquare,
  Plus,
  Presentation,
+ RefreshCw,
  Scan,
  Search,
  Square,
@@ -133,6 +135,9 @@ export default function App() {
   [pptDraft, setPptDraft] = useState('')
  const [withSearch, setWithSearch] = useState(false),
   [menu, setMenu] = useState(false),
+  [modelMenu, setModelMenu] = useState(false),
+  [modelsLoading, setModelsLoading] = useState(false),
+  [modelsError, setModelsError] = useState(''),
   [activities, setActivities] = useState<
    Array<
     Progress & {
@@ -141,6 +146,8 @@ export default function App() {
    >
   >([])
  const threadEnd = useRef<HTMLDivElement>(null),
+  attachmentAnchor = useRef<HTMLDivElement>(null),
+  modelAnchor = useRef<HTMLDivElement>(null),
   importedLecture = useRef(''),
   current = useRef({courseId: '', lectureId: '', sessionId: ''}),
   request = useRef(''),
@@ -281,6 +288,64 @@ export default function App() {
  }
  const activeProfile = settings?.profiles.find(p => p.id === settings.activeProfile) || settings?.profiles[0]
  const modelBrand = 'custom'
+ const models = (activeProfile?.models || []).filter(Boolean)
+ async function refreshModels(silent = false) {
+  if (!activeProfile || modelsLoading) return
+  setModelsLoading(true)
+  setModelsError('')
+  try {
+   await invoke<string[]>('settings:models', {profile: activeProfile, persist: true})
+   setSettings(await invoke<Settings>('settings:get'))
+  } catch (e) {
+   const message = e instanceof Error ? e.message : String(e)
+   setModelsError(message)
+   if (!silent) setError(message)
+  } finally {
+   setModelsLoading(false)
+  }
+ }
+ async function chooseModel(model: string) {
+  setModelMenu(false)
+  if (!settings || !activeProfile || model === activeProfile.model) return
+  try {
+   setSettings(
+    await invoke<Settings>('settings:save', {
+     settings: {
+      ...settings,
+      connection: 'qwen',
+      activeProfile: activeProfile.id,
+      profiles: [{...activeProfile, model}]
+     }
+    })
+   )
+  } catch (e) {
+   setError(e instanceof Error ? e.message : String(e))
+  }
+ }
+ useEffect(() => {
+  // 已持久化模型列表时不再请求，除非用户手动刷新。
+  if (!models.length && (activeProfile?.hasKey || activeProfile?.apiKey?.trim())) void refreshModels(true)
+ }, [activeProfile?.id, activeProfile?.hasKey, models.length])
+ useEffect(() => {
+  if (!menu && !modelMenu) return
+  // 点击菜单以外的区域或按 Esc 自动收起。
+  const onPointerDown = (event: PointerEvent) => {
+   const target = event.target as Node
+   if (!attachmentAnchor.current?.contains(target)) setMenu(false)
+   if (!modelAnchor.current?.contains(target)) setModelMenu(false)
+  }
+  const onKeyDown = (event: KeyboardEvent) => {
+   if (event.key !== 'Escape') return
+   setMenu(false)
+   setModelMenu(false)
+  }
+  document.addEventListener('pointerdown', onPointerDown)
+  document.addEventListener('keydown', onKeyDown)
+  return () => {
+   document.removeEventListener('pointerdown', onPointerDown)
+   document.removeEventListener('keydown', onKeyDown)
+  }
+ }, [menu, modelMenu])
  const exportResult = (kind: string, format: string) =>
   void task(async () => {
    const path = await invoke<string>('export', {id: lectureId, kind, format})
@@ -325,6 +390,28 @@ export default function App() {
   }
  }
  const activeAppearance = resolveAppearance(appearance, courseId)
+ const hasTranscriptSource = !!lecture?.lecture.transcript_path
+ const hasPptSource = !!lecture?.lecture.ppt_path
+ const missingSource = !lecture
+  ? ''
+  : !hasTranscriptSource && !hasPptSource
+    ? '请先添加语音识别原文和 PPT/课件'
+    : !hasTranscriptSource
+      ? '请先添加语音识别原文'
+      : !hasPptSource
+        ? '请先关联 PPT/课件'
+        : ''
+ const correctionButton = lecture && (
+  <Button
+   variant="primary"
+   size="sm"
+   isDisabled={busy || !!missingSource}
+   onClick={() => void task(() => generate('subtitles:generate'))}
+  >
+   <StudyIcon name="sparkle" />
+   {lecture.correction ? '继续校订字幕' : lecture.segments.length ? '重新校订字幕' : '原文 + PPT 校订字幕'}
+  </Button>
+ )
  return (
   <IdentityContext.Provider value={identity}>
    <TitleBar />
@@ -705,6 +792,14 @@ export default function App() {
           <>
            <div className="lecture-source-card">
             <h2>{lecture.lecture.title}</h2>
+            <div className="lecture-source-status">
+             <Chip color={hasTranscriptSource ? 'success' : 'warning'} size="sm" variant="soft">
+              {hasTranscriptSource ? '语音原文已关联' : '语音原文未添加'}
+             </Chip>
+             <Chip color={hasPptSource ? 'success' : 'warning'} size="sm" variant="soft">
+              {hasPptSource ? 'PPT/课件已关联' : 'PPT/课件未添加'}
+             </Chip>
+            </div>
             <div className="lecture-source-actions">
              <Button variant="tertiary" size="sm" isDisabled={busy} onClick={() => setModal('transcript')}>
               添加或替换原文
@@ -713,10 +808,19 @@ export default function App() {
               添加或替换课件
              </Button>
             </div>
-            <details>
-             <summary>查看语音识别原文</summary>
-             <TextArea className="srt-editor" readOnly value={lecture.lecture.transcript_text} />
-            </details>
+            <Disclosure className="lecture-transcript">
+             <Disclosure.Heading>
+              <Disclosure.Trigger className="lecture-transcript-trigger">
+               查看语音识别原文
+               <Disclosure.Indicator />
+              </Disclosure.Trigger>
+             </Disclosure.Heading>
+             <Disclosure.Content>
+              <Disclosure.Body>
+               <TextArea className="srt-editor" readOnly value={lecture.lecture.transcript_text} />
+              </Disclosure.Body>
+             </Disclosure.Content>
+            </Disclosure>
            </div>
            {progress && (
             <div className={`progress ${progress.error ? 'failed' : ''}`}>
@@ -739,17 +843,16 @@ export default function App() {
             {tab === 'subtitles' && (
              <>
               <div className="toolbar">
+               {missingSource ? (
+                <Tooltip delay={0} closeDelay={0}>
+                 <span className="blocked-action">{correctionButton}</span>
+                 <Tooltip.Content placement="top">{missingSource}</Tooltip.Content>
+                </Tooltip>
+               ) : (
+                correctionButton
+               )}
                <Button
-                variant="primary"
-                size="sm"
-                isDisabled={busy || !lecture.lecture.transcript_path || !lecture.lecture.ppt_path}
-                onClick={() => void task(() => generate('subtitles:generate'))}
-               >
-                <StudyIcon name="sparkle" />
-                {lecture.correction ? '继续校订字幕' : lecture.segments.length ? '重新校订字幕' : '原文 + PPT 校订字幕'}
-               </Button>
-               <Button
-                variant="tertiary"
+                variant="ghost"
                 size="sm"
                 isDisabled={busy}
                 onClick={() =>
@@ -881,7 +984,7 @@ export default function App() {
                 </>
                )}
                <Button
-                variant="tertiary"
+                variant="ghost"
                 size="sm"
                 isDisabled={busy}
                 onClick={() => exportResult('evidence-bundle', 'json')}
@@ -890,7 +993,7 @@ export default function App() {
                 证据包 JSON
                </Button>
                <Button
-                variant="tertiary"
+                variant="ghost"
                 size="sm"
                 isDisabled={busy}
                 onClick={() => exportResult('evidence-bundle', 'md')}
@@ -936,7 +1039,7 @@ export default function App() {
                  q => !q.answer || !q.explanation
                 ) && (
                  <Button
-                  variant="tertiary"
+                  variant="ghost"
                   size="sm"
                   isDisabled={busy}
                   onClick={() => void task(() => generate('practice:prepare'))}
@@ -1085,7 +1188,7 @@ export default function App() {
            }}
           />
           <div className="composer-controls">
-           <div className="attachment-menu-anchor">
+           <div className="attachment-menu-anchor" ref={attachmentAnchor}>
             <Button
              variant="ghost"
              isIconOnly
@@ -1099,7 +1202,7 @@ export default function App() {
             {menu && (
              <div className="attachment-menu" role="menu">
               <Button
-               variant="tertiary"
+               variant="ghost"
                size="sm"
                type="button"
                isDisabled={busy}
@@ -1112,7 +1215,7 @@ export default function App() {
                添加语音识别原文
               </Button>
               <Button
-               variant="tertiary"
+               variant="ghost"
                size="sm"
                type="button"
                isDisabled={busy}
@@ -1125,7 +1228,7 @@ export default function App() {
                添加 PPT/课件
               </Button>
               <Button
-               variant="tertiary"
+               variant="ghost"
                size="sm"
                type="button"
                onClick={() => {
@@ -1139,7 +1242,7 @@ export default function App() {
                智云课堂 · 搜索与导出
               </Button>
               <Button
-               variant="tertiary"
+               variant="ghost"
                size="sm"
                type="button"
                onClick={() => {
@@ -1151,7 +1254,7 @@ export default function App() {
                课前资料
               </Button>
               <Button
-               variant="tertiary"
+               variant="ghost"
                size="sm"
                type="button"
                onClick={() => {
@@ -1163,7 +1266,7 @@ export default function App() {
                聊天记录
               </Button>
               <Button
-               variant="tertiary"
+               variant="ghost"
                size="sm"
                type="button"
                onClick={() => {
@@ -1176,7 +1279,7 @@ export default function App() {
               </Button>
               <div className="menu-divider" />
               <Button
-               variant="tertiary"
+               variant="ghost"
                size="sm"
                type="button"
                isDisabled={!lecture || busy}
@@ -1190,7 +1293,7 @@ export default function App() {
                校订完整字幕
               </Button>
               <Button
-               variant="tertiary"
+               variant="ghost"
                size="sm"
                type="button"
                isDisabled={!lecture?.segments.length || !!lecture?.correction || busy}
@@ -1204,7 +1307,7 @@ export default function App() {
                提取重点笔记
               </Button>
               <Button
-               variant="tertiary"
+               variant="ghost"
                size="sm"
                type="button"
                isDisabled={!lecture?.segments.length || !!lecture?.correction || busy}
@@ -1219,7 +1322,7 @@ export default function App() {
               </Button>
               <div className="menu-divider" />
               <Button
-               variant="tertiary"
+               variant="ghost"
                size="sm"
                type="button"
                onClick={() => {
@@ -1233,21 +1336,60 @@ export default function App() {
              </div>
             )}
            </div>
-           <Button
-            variant="ghost"
-            className="composer-model-trigger"
-            aria-label="选择对话模型"
-            aria-haspopup="dialog"
-            aria-expanded={modal === 'settings'}
-            isDisabled={busy}
-            onClick={() => setModal('settings')}
-           >
-            <span className={`composer-brand ${modelBrand}`} aria-hidden="true">
-             {modelBrand === 'custom' && <Boxes />}
-            </span>
-            <span className="composer-model-name">{activeProfile?.model || '请选择千问模型'}</span>
-            <ChevronDown size={14} />
-           </Button>
+           <div className="composer-model-anchor" ref={modelAnchor}>
+            <Button
+             variant="ghost"
+             className="composer-model-trigger"
+             aria-label="选择对话模型"
+             aria-haspopup="menu"
+             aria-expanded={modelMenu}
+             isDisabled={busy}
+             onClick={() => {
+              const next = !modelMenu
+              setModelMenu(next)
+              if (next && !models.length) void refreshModels()
+             }}
+            >
+             <span className={`composer-brand ${modelBrand}`} aria-hidden="true">
+              {modelBrand === 'custom' && <Boxes />}
+             </span>
+             <span className="composer-model-name">{activeProfile?.model || '请选择千问模型'}</span>
+             <ChevronDown size={14} />
+            </Button>
+            {modelMenu && (
+             <div className="attachment-menu composer-model-menu" role="menu">
+              {models.map(model => (
+               <Button
+                key={model}
+                variant="ghost"
+                size="sm"
+                type="button"
+                className={'composer-model-option' + (model === activeProfile?.model ? ' selected' : '')}
+                onClick={() => void chooseModel(model)}
+               >
+                <span className="composer-model-option-name">{model}</span>
+                {model === activeProfile?.model && <Check size={14} aria-hidden="true" />}
+               </Button>
+              ))}
+              {!models.length && (
+               <p className="composer-model-empty">
+                {modelsLoading ? '正在读取可用模型…' : modelsError || '尚未读取到可用模型，请先在设置中配置千问'}
+               </p>
+              )}
+              <div className="menu-divider" />
+              <Button
+               variant="ghost"
+               size="sm"
+               type="button"
+               isDisabled={modelsLoading}
+               onClick={() => void refreshModels()}
+              >
+               <RefreshCw size={14} aria-hidden="true" />
+               {modelsLoading ? '正在读取…' : '刷新可用模型'}
+              </Button>
+             </div>
+            )}
+           </div>
            {busy ? (
             <Button
              type="button"

@@ -95,7 +95,7 @@ src/renderer/
 - 组件体系为 HeroUI v3（`@heroui/react` + `@heroui/styles`）+ Tailwind 4；样式入口只有 `styles/tailwind.css`，按需选择性导入组件样式。
 - 样式层顺序固定：`@layer legacy, theme, base, components, utilities;`。legacy 为旧样式，只减不增；新样式走 HeroUI 组件或 utilities 层。`styles/` 文件固定为 5 个：`tailwind.css`（唯一样式入口）、`upstream-tokens.css`（调色板令牌）、`legacy.css`（待淘汰的产品级样式，只减不增）、`chat.css` / `panel.css`（components 层：聊天与窗口/侧栏覆盖）。
 - 交互控件使用 HeroUI React 组件（`Button`、`Input`、`TextArea`、`ToggleButtonGroup`、`Modal` 等）；表单控件禁止再写原生 `<input>`/`<textarea>`/`<select>`（下拉统一用 `ui/SelectField` 包装的 HeroUI `Select`）；弹窗统一通过 `ui/UiParts` 的 `Modal`（内部为 HeroUI `Modal`）；BEM 类只作为组件内部样式与形态覆盖（`@layer components`），不得与 React 组件在同一个控件上混写。
-- 整页功能窗口一律使用 `ui/WindowPanel.tsx` + `ui/WindowMenuButton`：统一 220px 左菜单、内容区 32/40 间距与页头节奏；禁止再手写 `learning-window` 壳。
+- 整页功能窗口一律使用 `ui/WindowPanel.tsx` + `ui/WindowMenuButton`：统一 280px 左菜单（窄屏 240px）、内容区 32/40 间距与页头节奏；禁止再手写 `learning-window` 壳。
 - 设置类界面统一挂在 `features/settings/SettingsHub`（左菜单分区）；新增设置项必须加为 Hub 的一个分区，禁止再往 rail 或侧栏加散装入口。
 - 二级功能窗口统一由 `app/AppWindows.tsx` 按 modal 状态挂载，禁止再往 `App.tsx` 内联整页窗口；确认弹窗统一用 `ui/ConfirmDialog`，提示消息统一用 `ui/AlertBox`（内部均为 HeroUI 组件，禁止新增 `className="alert"` 旧式提示）。
 - HeroUI 语义变量（`--accent`、`--danger`、`--surface`、`--default` 等）统一在 `styles/tailwind.css` 映射到现有调色板，禁止在组件里另起色值。
