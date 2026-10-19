@@ -58,8 +58,8 @@ async function fileHash(path: string) {
 const sourceFiles = [
  'scripts/media-pixel-diagnostics.mts',
  'scripts/video-candidate-package.mts',
- 'src/main/media-process-guardian.ts',
- 'src/main/media-executable.ts'
+ 'src/main/workers/media-process-guardian.ts',
+ 'src/main/media/tools/media-executable.ts'
 ]
 async function sourceHashes() {
  return Object.fromEntries(await Promise.all(sourceFiles.map(async file => [file, await fileHash(join(root, file))])))
@@ -181,11 +181,28 @@ try {
    candidate.state === 'source_build_candidate_verified',
   'Candidate binding mismatch'
  )
- for (const file of ['src/main/media-process-guardian.ts', 'src/main/media-executable.ts'])
-  check(
-   (await fileHash(join(root, file))) === candidate.binding.sourceHashes[file],
-   'Production probe source differs from fixed candidate: ' + file
-  )
+ const probeSources = []
+ for (const [historical, current] of [
+  ['src/main/media-process-guardian.ts', 'src/main/workers/media-process-guardian.ts'],
+  ['src/main/media-executable.ts', 'src/main/media/tools/media-executable.ts']
+ ]) {
+  // Verify the immutable build source at its original locator; the migrated probe is recorded separately.
+  // A shallow checkout without this commit fails explicitly instead of substituting current source bytes.
+  const historicalSha256 = hash(execFileSync('git', ['show', profile.commit + ':' + historical], {cwd: root})),
+   currentSha256 = await fileHash(join(root, current))
+  check(historicalSha256 === candidate.binding.sourceHashes[historical], 'Fixed build source mismatch: ' + historical)
+  probeSources.push({
+   historical,
+   current,
+   historicalSha256,
+   currentSha256,
+   identical: historicalSha256 === currentSha256
+  })
+ }
+ report.probeSources = {
+  scope: 'Current production probe; not byte-identical to the historical build probe',
+  files: probeSources
+ }
  report.candidate = {
   run,
   artifact: profile.artifact,
@@ -213,7 +230,7 @@ try {
   ffprobe = join(resources, 'video/ffprobe'),
   entry = join(work, 'guardian.mjs')
  await build({
-  entryPoints: [join(root, 'src/main/media-process-guardian.ts')],
+  entryPoints: [join(root, 'src/main/workers/media-process-guardian.ts')],
   outfile: entry,
   bundle: true,
   platform: 'node',

@@ -3,11 +3,11 @@ import {z} from 'zod'
 import {readFile} from 'node:fs/promises'
 import {notesSchema} from '@shared/types'
 import {answerChoices, compareChoices, questionOptions} from '@shared/practice'
-import {prepareAnswer} from '../practice-answer'
-import {isCasualChat} from '../chat-policy'
+import {prepareAnswer} from '@main/learning/practice-answer'
+import {isCasualChat} from '@main/learning/chat-policy'
 import {identityPrompt} from '@shared/identity'
-import type {ApplicationContext} from '../main'
-import type {IpcHandler} from './handler'
+import type {ApplicationContext} from '@main/app/context'
+import type {IpcHandler} from '@main/ipc/handler'
 export function createLearningHandler(
  context: Pick<
   ApplicationContext,
@@ -158,7 +158,7 @@ export function createLearningHandler(
        : db.sessions(course.id)[0]
       const casual = isCasualChat(content)
       db.message(course.id, lectureId, 'user', content, session.id)
-      const messages: import('../api').ChatMessage[] = [
+      const messages: import('@main/ai/api').ChatMessage[] = [
         {role: 'system', content: identityPrompt(identity.get())},
         {role: 'user', content}
        ],

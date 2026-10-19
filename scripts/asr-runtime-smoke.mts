@@ -28,11 +28,11 @@ const sourceFiles = [
  'scripts/asr-runtime-electron.mts',
  'scripts/asr-model-prepare.mts',
  'scripts/video-candidate-package.mts',
- 'src/main/local-asr.ts',
- 'src/main/asr-worker.ts',
- 'src/main/asr-inference.ts',
- 'src/main/silero-vad.ts',
- 'src/main/media-executable.ts',
+ 'src/main/asr/local-asr.ts',
+ 'src/main/workers/asr-worker.ts',
+ 'src/main/asr/asr-inference.ts',
+ 'src/main/asr/silero-vad.ts',
+ 'src/main/media/tools/media-executable.ts',
  'src/shared/srt.ts'
 ]
 const bundleFiles = ['owner.mjs', 'asr-worker.js', 'fixture.mjs']
@@ -185,6 +185,7 @@ try {
   setup(builder: import('esbuild').PluginBuild) {
    builder.onResolve({filter: /^[^./]/}, args => {
     if (isAbsolute(args.path)) return
+    if (args.path.startsWith('@main/') || args.path.startsWith('@shared/')) return
     if (args.path === 'electron' || args.path.startsWith('node:')) return {path: args.path, external: true}
     return {path: import.meta.resolve(args.path), external: true}
    })
@@ -192,7 +193,7 @@ try {
  }
  const contents =
   'export {transcribeLocalVideo} from ' +
-  JSON.stringify(join(root, 'src/main/local-asr.ts').replaceAll('\\', '/')) +
+  JSON.stringify(join(root, 'src/main/asr/local-asr.ts').replaceAll('\\', '/')) +
   ';export {parseSrt} from ' +
   JSON.stringify(join(root, 'src/shared/srt.ts').replaceAll('\\', '/')) +
   ';'
@@ -205,7 +206,7 @@ try {
   plugins: [plugin]
  })
  await build({
-  entryPoints: [join(root, 'src/main/asr-worker.ts')],
+  entryPoints: [join(root, 'src/main/workers/asr-worker.ts')],
   outfile: join(work, 'asr-worker.js'),
   bundle: true,
   platform: 'node',

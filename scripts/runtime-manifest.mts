@@ -1,5 +1,5 @@
 import {readdir, readFile, stat, writeFile} from 'node:fs/promises'
-import {createReadStream} from 'node:fs'
+import {createReadStream, existsSync} from 'node:fs'
 import {createHash} from 'node:crypto'
 import {dirname, join, resolve} from 'node:path'
 import {fileURLToPath} from 'node:url'
@@ -10,12 +10,17 @@ const catalog = [
  ['asr', '离线字幕模型', 'asr'],
  ['video', '视频下载与处理工具', 'video']
 ] as const
-function included(id: string, path: string) {
+function included(id: string, path: string, platform: NodeJS.Platform) {
  if (id === 'knowledge')
   return path.startsWith('onnx-bge/') || ['vendor/NapCat.Shell.Windows.Node.zip', 'BiliSum-LICENSE'].includes(path)
  if (id === 'asr') return path.startsWith('onnx-small/')
  if (id === 'video')
-  return ['ffmpeg.exe', 'ffprobe.exe', 'LICENSE-ffmpeg-static.txt', 'LICENSE-ffprobe.txt'].includes(path)
+  return [
+   'ffmpeg' + (platform === 'win32' ? '.exe' : ''),
+   'ffprobe' + (platform === 'win32' ? '.exe' : ''),
+   'LICENSE-ffmpeg-static.txt',
+   'LICENSE-ffprobe.txt'
+  ].includes(path)
  return !/\.(?:py|pyc)$/i.test(path)
 }
 export async function generate(root: string): Promise<RuntimeManifest> {
@@ -25,6 +30,9 @@ export async function generate(root: string): Promise<RuntimeManifest> {
   const base = join(root, 'resources', directory),
    pending: {path: string; source: string}[] = [],
    files: RuntimeFile[] = []
+  if (!existsSync(base)) {
+   throw new Error('缺少组件目录，未改写运行清单：' + directory + '；使用已审核清单构建 lite/portable 请加 --prepared')
+  }
   async function walk(path: string, prefix = ''): Promise<void> {
    for (const entry of await readdir(path, {withFileTypes: true})) {
     if (entry.name === '__pycache__' || entry.name.endsWith('.pyc')) continue
@@ -39,10 +47,11 @@ export async function generate(root: string): Promise<RuntimeManifest> {
       continue
      if (id === 'asr' && relative !== 'onnx-small' && !relative.startsWith('onnx-small/')) continue
      await walk(source, relative + '/')
-    } else if (included(id, relative)) pending.push({path: relative, source})
+    } else if (included(id, relative, process.platform)) pending.push({path: relative, source})
    }
   }
   await walk(base)
+  if (!pending.length) throw new Error('组件没有可用文件，未改写运行清单：' + directory)
   console.log(`校验 ${id}（${pending.length} 个文件）`)
   let cursor = 0
   await Promise.all(

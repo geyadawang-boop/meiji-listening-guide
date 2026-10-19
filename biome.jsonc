@@ -14,6 +14,11 @@
  "files": {
   "includes": ["**", "!resources/runtime-manifest.json"]
  },
+ "css": {
+  "parser": {
+   "tailwindDirectives": true
+  }
+ },
  "formatter": {
   "enabled": true,
   "indentStyle": "space",

@@ -1,0 +1,96 @@
+@layer legacy, theme, base, components, utilities;
+
+/* Tailwind 基础层：跳过 preflight，保留 legacy 视觉。 */
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+
+/* HeroUI v3 设计系统：选择性导入，避免其自带的 Tailwind preflight 覆盖 legacy。
+ * 目前只用 Button，按需引入组件样式；后续迁移新组件时在这里补对应文件。 */
+@import "tw-animate-css";
+@import "@heroui/styles/base" layer(base);
+@import "@heroui/styles/themes/default" layer(theme);
+@import "@heroui/styles/components/button.css" layer(components);
+@import "@heroui/styles/components/alert.css" layer(components);
+@import "@heroui/styles/components/card.css" layer(components);
+@import "@heroui/styles/components/chip.css" layer(components);
+@import "@heroui/styles/components/close-button.css" layer(components);
+@import "@heroui/styles/components/input.css" layer(components);
+@import "@heroui/styles/components/input-group.css" layer(components);
+@import "@heroui/styles/components/kbd.css" layer(components);
+@import "@heroui/styles/components/list-box.css" layer(components);
+@import "@heroui/styles/components/list-box-item.css" layer(components);
+@import "@heroui/styles/components/modal.css" layer(components);
+@import "@heroui/styles/components/popover.css" layer(components);
+@import "@heroui/styles/components/scroll-shadow.css" layer(components);
+@import "@heroui/styles/components/select.css" layer(components);
+@import "@heroui/styles/components/slider.css" layer(components);
+@import "@heroui/styles/components/surface.css" layer(components);
+@import "@heroui/styles/components/textarea.css" layer(components);
+@import "@heroui/styles/components/toggle-button.css" layer(components);
+@import "@heroui/styles/components/toggle-button-group.css" layer(components);
+@import "@heroui/styles/components/tooltip.css" layer(components);
+@import "@heroui/styles/utilities";
+@import "@heroui/styles/variants";
+
+/* legacy 层：旧样式按原顺序合并为单文件，优先级最低；只减不增，迁移完一段删一段。 */
+@import "./upstream-tokens.css" layer(legacy);
+@import "./legacy.css" layer(legacy);
+@import "./chat.css" layer(components);
+@import "./panel.css" layer(components);
+
+/* HeroUI 语义变量映射到现有调色板（覆盖 @heroui/styles 的默认主题值）。 */
+:root,
+.light,
+[data-theme="light"],
+[data-theme="default"] {
+ --accent: #13a8ff;
+ --accent-foreground: #ffffff;
+ --danger: #dc4453;
+ --danger-foreground: #ffffff;
+ --default: #ebebeb;
+ --default-foreground: #111111;
+ --surface: #ffffff;
+ --surface-foreground: #111111;
+ --overlay: #ffffff;
+ --overlay-foreground: #111111;
+ --background: #ffffff;
+ --foreground: #111111;
+ --muted: #8b8b8b;
+ --border: rgba(0, 0, 0, 0.075);
+ --separator: rgba(0, 0, 0, 0.055);
+ --focus: #13a8ff;
+ --link: #13a8ff;
+}
+
+.dark,
+[data-theme="dark"] {
+ --accent: #36aef7;
+ --accent-foreground: #ffffff;
+ --danger: #e5697a;
+ --danger-foreground: #0b0b0c;
+ --default: rgba(255, 255, 255, 0.065);
+ --default-foreground: #f2f2f5;
+ --surface: #2c2c2e;
+ --surface-foreground: #f2f2f5;
+ --overlay: #2c2c2e;
+ --overlay-foreground: #f2f2f5;
+ --background: #151517;
+ --foreground: #f2f2f5;
+ --muted: #a4a4ad;
+ --border: rgba(255, 255, 255, 0.11);
+ --separator: rgba(255, 255, 255, 0.075);
+ --focus: #36aef7;
+ --link: #36aef7;
+}
+
+/* 标题栏高度：窗口自绘标题栏与固定浮层共用。 */
+:root {
+ --titlebar-height: 36px;
+}
+
+/* 按钮形态与现有布局对齐：默认 8px 圆角，不再使用 HeroUI 的胶囊形。 */
+@layer components {
+ .button {
+  border-radius: var(--radius-lg);
+ }
+}

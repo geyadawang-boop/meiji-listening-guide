@@ -1,53 +1,56 @@
-import {dispatch} from './ipc/handler'
-import {RuntimeComponents} from './runtime-components'
-import {diagnostic} from './diagnostics'
-import {createKnowledgeHandler} from './ipc/knowledge'
-import {createCoursewareHandler} from './ipc/courseware'
-import {createResourcesHandler} from './ipc/resources'
-import {createResearchHandler} from './ipc/research'
-import {createStudyHandler} from './ipc/study'
-import {createDesktopHandler} from './ipc/desktop'
-import {createCoursesHandler} from './ipc/courses'
-import {createLearningHandler} from './ipc/learning'
-import {AppearanceStore} from './appearance'
-import {KnowledgeBase} from './knowledge'
-import {MediaBackend} from './media'
-import {NativeResearchBackend} from './research'
-import {VisualTasks} from './visual'
-import {SubtitleSync, subtitleLocator} from './subtitle-sync'
-import {SubtitleDerived} from './subtitle-derived'
-import {BiliResources} from './bili-resources'
-import {BiliDiscussion} from './bili-discussion'
-import {PptExtractor} from './ppt-extract'
-import {TextbookHighlighter} from './study'
-import {VideoPpt} from './video-ppt'
-import {readBiliSubtitles} from './bili-subtitles'
-import {transcribeLocalVideo} from './local-asr'
-import {summarizeVideo, summaryMode} from './video-summary'
-import type {VideoSeries} from '../shared/video-ppt'
-import {bilibiliUrl} from './video-policy'
-import {IdentityStore} from './identity'
+import {dispatch} from '@main/ipc/handler'
+import {RuntimeComponents} from '@main/app/runtime-components'
+import {diagnostic} from '@main/app/diagnostics'
+import {createKnowledgeHandler} from '@main/ipc/knowledge'
+import {createCoursewareHandler} from '@main/ipc/courseware'
+import {createResourcesHandler} from '@main/ipc/resources'
+import {createResearchHandler} from '@main/ipc/research'
+import {createStudyHandler} from '@main/ipc/study'
+import {createDesktopHandler} from '@main/ipc/desktop'
+import {createCoursesHandler} from '@main/ipc/courses'
+import {createLearningHandler} from '@main/ipc/learning'
+import {createWindowHandler} from '@main/ipc/window'
+import {createMainWindow} from '@main/app/window'
+import {AppearanceStore} from '@main/config/appearance'
+import {KnowledgeBase} from '@main/knowledge/knowledge'
+import {MediaBackend} from '@main/media/core/media'
+import {NativeResearchBackend} from '@main/research/research'
+import {VisualTasks} from '@main/learning/video/visual'
+import {SubtitleSync, subtitleLocator} from '@main/learning/subtitles/subtitle-sync'
+import {SubtitleDerived} from '@main/learning/subtitles/subtitle-derived'
+import {BiliResources} from '@main/media/bilibili/bili-resources'
+import {BiliDiscussion} from '@main/media/bilibili/bili-discussion'
+import {PptExtractor} from '@main/documents/ppt-extract'
+import {TextbookHighlighter} from '@main/learning/study/study'
+import {VideoPpt} from '@main/learning/video/video-ppt'
+import {readBiliSubtitles} from '@main/media/bilibili/bili-subtitles'
+import {transcribeLocalVideo} from '@main/asr/local-asr'
+import {summarizeVideo, summaryMode} from '@main/learning/video/video-summary'
+import type {VideoSeries} from '@shared/video-ppt'
+import {bilibiliUrl} from '@main/media/bilibili/video-policy'
+import {IdentityStore} from '@main/config/identity'
 import {app, BrowserWindow, dialog, ipcMain, net, session} from 'electron'
 import {join, extname, dirname, basename} from 'node:path'
 import {fileURLToPath} from 'node:url'
 import {createHash} from 'node:crypto'
 import {readFile, writeFile, rm} from 'node:fs/promises'
 import {z} from 'zod'
-import {Store} from './db'
-import {openPortableLibrary} from './portable-library'
-import {searchAnswers} from './practice-answer'
-import {SettingsStore} from './settings'
-import {Api} from './api'
-import {modelRouter} from './model-router'
-import {Workflows} from './workflows'
-import {type EventPayload} from '../shared/types'
-import {parseSrt} from '../shared/srt'
-import {markdown} from './exports'
-import {ensureLibrary, libraryDirectory, folderName, reserveFile} from './library'
-import {managedFile} from './file-manager'
-import {Zhiyun} from './zhiyun'
-import {ZhiyunBrowser} from './zhiyun-browser'
-import {verifyGeneratedPdf} from './pdf-ppt-cleanup'
+import {Store} from '@main/storage/db'
+import {openPortableLibrary} from '@main/storage/portable-library'
+import {searchAnswers} from '@main/learning/practice-answer'
+import {SettingsStore} from '@main/config/settings'
+import {Api} from '@main/ai/api'
+import {modelRouter} from '@main/ai/model-router'
+import {Workflows} from '@main/learning/workflows'
+import {type EventPayload} from '@shared/types'
+import {parseSrt} from '@shared/srt'
+import {markdown} from '@main/documents/exports'
+import {ensureLibrary, libraryDirectory, folderName, reserveFile} from '@main/library/library'
+import {managedFile} from '@main/library/file-manager'
+import {Zhiyun} from '@main/zhiyun/zhiyun'
+import {ZhiyunBrowser} from '@main/zhiyun/zhiyun-browser'
+import {verifyGeneratedPdf} from '@main/documents/pdf-ppt-cleanup'
+import type {ApplicationContext} from '@main/app/context'
 const mainDir = fileURLToPath(new URL('.', import.meta.url))
 let store: Store | undefined, mainWindow: BrowserWindow | undefined
 let shutdownBackends: (() => Promise<void>) | undefined,
@@ -67,7 +70,7 @@ else
   .whenReady()
   .then(startApplication)
   .catch(error => {
-   dialog.showErrorBox('梅酱的听课指南启动失败', error instanceof Error ? error.message : '未知错误')
+   dialog.showErrorBox('摘云启动失败', error instanceof Error ? error.message : '未知错误')
    app.quit()
   })
 async function startApplication() {
@@ -113,25 +116,22 @@ async function startApplication() {
  db.db
   .prepare("UPDATE lectures SET status='上次任务中断，可继续校订' WHERE status='预处理中' OR status LIKE '校订中%'")
   .run()
- const window = new BrowserWindow({
-  width: 1500,
-  height: 950,
-  minWidth: 1050,
-  minHeight: 700,
-  title: '梅酱的听课指南',
-  icon: join(app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'resources'), 'icon.png'),
-  backgroundColor: '#f9fafb',
-  webPreferences: {
-   preload: join(mainDir, '../preload/preload.cjs'),
-   contextIsolation: true,
-   nodeIntegration: false,
-   sandbox: true
-  }
+ const window = createMainWindow({
+  mainDir,
+  icon: join(app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'resources'), 'icon.png')
  })
  mainWindow = window
+ window.on('close', event => {
+  if (process.platform === 'darwin' && !quitting) {
+   event.preventDefault()
+   window.hide()
+  }
+ })
  const emit = (e: EventPayload) => {
   if (!window.isDestroyed()) window.webContents.send('assistant:event', e)
  }
+ window.on('maximize', () => emit({kind: 'window', data: {maximized: true}}))
+ window.on('unmaximize', () => emit({kind: 'window', data: {maximized: false}}))
  const zhiyunSession = session.fromPartition('persist:zhiyun')
  const zhiyunBrowser = new ZhiyunBrowser(window, message =>
   emit({kind: 'progress', data: {stage: '智云登录', message, error: true}})
@@ -239,8 +239,6 @@ async function startApplication() {
    {images: [{label: '教材原页', url}]}
   )
  )
- window.webContents.setWindowOpenHandler(() => ({action: 'deny'}))
- window.webContents.on('will-navigate', e => e.preventDefault())
  const idSchema = z.string().uuid()
  const pptExtractor = new PptExtractor(routed, message => emit({kind: 'progress', data: {stage: '截取 PPT', message}}))
  const videoProgress = (message: string) => emit({kind: 'progress', data: {stage: '视频提取 PPT', message}})
@@ -454,7 +452,7 @@ async function startApplication() {
    ),
   progress: videoProgress
  }
- const context = {
+ const context: ApplicationContext = {
   runtime,
   answerDependencies,
   api,
@@ -508,7 +506,8 @@ async function startApplication() {
   createStudyHandler(context),
   createDesktopHandler(context),
   createCoursesHandler(context),
-  createLearningHandler(context)
+  createLearningHandler(context),
+  createWindowHandler(context)
  ]
  ipcMain.handle('assistant:invoke', async (event, action: string, args: unknown) => {
   if (event.sender !== window.webContents || event.senderFrame !== window.webContents.mainFrame)
@@ -536,15 +535,17 @@ async function startApplication() {
  }
  return context
 }
-export type ApplicationContext = Awaited<ReturnType<typeof startApplication>>
 app.on('before-quit', event => {
- if (shutdownBackends && !quitting) {
+ if (quitting) return
+ quitting = true
+ if (shutdownBackends) {
   event.preventDefault()
-  quitting = true
   void shutdownBackends().finally(() => app.quit())
  }
 })
-app.on('window-all-closed', () => app.quit())
+app.on('window-all-closed', () => {
+ if (process.platform !== 'darwin') app.quit()
+})
 app.on('second-instance', showMainWindow)
 app.on('activate', showMainWindow)
 app.on('will-quit', () => {

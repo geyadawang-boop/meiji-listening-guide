@@ -22,7 +22,7 @@ try {
  }
  const work = await mkdtemp(join(await realpath(tmpdir()), 'meiji-runtime-status-'))
  await build({
-  entryPoints: [join(root, 'src/main/runtime-components.ts')],
+  entryPoints: [join(root, 'src/main/app/runtime-components.ts')],
   outfile: join(work, 'service.mjs'),
   bundle: true,
   platform: 'node',
@@ -176,10 +176,10 @@ try {
   sourceHashes: Object.fromEntries(
    await Promise.all(
     [
-     'src/main/runtime-components.ts',
+     'src/main/app/runtime-components.ts',
      'src/shared/runtime.ts',
      'src/shared/runtime-manifest-v2.ts',
-     'src/renderer/src/RuntimePanel.tsx',
+     'src/renderer/src/features/tools/RuntimePanel.tsx',
      'scripts/runtime-v2-status-smoke.mts'
     ].map(async file => [
      file,

@@ -3,6 +3,8 @@ out/
 release/
 test-results/
 tmp/
+# 临时文档目录：按 AGENTS.md 规则只放不进仓库的草稿
+docs/tmp/
 课程数据/
 资料/
 *.db

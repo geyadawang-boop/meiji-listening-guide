@@ -302,7 +302,7 @@ try {
  for (const tool of ['ffmpeg', 'ffprobe']) await copyFile(join(prefix, 'bin', tool), join(video, tool))
  const entry = join(prepared.work, 'guardian.mjs')
  await build({
-  entryPoints: [join(root, 'src/main/media-process-guardian.ts')],
+  entryPoints: [join(root, 'src/main/workers/media-process-guardian.ts')],
   outfile: entry,
   bundle: true,
   platform: 'node',
@@ -529,8 +529,8 @@ try {
      'scripts/media-source-codecs.mts',
      'scripts/media-source-prepare.mts',
      'scripts/media-build-source-lock.mts',
-     'src/main/media-process-guardian.ts',
-     'src/main/media-executable.ts'
+     'src/main/workers/media-process-guardian.ts',
+     'src/main/media/tools/media-executable.ts'
     ].map(async file => [
      file,
      createHash('sha256')

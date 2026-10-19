@@ -16,6 +16,8 @@ pnpm build
 
 开发与构建入口在 macOS/Linux/Windows 均可用（发布产物仍以 Windows 为主）；macOS/Linux 的 lite 安装包由 CI 构建，功能适配现状见 docs/跨平台适配清单.md。
 
+macOS 开发：未放置应用内媒体组件时，会自动回退到白名单系统 FFmpeg/FFprobe（`/opt/homebrew/bin`、`/usr/local/bin`），仍校验真实路径与执行权限；打包应用默认只用应用内组件，需要时显式设置 `MEIJI_SYSTEM_MEDIA=1`。本机微信只读、内置 QQ 后台等 Windows x64 专属功能在 macOS/Linux 上按实际能力禁用并说明。
+
 resources 只包含独立 ONNX 模型、NapCat Node 组件和 FFmpeg/FFprobe 及其许可证。它们是必要第三方资源，不能以 TypeScript 源码代替二进制或权重。源码包不含这些大型文件，需恢复同版本组件。PDF 由应用原生 TypeScript 库处理，不需要 Python。
 
 模型连接在设置中填写千问 API 地址与密钥，并分别选择文本和视觉模型；不再提供 ChatGPT/Codex 账号或 DeepSeek 专用入口，也不需要 Codex 连接组件。
@@ -53,7 +55,7 @@ CI 手动运行时可选 `media_candidate`，在匹配的 macOS arm64/Linux x64 
 pnpm build
 pnpm release portable
 pnpm release full
-pnpm release lite
+pnpm release lite --prepared
 pnpm release components
 pnpm release:source
 node scripts/restore-runtime.mts knowledge 同版本组件文件夹
@@ -61,11 +63,14 @@ node scripts/restore-runtime.mts knowledge 同版本组件文件夹
 
 portable 为完整目录，full 为完整安装包，lite 为不含可选离线组件的应用，components 为同版本组件。组件恢复逐文件核对大小、SHA256 和版本，不覆盖改动过的文件；其它组件编号为 asr、video。完整发布须重建 EXE，不能只修改 ASAR。实际安装后验证版本、原生后台、运行资源及课程资料不变后才能清理回退文件。
 
+`--prepared` 使用仓库已审核的同版本运行清单，保留 lite 后续补装所需的文件摘要。不带该参数会从本地资源重新生成清单，缺少组件目录或可用文件时明确失败并保留已有清单。macOS/Linux 的 portable 同样省略尚未审核分发的可选组件；需要时使用上述系统媒体工具回退，不自动夹带 Windows 资源。
+
 ## 代码目录
 
 | 目录 | 职责 |
 | --- | --- |
-| src/main、src/main/ipc | Electron 主进程、受限原生接口、课程和任务调度 |
+| src/main | Electron 主进程、IPC、媒体/知识库/IM 等业务域 |
+| src/main/workers | 工作进程入口（utilityProcess/子进程） |
 | src/renderer、src/preload | React 页面和最小隔离桥接 |
 | src/shared | 类型、协议和验证规则 |
 | scripts/*.mts | 当前构建、组件恢复、模型维护及验收入口 |
@@ -87,5 +92,5 @@ out 中的 JavaScript 是 TypeScript 的编译产物；第三方 npm 包、WASM�
 
 只有最终成果写入、回读、哈希及必要页数/时长核对通过，才删除该任务生成的中间视频、图片等；原教材、源文件、独立下载成果和失败恢复材料保留。开发清理按 AGENTS.md。
 
-沿用 AGPL-3.0-only 和第三方许可，详见 LICENSE、NOTICE、THIRD_PARTY_NOTICES.md。SponsorBlock 社区数据使用 CC BY-NC-SA 4.0，并随对应片段计划保留来源及许可；时长不符不执行裁剪。公开仓库及下载：https://github.com/mikudeshuo/meiji-listening-guide/releases/latest 。
+沿用 AGPL-3.0-only 和第三方许可，详见 LICENSE、NOTICE、docs/legal/THIRD_PARTY_NOTICES.md。SponsorBlock 社区数据使用 CC BY-NC-SA 4.0，并随对应片段计划保留来源及许可；时长不符不执行裁剪。公开仓库及下载：https://github.com/mikudeshuo/meiji-listening-guide/releases/latest 。
 

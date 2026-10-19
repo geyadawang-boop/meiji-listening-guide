@@ -29,21 +29,21 @@ const sourceFiles = [
  'scripts/media-source-stage.mts',
  'scripts/visual-runtime-electron.mts',
  'scripts/ppt-parent-exit-electron.mts',
- 'src/main/video-ppt.ts',
- 'src/main/ppt-extract.ts',
- 'src/main/image-pdf.ts',
- 'src/main/pdf-ppt-cleanup.ts',
- 'src/main/video-policy.ts',
+ 'src/main/learning/video/video-ppt.ts',
+ 'src/main/documents/ppt-extract.ts',
+ 'src/main/documents/image-pdf.ts',
+ 'src/main/documents/pdf-ppt-cleanup.ts',
+ 'src/main/media/bilibili/video-policy.ts',
  'scripts/video-candidate-package.mts',
  'src/shared/runtime-descriptor-v2.ts',
  'src/shared/runtime-manifest-v2.ts',
  'scripts/media-build-source-lock.mts',
- 'src/main/media.ts',
- 'src/main/media-downloads.ts',
- 'src/main/visual-frames.ts',
- 'src/main/media-command.ts',
- 'src/main/media-executable.ts',
- 'src/main/media-process-guardian.ts'
+ 'src/main/media/core/media.ts',
+ 'src/main/media/download/media-downloads.ts',
+ 'src/main/learning/video/visual-frames.ts',
+ 'src/main/media/tools/media-command.ts',
+ 'src/main/media/tools/media-executable.ts',
+ 'src/main/workers/media-process-guardian.ts'
 ]
 const sourceBefore = Object.fromEntries(
  await Promise.all(
@@ -153,9 +153,9 @@ try {
  }
  const exports =
   'export {MediaBackend} from ' +
-  JSON.stringify(join(root, 'src/main/media.ts').replaceAll('\\', '/')) +
+  JSON.stringify(join(root, 'src/main/media/core/media.ts').replaceAll('\\', '/')) +
   ';export {mediaCommand} from ' +
-  JSON.stringify(join(root, 'src/main/media-command.ts').replaceAll('\\', '/')) +
+  JSON.stringify(join(root, 'src/main/media/tools/media-command.ts').replaceAll('\\', '/')) +
   ';'
  await build({
   stdin: {contents: exports, resolveDir: root, loader: 'ts'},
@@ -170,6 +170,7 @@ try {
     setup(builder) {
      builder.onResolve({filter: /^[^./]/}, args => {
       if (isAbsolute(args.path)) return
+      if (args.path.startsWith('@main/') || args.path.startsWith('@shared/')) return
       if (args.path === 'electron' || args.path.startsWith('node:')) return {path: args.path, external: true}
       return {path: import.meta.resolve(args.path), external: true}
      })
@@ -178,7 +179,7 @@ try {
   ]
  })
  await build({
-  entryPoints: [join(root, 'src/main/media-process-guardian.ts')],
+  entryPoints: [join(root, 'src/main/workers/media-process-guardian.ts')],
   outfile: join(work, 'media-process-guardian.js'),
   bundle: true,
   platform: 'node',
@@ -241,7 +242,7 @@ try {
  }
  // Separate baseline: observe the unchanged PPT helper after its real parent dies.
  await build({
-  entryPoints: [join(root, 'src/main/video-ppt.ts')],
+  entryPoints: [join(root, 'src/main/learning/video/video-ppt.ts')],
   outfile: join(work, 'ppt-owner.mjs'),
   bundle: true,
   platform: 'node',
@@ -253,6 +254,7 @@ try {
     setup(builder) {
      builder.onResolve({filter: /^[^./]/}, args => {
       if (isAbsolute(args.path)) return
+      if (args.path.startsWith('@main/') || args.path.startsWith('@shared/')) return
       if (args.path === 'electron' || args.path.startsWith('node:')) return {path: args.path, external: true}
       return {path: import.meta.resolve(args.path), external: true}
      })

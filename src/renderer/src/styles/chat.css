@@ -1,0 +1,547 @@
+/* 聊天工作区与消息流样式：合并自 agent.css / chat-eleckoi.css（ElecKoi 布局，AGPL-3.0）。
+ * HeroUI 组件为主，本文件只保留布局与形态覆盖。 */
+.agent-workspace {
+ display: flex;
+ flex-direction: column;
+ overflow: hidden;
+ padding: 22px 24px 16px;
+}
+.agent-workspace .workspace-header {
+ flex: none;
+ margin-bottom: 14px;
+ min-height: 32px;
+}
+.agent-heading {
+ display: flex;
+ align-items: center;
+ gap: 14px;
+ min-width: 0;
+}
+.agent-heading h1 {
+ font-size: 20px;
+ letter-spacing: 0;
+ margin: 0;
+ overflow: hidden;
+ text-overflow: ellipsis;
+ white-space: nowrap;
+}
+.agent-heading > span {
+ font-size: 11px;
+ color: var(--muted);
+ white-space: nowrap;
+}
+.header-icon {
+ border: 0;
+ background: transparent;
+ font-size: 19px;
+ padding: 4px 8px;
+}
+.agent-workspace .lecture-bar {
+ margin-bottom: 4px;
+ flex: none;
+}
+.agent-tabs {
+ flex: none;
+ gap: 25px;
+ margin: 0 -24px;
+ padding: 0 24px;
+}
+.agent-tabs button {
+ font-size: 12px;
+ padding: 12px 0;
+}
+.agent-scroll {
+ flex: 1;
+ overflow: auto;
+ min-height: 0;
+ padding: 26px 2px 24px;
+ scrollbar-gutter: stable;
+}
+.agent-thread {
+ max-width: 832px;
+ margin: 0 auto;
+ min-height: 100%;
+ display: flex;
+ flex-direction: column;
+ gap: 0;
+}
+.agent-empty {
+ margin: auto;
+ text-align: center;
+ padding: 48px 16px;
+ color: var(--muted);
+}
+.agent-empty h2 {
+ color: var(--text);
+ font-size: 23px;
+ font-weight: 600;
+ letter-spacing: -0.4px;
+ margin-bottom: 12px;
+}
+.agent-empty p {
+ font-size: 12px;
+}
+.suggestions {
+ display: flex;
+ gap: 8px;
+ justify-content: center;
+ flex-wrap: wrap;
+ margin-top: 20px;
+}
+.message-agent {
+ background: transparent;
+ border: 0;
+ border-radius: 0;
+ display: grid;
+ grid-template-columns: 40px minmax(0, 1fr);
+ column-gap: 10px;
+ width: 100%;
+ box-sizing: border-box;
+ margin: 0 auto 28px;
+ padding: 0 8px;
+ font-size: 16px;
+ line-height: 25px;
+ overflow-wrap: anywhere;
+}
+.chat-avatar {
+ grid-column: 1;
+ grid-row: 1;
+ display: grid;
+ place-items: center;
+ width: 40px;
+ height: 40px;
+ border-radius: 50%;
+ background: var(--surface-subtle);
+ color: var(--blue);
+ font-size: 15px;
+}
+.chat-avatar svg {
+ width: 22px;
+ height: 22px;
+ fill: none;
+ stroke: currentColor;
+ stroke-width: 1.7;
+}
+.chat-author {
+ grid-column: 2;
+ grid-row: 1;
+ display: flex;
+ align-items: center;
+ font-weight: 650;
+ font-size: 16px;
+ min-height: 40px;
+ margin-bottom: 15px;
+}
+.chat-bubble {
+ grid-column: 1 / -1;
+ min-width: 0;
+ padding: 2px 0;
+ color: var(--bubble-fg);
+}
+.chat-bubble p {
+ margin: 0 0 12px;
+ line-height: 1.65;
+}
+.chat-bubble p:last-child {
+ margin-bottom: 0;
+}
+.chat-bubble pre {
+ overflow: auto;
+ background: var(--markdown-code-block-bg);
+ padding: 16px;
+ border-radius: 12px;
+}
+.chat-bubble img {
+ max-width: 100%;
+}
+.chat-bubble table {
+ border-collapse: collapse;
+ display: block;
+ overflow: auto;
+}
+.chat-bubble th,
+.chat-bubble td {
+ border: 1px solid var(--line-strong);
+ padding: 8px 12px;
+}
+.message-agent.mine {
+ grid-template-columns: minmax(0, 1fr) 40px;
+ margin-bottom: 22px;
+}
+.message-agent.mine .chat-avatar {
+ grid-column: 2;
+ color: var(--muted);
+}
+.message-agent.mine .chat-author {
+ grid-column: 1;
+ justify-content: flex-end;
+}
+.message-agent.mine .chat-bubble {
+ justify-self: end;
+ max-width: 88%;
+ padding: 9px 12px;
+ border-radius: 12px;
+ background: var(--bubble-blue);
+}
+.chat-message-actions {
+ grid-column: 1 / -1;
+ display: flex;
+ align-items: center;
+ min-height: 30px;
+ margin-top: 10px;
+ color: var(--muted);
+}
+.chat-message-actions .button {
+ display: grid;
+ place-items: center;
+ width: 28px;
+ height: 30px;
+ padding: 2px;
+ border-radius: 7px;
+ color: inherit;
+}
+.chat-message-actions .button:hover {
+ background: var(--active);
+ color: var(--text);
+}
+.message-agent.mine .chat-message-actions {
+ justify-self: end;
+ margin-top: 3px;
+ opacity: 0;
+}
+.message-agent.mine:hover .chat-message-actions,
+.message-agent.mine:focus-within .chat-message-actions {
+ opacity: 1;
+}
+.agent-composer {
+ flex: none;
+ width: 100%;
+ max-width: 832px;
+ margin: 0 auto;
+ position: relative;
+}
+.composer-box {
+ border: 1px solid var(--line-strong);
+ border-radius: 24px;
+ background: var(--surface-raised);
+ box-shadow: 0 4px 24px #00000008;
+ padding: 16px 16px 12px;
+}
+.composer-box textarea {
+ display: block;
+ border: 0;
+ box-shadow: none;
+ background: transparent;
+ resize: none;
+ width: 100%;
+ min-height: 64px;
+ height: 76px;
+ padding: 3px 4px;
+ font-size: 16px;
+ line-height: 24px;
+}
+.composer-box textarea::placeholder {
+ color: var(--muted);
+}
+.composer-controls {
+ display: flex;
+ align-items: center;
+ gap: 12px;
+}
+.composer-plus {
+ flex: none;
+ width: 34px;
+ height: 34px;
+ border-radius: 50%;
+ background: var(--surface-subtle);
+ color: var(--composer-icon-fg);
+}
+.composer-send {
+ flex: none;
+ width: 38px;
+ height: 38px;
+ border-radius: 50%;
+}
+.attachment-menu-anchor {
+ position: relative;
+}
+.attachment-menu {
+ position: absolute;
+ bottom: 48px;
+ left: 0;
+ width: 210px;
+ background: var(--surface-raised);
+ border: 1px solid var(--line-strong);
+ border-radius: 13px;
+ box-shadow: 0 12px 45px #0002;
+ padding: 10px;
+ z-index: 20;
+}
+.attachment-menu .button {
+ width: 100%;
+ justify-content: flex-start;
+ gap: 10px;
+ border-radius: 7px;
+ padding: 8px 10px;
+ font-size: 12px;
+}
+.menu-divider {
+ height: 1px;
+ background: var(--line);
+ margin: 5px 8px;
+}
+.draft-attachment {
+ display: flex;
+ align-items: center;
+ gap: 10px;
+ padding: 10px 12px;
+ margin-bottom: 10px;
+ background: var(--surface-subtle);
+ border-radius: 12px;
+}
+.draft-attachment > span {
+ display: grid;
+ place-items: center;
+ font-size: 22px;
+ color: var(--blue);
+}
+.draft-attachment > div {
+ flex: 1;
+ min-width: 0;
+}
+.draft-attachment strong {
+ font-size: 12px;
+ display: block;
+}
+.draft-attachment .button {
+ flex: none;
+ font-size: 11px;
+ padding: 6px 9px;
+}
+.draft-attachment .button:last-child {
+ border: 0;
+ background: none;
+ font-size: 18px;
+ padding: 4px;
+}
+.local-path {
+ width: 100%;
+ font:
+  10px Consolas,
+  "Microsoft YaHei",
+  monospace;
+ color: var(--muted);
+ padding: 5px 0;
+ background: transparent;
+ border: 0;
+ box-shadow: none;
+}
+.file-chip > div {
+ flex: 1;
+ min-width: 0;
+ margin-right: 10px;
+}
+.file-chip strong {
+ font-size: 12px;
+}
+.chat-waiting-reply {
+ display: flex;
+ align-items: center;
+ gap: 8px;
+ padding: 0 8px 12px;
+ color: var(--muted);
+ font-size: 13px;
+}
+.chat-running-dot {
+ width: 8px;
+ height: 8px;
+ border-radius: 50%;
+ background: var(--blue);
+ animation: chat-waiting 1.3s ease-in-out infinite;
+}
+@keyframes chat-waiting {
+ 50% {
+  opacity: 0.25;
+ }
+}
+@media (prefers-reduced-motion: reduce) {
+ .chat-running-dot {
+  animation: none;
+ }
+}
+.composer-brand {
+ display: grid;
+ place-items: center;
+ width: 20px;
+ height: 20px;
+ flex: none;
+ background: currentColor;
+}
+.composer-brand.custom {
+ background: none;
+ color: var(--blue);
+}
+.composer-brand.custom svg {
+ width: 20px;
+ height: 20px;
+ fill: currentColor;
+}
+.composer-model-name {
+ overflow: hidden;
+ text-overflow: ellipsis;
+ white-space: nowrap;
+ max-width: 240px;
+ font-size: 14px;
+ line-height: 20px;
+}
+.composer-model-trigger {
+ display: flex;
+ align-items: center;
+ gap: 8px;
+ margin-left: auto;
+ padding: 6px 8px;
+ border: 0;
+ border-radius: 8px;
+ background: transparent;
+ color: var(--text);
+}
+.composer-model-trigger:hover,
+.composer-model-trigger[aria-expanded="true"] {
+ background: var(--active);
+}
+.composer-model-trigger > svg {
+ width: 16px;
+ height: 16px;
+ margin-left: 6px;
+ flex: none;
+}
+.agent-workspace .tab-content {
+ min-height: 0;
+}
+.activity-list {
+ max-width: 800px;
+ margin: auto;
+}
+.activity-item {
+ display: flex;
+ gap: 16px;
+ border-bottom: 1px solid var(--line);
+ padding: 16px 0;
+ font-size: 12px;
+}
+.activity-item > span {
+ color: var(--blue);
+ font-size: 9px;
+ padding-top: 4px;
+}
+.activity-item > div {
+ flex: 1;
+}
+.activity-item p {
+ margin: 4px 0 0;
+ color: var(--muted);
+ font-size: 11px;
+}
+.activity-item time {
+ color: var(--muted);
+ font-size: 10px;
+ font-family: Consolas, monospace;
+}
+.busy-indicator {
+ position: fixed;
+ top: 8px;
+ left: 50%;
+ transform: translateX(-50%);
+ border: 1px solid var(--line-strong);
+ background: var(--surface-raised);
+ border-radius: 24px;
+ box-shadow: 0 3px 15px #0001;
+ padding: 5px 12px;
+ font-size: 11px;
+ z-index: 250;
+ display: flex;
+ align-items: center;
+ gap: 8px;
+}
+.busy-indicator > span {
+ color: var(--blue);
+}
+.note-editor {
+ margin-top: 16px;
+ border-top: 1px solid var(--line);
+ padding-top: 8px;
+}
+.note-editor textarea {
+ min-height: 70px;
+}
+.agent-workspace .welcome {
+ margin: auto;
+ align-self: center;
+}
+.agent-workspace .welcome h2 {
+ font-size: 24px;
+}
+.lecture-source-card {
+ padding: 18px 22px;
+ margin-bottom: 18px;
+ border: 1px solid var(--line);
+ border-radius: 14px;
+ background: var(--surface-raised);
+}
+.lecture-source-card h2 {
+ font-size: 17px;
+ margin: 0 0 8px;
+}
+.lecture-source-card p {
+ font-size: 12px;
+ color: var(--muted);
+}
+.lecture-source-actions {
+ display: flex;
+ gap: 8px;
+ margin: 8px 0 12px;
+}
+.lecture-source-card details {
+ font-size: 12px;
+ margin-top: 12px;
+}
+.subtitle > div {
+ flex: 1;
+ min-width: 0;
+}
+.subtitle details {
+ font-size: 12px;
+ color: var(--muted);
+ margin: 8px 0;
+}
+.subtitle small.warning {
+ display: block;
+}
+@media (max-width: 1200px) {
+ .agent-workspace {
+  padding: 16px 18px 10px;
+ }
+ .agent-heading h1 {
+  font-size: 18px;
+ }
+ .agent-heading > span {
+  display: none;
+ }
+ .agent-tabs {
+  margin: 0 -18px;
+  padding: 0 18px;
+  gap: 18px;
+ }
+ .agent-tabs button {
+  font-size: 11px;
+ }
+ .attachment-menu {
+  width: 190px;
+ }
+ .message-agent {
+  font-size: 15px;
+ }
+ .composer-model-name {
+  max-width: 150px;
+ }
+}

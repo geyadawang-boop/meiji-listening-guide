@@ -3,7 +3,11 @@
   "target": "ES2022",
   "module": "ESNext",
   "moduleResolution": "Bundler",
-  "paths": { "@shared/*": ["./src/shared/*"] },
+  "paths": {
+   "@shared/*": ["./src/shared/*"],
+   "@main/*": ["./src/main/*"],
+   "@renderer/*": ["./src/renderer/src/*"]
+  },
   "jsx": "react-jsx",
   "strict": true,
   "esModuleInterop": true,
