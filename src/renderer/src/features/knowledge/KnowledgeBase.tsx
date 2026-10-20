@@ -1,10 +1,11 @@
 import {Button, Card, Input} from '@heroui/react'
 import {useEffect, useRef, useState} from 'react'
 import {BookOpen} from 'lucide-react'
-import {AlertBox} from '@renderer/ui/AlertBox'
+import {notify} from '@renderer/ui/ToastHost'
 import {WindowMenuButton, WindowPanel} from '@renderer/ui/WindowPanel'
 import {SelectField} from '@renderer/ui/SelectField'
 import {KnowledgeClassification} from '@renderer/features/knowledge/KnowledgeClassification'
+import {SettingsLink} from '@renderer/app/settings-navigation'
 import type {KnowledgeEntry, KnowledgeList, KnowledgeHit, KnowledgeSearch} from '@shared/knowledge'
 const invoke = <T,>(action: string, args?: unknown) => window.assistant.invoke<T>(action, args)
 type Answer = {
@@ -28,9 +29,7 @@ export function KnowledgeBase({visible, close}: {visible: boolean; close: () => 
  const [category, setCategory] = useState(''),
   [importCategory, setImportCategory] = useState(''),
   [query, setQuery] = useState('')
- const [busy, setBusy] = useState(false),
-  [error, setError] = useState(''),
-  [notice, setNotice] = useState('')
+ const [busy, setBusy] = useState(false)
  const [search, setSearch] = useState<KnowledgeSearch | null>(null),
   [answer, setAnswer] = useState<Answer | null>(null)
  const [reading, setReading] = useState<{title: string; text: string} | null>(null),
@@ -55,7 +54,7 @@ export function KnowledgeBase({visible, close}: {visible: boolean; close: () => 
   setVector(await invoke<VectorState>('knowledge:vector-status'))
  }
  useEffect(() => {
-  if (visible) void refresh().catch(reason => setError(String(reason)))
+  if (visible) void refresh().catch(reason => notify.error(reason, {title: '读取知识库失败'}))
  }, [visible])
  useEffect(
   () =>
@@ -68,13 +67,11 @@ export function KnowledgeBase({visible, close}: {visible: boolean; close: () => 
   if (working.current) return
   working.current = true
   setBusy(true)
-  setError('')
-  setNotice('')
   setProgressText('')
   try {
    await fn()
   } catch (reason) {
-   setError(reason instanceof Error ? reason.message : String(reason))
+   notify.error(reason)
   } finally {
    working.current = false
    setBusy(false)
@@ -97,8 +94,11 @@ export function KnowledgeBase({visible, close}: {visible: boolean; close: () => 
   setAnswer(null)
   setReading(null)
   setMoving(null)
-  setNotice(`已移动 ${result.changed} 份资料，${result.unchanged} 份分类相同；原文件保留。`)
-  if (result.failures.length) setError(result.failures.map(item => item.title + '：' + item.error).join('\n'))
+  notify.success(`已移动 ${result.changed} 份资料，${result.unchanged} 份分类相同；原文件保留。`)
+  if (result.failures.length)
+   notify.error(result.failures.map(item => item.title + '：' + item.error).join('\n'), {
+    title: `${result.failures.length} 份资料移动失败`
+   })
   else if (wholeCategory) {
    setCategory(target.trim())
    setCategoryTarget('')
@@ -115,7 +115,13 @@ export function KnowledgeBase({visible, close}: {visible: boolean; close: () => 
     visible={visible}
     label="知识库"
     title="知识库"
-    description="对资料正文建立索引，跨资料检索与引用问答。"
+    description={
+     <>
+      保存正文副本与索引，
+      <br />
+      原文件仍在文件管理
+     </>
+    }
     heading={category || '课程知识库'}
     subheading={`${data.stats.totalVideos} 份资料 · ${data.stats.totalChunks} 个原文片段`}
     menu={
@@ -178,15 +184,13 @@ export function KnowledgeBase({visible, close}: {visible: boolean; close: () => 
           await refresh()
           setSearch(null)
           setAnswer(null)
-          setNotice(
-           results
-            .map(item =>
-             item.ok
-              ? item.name + (item.result?.unchanged ? '：已有相同版本' : '：已导入')
-              : item.name + '：' + item.error
-            )
-            .join('\n')
-          )
+          const imported = results.filter(item => item.ok).length
+          const failed = results.filter(item => !item.ok)
+          if (imported) notify.success(`已导入或核对 ${imported} 份资料`)
+          if (failed.length)
+           notify.error(failed.map(item => item.name + '：' + item.error).join('\n'), {
+            title: `${failed.length} 份资料导入失败`
+           })
          }
         })
        }
@@ -201,7 +205,7 @@ export function KnowledgeBase({visible, close}: {visible: boolean; close: () => 
         void run(async () => {
          await invoke('knowledge:rebuild')
          await refresh()
-         setNotice('关键词索引已重建')
+         notify.success('关键词索引已重建')
         })
        }
       >
@@ -238,7 +242,7 @@ export function KnowledgeBase({visible, close}: {visible: boolean; close: () => 
          onClick={() =>
           void run(async () => {
            setVector(await invoke<VectorState>('knowledge:vector-enable'))
-           setNotice('中文模型已启用，请建立语义索引')
+           notify.success('中文模型已启用，请建立语义索引')
           })
          }
         >
@@ -255,7 +259,7 @@ export function KnowledgeBase({visible, close}: {visible: boolean; close: () => 
           setVector(result.status)
           setSearch(null)
           setAnswer(null)
-          setNotice('语义索引已建立')
+          notify.success('语义索引已建立')
          })
         }
        >
@@ -330,7 +334,8 @@ export function KnowledgeBase({visible, close}: {visible: boolean; close: () => 
      </Button>
     </form>
     <p className="hint">
-     检索在本机进行；点击“根据资料回答”会将问题和检索片段交给当前连接的模型。回答附可查看的原文引用。
+     检索在本机进行；点击“根据资料回答”会将问题和检索片段交给当前连接的模型。回答附可查看的原文引用。{' '}
+     <SettingsLink section="qwen">模型设置</SettingsLink>
     </p>
     {busy && (
      <div className="row">
@@ -338,12 +343,6 @@ export function KnowledgeBase({visible, close}: {visible: boolean; close: () => 
       <Button variant="ghost" size="sm" onClick={() => void invoke('cancel')}>
        取消处理
       </Button>
-     </div>
-    )}
-    {error && <AlertBox>{error}</AlertBox>}
-    {notice && (
-     <div className="knowledge-notice" role="status">
-      {notice}
      </div>
     )}
     {search && (
@@ -502,7 +501,7 @@ export function KnowledgeBase({visible, close}: {visible: boolean; close: () => 
             setAnswer(null)
             setReading(null)
             await refresh()
-            setNotice('知识库版本已删除，原文件保留')
+            notify.success('知识库版本已删除，原文件保留')
            })
           }
          >

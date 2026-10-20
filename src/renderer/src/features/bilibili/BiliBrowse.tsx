@@ -1,23 +1,21 @@
 import {Button, Card, Input} from '@heroui/react'
 import {useState} from 'react'
-import {AlertBox} from '@renderer/ui/AlertBox'
+import {notify} from '@renderer/ui/ToastHost'
 type Video = {bvid: string; title: string; author: string; duration: string; url: string}
 type Listing = {videos: Video[]; page: number; hasMore: boolean}
 export function BiliBrowse({useVideo}: {useVideo: (url: string, kind: 'videoPpt' | 'videoSubtitles') => void}) {
  const [query, setQuery] = useState(''),
   [submitted, setSubmitted] = useState(''),
   [result, setResult] = useState<Listing>(),
-  [busy, setBusy] = useState(false),
-  [error, setError] = useState('')
+  [busy, setBusy] = useState(false)
  async function read(kind: string, page = 1, word = query) {
   setBusy(true)
-  setError('')
   setResult(undefined)
   try {
    setResult(await window.assistant.invoke<Listing>('bili-resources:browse', {kind, query: word, page}))
    setSubmitted(kind === 'search' ? word : '')
   } catch (reason) {
-   setError(reason instanceof Error ? reason.message : String(reason))
+   notify.error(reason, {title: '读取视频列表失败'})
   } finally {
    setBusy(false)
   }
@@ -92,7 +90,6 @@ export function BiliBrowse({useVideo}: {useVideo: (url: string, kind: 'videoPpt'
     </>
    )}
    {busy && <p role="status">正在读取视频列表…</p>}
-   {error && <AlertBox>{error}</AlertBox>}
   </Card>
  )
 }

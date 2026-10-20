@@ -50,6 +50,7 @@ export function WindowPanel({
  subheading,
  actions,
  close,
+ backLabel = '返回课程对话',
  className,
  onDragOver,
  onDrop,
@@ -64,6 +65,7 @@ export function WindowPanel({
  subheading?: ReactNode
  actions?: ReactNode
  close: () => void
+ backLabel?: string
  className?: string
  onDragOver?: DragEventHandler<HTMLElement>
  onDrop?: DragEventHandler<HTMLElement>
@@ -86,7 +88,7 @@ export function WindowPanel({
     </ScrollShadow>
     <Button variant="ghost" size="sm" fullWidth className="window-panel__back" onPress={close}>
      <ArrowLeft size={16} aria-hidden="true" />
-     返回课程对话
+     {backLabel}
     </Button>
    </aside>
    <main className="learning-content">

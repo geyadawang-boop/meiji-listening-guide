@@ -488,24 +488,85 @@
  font-size: 10px;
  font-family: Consolas, monospace;
 }
-.busy-indicator {
+.task-capsule {
  position: fixed;
- top: 8px;
+ top: calc(var(--titlebar-height) + 8px);
  left: 50%;
- transform: translateX(-50%);
- border: 1px solid var(--line-strong);
- background: var(--surface-raised);
- border-radius: 24px;
- box-shadow: 0 3px 15px #0001;
- padding: 5px 12px;
- font-size: 11px;
  z-index: 250;
  display: flex;
  align-items: center;
- gap: 8px;
+ gap: 9px;
+ max-width: min(520px, calc(100vw - 32px));
+ padding: 5px 6px 5px 13px;
+ border: 1px solid color-mix(in srgb, var(--blue) 32%, var(--line-strong));
+ border-radius: var(--capsule-radius);
+ background: var(--surface-raised);
+ box-shadow: 0 6px 24px var(--shadow-color);
+ opacity: 0;
+ visibility: hidden;
+ pointer-events: none;
+ transform: translateX(-50%) translateY(-6px) scaleX(0.82);
+ transform-origin: center;
+ transition:
+  opacity 160ms ease,
+  transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
+  visibility 0s linear 220ms;
 }
-.busy-indicator > span {
- color: var(--blue);
+.task-capsule[data-open="true"] {
+ opacity: 1;
+ visibility: visible;
+ pointer-events: auto;
+ transform: translateX(-50%) translateY(0) scaleX(1);
+ transition:
+  opacity 160ms ease,
+  transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
+  visibility 0s;
+}
+.task-capsule__dot {
+ flex: 0 0 auto;
+ width: 8px;
+ height: 8px;
+ border-radius: 50%;
+ background: var(--blue);
+ box-shadow: 0 0 0 4px var(--active);
+ animation: task-breathe 1.6s ease-in-out infinite;
+}
+.task-capsule[data-open="false"] .task-capsule__dot {
+ animation-play-state: paused;
+}
+.task-capsule__text {
+ min-width: 0;
+ overflow: hidden;
+ text-overflow: ellipsis;
+ white-space: nowrap;
+ font-size: 12px;
+ line-height: 1.5;
+ color: var(--muted);
+}
+.task-capsule__stage {
+ color: var(--text);
+ font-weight: 600;
+}
+@keyframes task-breathe {
+ 0%,
+ 100% {
+  opacity: 1;
+  transform: scale(1);
+  box-shadow: 0 0 0 4px var(--active);
+ }
+ 50% {
+  opacity: 0.55;
+  transform: scale(0.82);
+  box-shadow: 0 0 0 2px var(--active);
+ }
+}
+@media (prefers-reduced-motion: reduce) {
+ .task-capsule {
+  transition: none;
+ }
+ .task-capsule__dot {
+  animation: none;
+ }
 }
 .note-editor {
  margin-top: 16px;
@@ -663,6 +724,49 @@
  color: var(--muted);
  margin: 8px 0;
 }
+.subtitle-original summary {
+ display: inline-flex;
+ align-items: center;
+ gap: 4px;
+ width: fit-content;
+ list-style: none;
+ cursor: pointer;
+ color: var(--muted);
+}
+.subtitle-original summary::-webkit-details-marker {
+ display: none;
+}
+.subtitle-original summary::marker {
+ content: "";
+}
+.subtitle-original summary:hover {
+ color: var(--blue);
+}
+.subtitle-original summary:focus-visible {
+ outline: 2px solid var(--blue);
+ outline-offset: 2px;
+ border-radius: var(--radius-sm);
+}
+.subtitle-original-chevron {
+ flex: none;
+ transition: transform 0.15s ease;
+}
+.subtitle-original[open] .subtitle-original-chevron {
+ transform: rotate(90deg);
+}
+.subtitle-original p {
+ margin: 6px 0 2px;
+ color: var(--text);
+ white-space: pre-wrap;
+}
+.subtitle-original small {
+ color: var(--muted);
+}
+@media (prefers-reduced-motion: reduce) {
+ .subtitle-original-chevron {
+  transition: none;
+ }
+}
 .subtitle small.warning {
  display: block;
 }
@@ -693,4 +797,50 @@
  .composer-model-name {
   max-width: 150px;
  }
+}
+
+/* 聊天外观：变量由 AppearanceEditor 写在 .chat-styled 容器上。
+ * 必须留在 components 层，否则会被本文件的聊天基础规则覆盖。 */
+.chat-styled .agent-thread {
+ max-width: var(--chat-width);
+}
+.chat-styled .message-agent {
+ font-size: var(--chat-font);
+ line-height: var(--chat-line);
+ margin-bottom: var(--chat-gap);
+ grid-template-columns: var(--chat-avatar-size) minmax(0, 1fr);
+}
+.chat-styled .message-agent.mine {
+ grid-template-columns: minmax(0, 1fr) var(--chat-avatar-size);
+}
+.chat-styled .chat-avatar {
+ width: var(--chat-avatar-size);
+ height: var(--chat-avatar-size);
+ border-radius: var(--chat-avatar-radius);
+}
+.chat-styled .chat-author {
+ min-height: var(--chat-avatar-size);
+}
+.chat-styled .chat-bubble p {
+ line-height: var(--chat-line);
+}
+.chat-styled .message-agent.mine .chat-bubble {
+ border-radius: var(--chat-bubble-radius);
+ background: var(--appearance-user-bg);
+ color: var(--text);
+}
+.chat-styled[data-bubbles="true"] .message-agent.theirs .chat-bubble {
+ border-radius: var(--chat-bubble-radius);
+ padding: 16px 20px;
+ background: color-mix(in srgb, var(--appearance-accent) 8%, var(--surface-raised));
+ color: var(--text);
+}
+.chat-styled[data-names="false"] .chat-author {
+ visibility: hidden;
+ height: var(--chat-avatar-size);
+ margin-bottom: 8px;
+}
+.chat-styled .agent-composer {
+ max-width: var(--chat-width);
+ border-color: color-mix(in srgb, var(--appearance-accent) 35%, var(--line-strong));
 }

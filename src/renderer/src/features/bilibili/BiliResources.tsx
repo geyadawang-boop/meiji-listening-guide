@@ -1,12 +1,11 @@
-import {Button, Card, Input} from '@heroui/react'
+import {Button, Card, Checkbox, Input} from '@heroui/react'
 import {useEffect, useRef, useState} from 'react'
 import {Bookmark} from 'lucide-react'
-import {AlertBox} from '@renderer/ui/AlertBox'
+import {notify} from '@renderer/ui/ToastHost'
 import {SelectField} from '@renderer/ui/SelectField'
-import {SubtitleBatchRecords} from '@renderer/features/video/SubtitleBatchRecords'
-import {MediaDownloads} from '@renderer/features/bilibili/MediaDownloads'
 import {Discussion} from '@renderer/features/bilibili/Discussion'
 import {BiliBrowse} from '@renderer/features/bilibili/BiliBrowse'
+import {SettingsLink} from '@renderer/app/settings-navigation'
 import type {VideoSeries} from '@shared/video-ppt'
 import type {SubtitleSyncTask} from '@shared/subtitle-sync'
 const invoke = <T,>(action: string, args?: unknown) => window.assistant.invoke<T>(action, args)
@@ -32,22 +31,12 @@ export function BiliResourcesPanel({
   [hasMore, setHasMore] = useState(false),
   [filter, setFilter] = useState('')
  const [busy, setBusy] = useState(false),
-  [error, setError] = useState(''),
-  [qr, setQr] = useState(''),
-  [login, setLogin] = useState(''),
   [checked, setChecked] = useState(false)
  const [basket, setBasket] = useState<{url: string; title: string; series: VideoSeries; pages: number[]}[]>([]),
   [category, setCategory] = useState(''),
-  [tasks, setTasks] = useState<SubtitleSyncTask[]>([]),
   [progress, setProgress] = useState('')
  const working = useRef(false)
  const selectedCount = basket.reduce((count, item) => count + item.pages.length, 0)
- async function loadTasks() {
-  setTasks(await invoke('subtitle-sync:list'))
- }
- useEffect(() => {
-  if (visible) void loadTasks().catch(reason => setError(String(reason)))
- }, [visible])
  useEffect(
   () =>
    window.assistant.onEvent(event => {
@@ -72,20 +61,21 @@ export function BiliResourcesPanel({
    setBasket([])
   }
  }
+ useEffect(() => {
+  if (visible) void refresh().catch(reason => notify.error(reason, {title: '读取 B 站账号失败'}))
+ }, [visible])
  async function run(fn: () => Promise<void>) {
   if (working.current) return
   working.current = true
   setBusy(true)
-  setError('')
   setProgress('')
   try {
    await fn()
   } catch (reason) {
-   setError(reason instanceof Error ? reason.message : String(reason))
+   notify.error(reason)
   } finally {
    working.current = false
    setBusy(false)
-   void loadTasks().catch(reason => setError(String(reason)))
   }
  }
  async function choose(video: Video) {
@@ -93,35 +83,6 @@ export function BiliResourcesPanel({
   const series = await invoke<VideoSeries>('video-ppt:series', {url: video.url})
   setBasket(current => [...current, {url: video.url, title: video.title, series, pages: []}])
  }
- // A repeated waiting result must schedule the next check, even if its text
- // is unchanged. The sequence below remains scoped to the visible QR panel.
- const [pollTick, setPollTick] = useState(0)
- useEffect(() => {
-  if (!visible || !qr || !['waiting', 'scanning'].includes(login)) return
-  let stopped = false
-  const timer = setTimeout(() => {
-   void invoke<{status: string}>('bili-resources:poll')
-    .then(async result => {
-     if (stopped) return
-     setLogin(result.status)
-     setPollTick(tick => tick + 1)
-     if (result.status === 'success') {
-      setQr('')
-      await refresh()
-     }
-    })
-    .catch(reason => {
-     if (!stopped) {
-      setError(String(reason))
-      setLogin('failed')
-     }
-    })
-  }, 2500)
-  return () => {
-   stopped = true
-   clearTimeout(timer)
-  }
- }, [visible, qr, login, pollTick])
  async function load(selected: Folder, nextPage: number) {
   const result = await invoke<{videos: Video[]; hasMore: boolean; page: number}>('bili-resources:videos', {
    id: selected.id,
@@ -152,70 +113,10 @@ export function BiliResourcesPanel({
     <Button variant="tertiary" size="sm" isDisabled={busy} onClick={() => void run(refresh)}>
      刷新收藏夹
     </Button>
+    <SettingsLink section="bilibili">账号设置</SettingsLink>
    </div>
    <BiliBrowse useVideo={useVideo} />
-   <MediaDownloads visible={visible} />
    <Discussion />
-   <Card className="knowledge-card">
-    <header>
-     <h3>B 站账号</h3>
-     <div className="row">
-      <Button variant="tertiary" size="sm" isDisabled={busy} onClick={() => void run(refresh)}>
-       检查登录状态
-      </Button>
-      {user.loggedIn ? (
-       <Button
-        variant="ghost"
-        size="sm"
-        isDisabled={busy}
-        onClick={() =>
-         void run(async () => {
-          await invoke('bili-resources:logout')
-          setQr('')
-          setLogin('')
-          await refresh()
-         })
-        }
-       >
-        退出 B 站
-       </Button>
-      ) : (
-       <Button
-        variant="primary"
-        size="sm"
-        isDisabled={busy}
-        onClick={() =>
-         void run(async () => {
-          setQr('')
-          setLogin('')
-          setQr(await invoke<string>('bili-resources:qr'))
-          setLogin('waiting')
-         })
-        }
-       >
-        扫码登录 B 站
-       </Button>
-      )}
-     </div>
-    </header>
-    <p className="hint">
-     登录保存在本应用的独立 B 站会话中，不读取 Chrome 或 BiliSum 的账号；只读取收藏列表，不修改 B 站收藏。
-    </p>
-    {qr && (
-     <div className="resource-qr">
-      <img src={qr} alt="B 站官方登录二维码" />
-      <p>
-       {login === 'scanning'
-        ? '已扫码，请在手机上确认'
-        : login === 'expired'
-          ? '二维码已过期，请重新生成'
-          : login === 'failed'
-            ? '检查失败，请重试'
-            : '请使用 B 站手机应用扫码'}
-      </p>
-     </div>
-    )}
-   </Card>
    {busy && (
     <div className="row">
      <p role="status">{progress || '正在读取 B 站资源…'}</p>
@@ -225,7 +126,6 @@ export function BiliResourcesPanel({
     </div>
    )}
    {!busy && progress && <p role="status">{progress}</p>}
-   {error && <AlertBox>{error}</AlertBox>}
    {folder ? (
     <section>
      <div className="row">
@@ -358,29 +258,33 @@ export function BiliResourcesPanel({
        </div>
        <div className="batch-options">
         {item.series.episodes.map(part => (
-         <label key={part.url}>
-          <input
-           type="checkbox"
-           disabled={busy}
-           aria-label={`同步 ${item.title} P${part.page} ${part.title}`}
-           checked={item.pages.includes(part.page)}
-           onChange={event =>
-            setBasket(current =>
-             current.map(row =>
-              row.url === item.url
-               ? {
-                  ...row,
-                  pages: event.target.checked ? [...row.pages, part.page] : row.pages.filter(page => page !== part.page)
-                 }
-               : row
-             )
+         <Checkbox
+          key={part.url}
+          isSelected={item.pages.includes(part.page)}
+          isDisabled={busy}
+          aria-label={`同步 ${item.title} P${part.page} ${part.title}`}
+          onChange={checked =>
+           setBasket(current =>
+            current.map(row =>
+             row.url === item.url
+              ? {
+                 ...row,
+                 pages: checked ? [...row.pages, part.page] : row.pages.filter(page => page !== part.page)
+                }
+              : row
             )
-           }
-          />
-          <span>
-           P{part.page} · {part.title}
-          </span>
-         </label>
+           )
+          }
+         >
+          <Checkbox.Content>
+           <Checkbox.Control>
+            <Checkbox.Indicator />
+           </Checkbox.Control>
+           <span>
+            P{part.page} · {part.title}
+           </span>
+          </Checkbox.Content>
+         </Checkbox>
         ))}
        </div>
       </details>
@@ -410,7 +314,6 @@ export function BiliResourcesPanel({
           category: category.trim() || courseName || '',
           courseId: courseId || undefined
          })
-         setTasks(current => [task, ...current.filter(item => item.id !== task.id)])
          setProgress(
           `批量同步结束：完成 ${task.items.filter(item => item.status === '已完成').length}，失败 ${task.items.filter(item => item.status === '失败').length}`
          )
@@ -422,14 +325,6 @@ export function BiliResourcesPanel({
      </div>
     </Card>
    )}
-   <SubtitleBatchRecords
-    visible={visible}
-    tasks={tasks}
-    busy={busy}
-    run={run}
-    refresh={loadTasks}
-    courseName={courseName}
-   />
   </>
  )
 }

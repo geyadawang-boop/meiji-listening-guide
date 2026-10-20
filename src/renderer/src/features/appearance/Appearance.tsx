@@ -1,9 +1,9 @@
-import {Button, Label, Slider} from '@heroui/react'
+import {Button, Checkbox, Label, Slider, Tabs} from '@heroui/react'
 import {useState, useRef, useEffect, type CSSProperties} from 'react'
 import {defaultAppearance, resolveAppearance, type Appearance, type AppearanceState} from '@shared/appearance'
 import type {Course} from '@shared/types'
 import {ChatMessage} from '@renderer/features/chat/ChatMessage'
-import {AlertBox} from '@renderer/ui/AlertBox'
+import {notify} from '@renderer/ui/ToastHost'
 import {SelectField} from '@renderer/ui/SelectField'
 const colors = {default: 'var(--blue)', lavender: '#9279c7', rose: '#ca809c', mint: '#5d9e90', blue: '#6497ca'}
 export function chatStyle(value: Appearance) {
@@ -60,7 +60,6 @@ export function AppearanceEditor({
   [scope, setScope] = useState<'global' | 'course'>('global'),
   [value, setValue] = useState(initial.global),
   [busy, setBusy] = useState(false),
-  [error, setError] = useState(''),
   [status, setStatus] = useState('')
  const stateRef = useRef(initial),
   pending = useRef(new Map<string, Appearance>()),
@@ -95,7 +94,7 @@ export function AppearanceEditor({
     } catch (e) {
      for (const [id, value] of batch) if (!pending.current.has(id)) pending.current.set(id, value)
      if (mounted.current) {
-      setError(e instanceof Error ? e.message : String(e))
+      notify.error(e, {title: '保存外观失败', key: 'appearance:save', dedupeWindow: 10000})
       setStatus('保存失败，可点击保存重试')
      }
      throw e
@@ -115,7 +114,6 @@ export function AppearanceEditor({
   const merged = {...value, ...next},
    id = scope === 'course' ? editingCourseId : ''
   setValue(merged)
-  setError('')
   setStatus('正在保存…')
   const current = stateRef.current,
    staged: AppearanceState = id
@@ -132,16 +130,14 @@ export function AppearanceEditor({
  const changeScope = (next: 'global' | 'course') => {
   setScope(next)
   setValue(next === 'global' ? stateRef.current.global : resolveAppearance(stateRef.current, editingCourseId))
-  setError('')
  }
  async function run(fn: () => Promise<void>) {
   setBusy(true)
-  setError('')
   try {
    await flush()
    await fn()
   } catch (e) {
-   setError(e instanceof Error ? e.message : String(e))
+   notify.error(e, {title: '保存外观失败', key: 'appearance:save', dedupeWindow: 10000})
   } finally {
    setBusy(false)
   }
@@ -215,71 +211,84 @@ export function AppearanceEditor({
     </div>
    </header>
    <div className="appearance-layout">
-    <fieldset className="appearance-controls" disabled={busy}>
-     <div className="appearance-scope" role="group" aria-label="设置范围">
-      <button disabled={busy} className={scope === 'global' ? 'selected' : ''} onClick={() => changeScope('global')}>
-       全局
-      </button>
-      <button
-       disabled={busy || !courses.length}
-       className={scope === 'course' ? 'selected' : ''}
-       onClick={() => changeScope('course')}
+    <fieldset className="appearance-controls appearance-controls--background" disabled={busy}>
+     <div className="appearance-scope-block">
+      <Tabs
+       className="appearance-scope-tabs"
+       selectedKey={scope}
+       onSelectionChange={key => {
+        if (key === 'global' || key === 'course') changeScope(key)
+       }}
       >
-       课程
-      </button>
+       <Tabs.ListContainer className="app-tabs__list-container">
+        <Tabs.List aria-label="设置范围">
+         <Tabs.Tab className="app-tabs__tab" id="global" isDisabled={busy}>
+          全局
+          <Tabs.Indicator />
+         </Tabs.Tab>
+         <Tabs.Tab className="app-tabs__tab" id="course" isDisabled={busy || !courses.length}>
+          课程
+          <Tabs.Indicator />
+         </Tabs.Tab>
+        </Tabs.List>
+       </Tabs.ListContainer>
+       <Tabs.Panel id="global">
+        {courseId && state.courses[courseId] && (
+         <div className="appearance-notice">
+          {courses.find(c => c.id === courseId)?.name} 使用独立外观。
+          <Button
+           variant="tertiary"
+           size="sm"
+           isDisabled={busy}
+           onClick={() =>
+            void run(async () => commit(await window.assistant.invoke<AppearanceState>('appearance:clear', {courseId})))
+           }
+          >
+           让当前课程跟随全局
+          </Button>
+         </div>
+        )}
+       </Tabs.Panel>
+       <Tabs.Panel id="course">
+        <div className="appearance-course">
+         <label>
+          选择课程
+          <SelectField
+           label="外观设置课程"
+           isDisabled={busy}
+           value={editingCourseId}
+           onChange={next => {
+            setEditingCourseId(next)
+            setValue(resolveAppearance(stateRef.current, next))
+           }}
+           options={courses.map(c => ({value: c.id, label: c.name}))}
+          />
+         </label>
+         <span>{state.courses[editingCourseId] ? '独立设置' : '跟随全局'}</span>
+         <Button
+          variant="tertiary"
+          size="sm"
+          isDisabled={busy}
+          onClick={() =>
+           void run(async () => {
+            const next = await window.assistant.invoke<AppearanceState>('appearance:clear', {
+             courseId: editingCourseId
+            })
+            commit(next)
+            setValue(next.global)
+           })
+          }
+         >
+          跟随全局
+         </Button>
+        </div>
+       </Tabs.Panel>
+      </Tabs>
      </div>
-     {scope === 'global' && courseId && state.courses[courseId] && (
-      <div className="appearance-notice">
-       {courses.find(c => c.id === courseId)?.name} 使用独立外观。
-       <Button
-        variant="tertiary"
-        size="sm"
-        isDisabled={busy}
-        onClick={() =>
-         void run(async () => commit(await window.assistant.invoke<AppearanceState>('appearance:clear', {courseId})))
-        }
-       >
-        让当前课程跟随全局
-       </Button>
-      </div>
-     )}
-     {scope === 'course' && (
-      <div className="appearance-course">
-       <label>
-        选择课程
-        <SelectField
-         label="外观设置课程"
-         isDisabled={busy}
-         value={editingCourseId}
-         onChange={next => {
-          setEditingCourseId(next)
-          setValue(resolveAppearance(stateRef.current, next))
-          setError('')
-         }}
-         options={courses.map(c => ({value: c.id, label: c.name}))}
-        />
-       </label>
-       <span>{state.courses[editingCourseId] ? '独立设置' : '跟随全局'}</span>
-       <Button
-        variant="tertiary"
-        size="sm"
-        isDisabled={busy}
-        onClick={() =>
-         void run(async () => {
-          const next = await window.assistant.invoke<AppearanceState>('appearance:clear', {courseId: editingCourseId})
-          commit(next)
-          setValue(next.global)
-         })
-        }
-       >
-        跟随全局
-       </Button>
-      </div>
-     )}
      <section>
       <h3>聊天背景</h3>
       <label>
-       背景
+       背景样式
        <SelectField
         label="聊天背景"
         value={value.background}
@@ -311,14 +320,39 @@ export function AppearanceEditor({
         移除背景
        </Button>
       </div>
-      {slider('背景透明度', 'opacity', 0, 1, 0.05)}
+     </section>
+    </fieldset>
+    <aside>
+     <h3 className="appearance-preview-title">实时预览</h3>
+     <div
+      className="appearance-preview chat-styled"
+      style={chatStyle(value)}
+      data-names={value.showNames}
+      data-bubbles={value.assistantBubble}
+     >
+      <Wallpaper value={value} />
+      <div className="agent-thread">
+       <ChatMessage role="user" content="梅酱，今天一起学习吧。">
+        <p>梅酱，今天一起学习吧。</p>
+       </ChatMessage>
+       <ChatMessage role="assistant" content="好呀，我们先整理重点，再一起练习。">
+        <p>
+         好呀，我们先整理重点，
+         <br />
+         再一起练习。
+        </p>
+       </ChatMessage>
+      </div>
+     </div>
+    </aside>
+    <fieldset className="appearance-controls appearance-controls--details" disabled={busy}>
+     <section>
+      <h3>背景细节与头像</h3>
+      {slider('背景不透明度', 'opacity', 0, 1, 0.05)}
       {slider('背景模糊', 'blur', 0, 24)}
       {slider('背景遮罩', 'scrim', 0, 1, 0.05)}
-     </section>
-     <section>
-      <h3>头像与消息</h3>
       <label>
-       主题色
+       聊天主题色
        <SelectField
         label="聊天主题色"
         value={value.accent}
@@ -360,69 +394,64 @@ export function AppearanceEditor({
        />
       </label>
       {slider('头像大小', 'avatarSize', 28, 72)}
+     </section>
+    </fieldset>
+    <fieldset className="appearance-controls appearance-controls--style" disabled={busy}>
+     <section>
+      <h3>文字与气泡</h3>
       {slider('正文字号', 'fontSize', 12, 24)}
-      {slider('正文行距', 'lineHeight', 1.3, 2.2, 0.05)}
+      {slider('正文行高', 'lineHeight', 1.3, 2.2, 0.05)}
       {slider('消息间距', 'messageGap', 8, 48)}
       {slider('气泡圆角', 'bubbleRadius', 0, 28)}
       {slider('聊天内容宽度', 'contentWidth', 560, 1040, 20)}
-      <label className="appearance-check">
-       <input type="checkbox" checked={value.showNames} onChange={e => update({showNames: e.target.checked})} />
-       显示名字
-      </label>
-      <label className="appearance-check">
-       <input
-        type="checkbox"
-        checked={value.assistantBubble}
-        onChange={e => update({assistantBubble: e.target.checked})}
-       />
-       助手消息使用气泡
-      </label>
+      <Checkbox
+       className="appearance-check"
+       isSelected={value.showNames}
+       onChange={checked => update({showNames: checked})}
+      >
+       <Checkbox.Content>
+        <Checkbox.Control>
+         <Checkbox.Indicator />
+        </Checkbox.Control>
+        显示发送者名字
+       </Checkbox.Content>
+      </Checkbox>
+      <Checkbox
+       className="appearance-check"
+       isSelected={value.assistantBubble}
+       onChange={checked => update({assistantBubble: checked})}
+      >
+       <Checkbox.Content>
+        <Checkbox.Control>
+         <Checkbox.Indicator />
+        </Checkbox.Control>
+        助手消息使用气泡
+       </Checkbox.Content>
+      </Checkbox>
      </section>
-     <Button
-      variant="tertiary"
-      size="sm"
-      isDisabled={busy}
-      onClick={() =>
-       void run(async () => {
-        const next = {...defaultAppearance}
-        setValue(next)
-        commit(
-         await window.assistant.invoke<AppearanceState>('appearance:save', {
-          value: next,
-          courseId: scope === 'course' ? editingCourseId : undefined
-         })
-        )
-       })
-      }
-     >
-      恢复默认外观
-     </Button>
-     {error && <AlertBox>{error}</AlertBox>}
-     {status && <p role="status">{status}</p>}
     </fieldset>
-    <aside>
-     <h3>实时预览</h3>
-     <div
-      className="appearance-preview chat-styled"
-      style={chatStyle(value)}
-      data-names={value.showNames}
-      data-bubbles={value.assistantBubble}
-     >
-      <Wallpaper value={value} />
-      <div className="agent-thread">
-       <ChatMessage role="user" content="梅酱，今天一起学习吧。">
-        <p>梅酱，今天一起学习吧。</p>
-       </ChatMessage>
-       <ChatMessage role="assistant" content="好呀，我们先整理重点，再一起练习。">
-        <p>
-         好呀，我们先整理重点，
-         <br />
-         再一起练习。
-        </p>
-       </ChatMessage>
-      </div>
-     </div>
-    </aside>
+   </div>
+   <div className="appearance-footer">
+    <Button
+     variant="tertiary"
+     size="sm"
+     isDisabled={busy}
+     onClick={() =>
+      void run(async () => {
+       const next = {...defaultAppearance}
+       setValue(next)
+       commit(
+        await window.assistant.invoke<AppearanceState>('appearance:save', {
+         value: next,
+         courseId: scope === 'course' ? editingCourseId : undefined
+        })
+       )
+      })
+     }
+    >
+     恢复默认外观
+    </Button>
+    {status && <p role="status">{status}</p>}
    </div>
   </section>
  )

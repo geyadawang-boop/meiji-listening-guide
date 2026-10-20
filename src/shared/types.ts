@@ -179,8 +179,14 @@ export interface Progress {
  total?: number
  error?: boolean
 }
+export interface JobState {
+ key: string
+ lectureId?: string
+ progress?: Progress
+}
 export type EventPayload =
  | {kind: 'progress'; data: Progress}
+ | {kind: 'job'; data: {key: string; lectureId?: string; state: 'finished'; error?: string}}
  | {kind: 'chat'; requestId: string; text: string}
  | {kind: 'browser'; url: string}
  | {kind: 'window'; data: {maximized: boolean}}

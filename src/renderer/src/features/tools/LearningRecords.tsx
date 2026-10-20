@@ -1,7 +1,7 @@
-import {Button, Card, Input, TextArea} from '@heroui/react'
+import {Button, Card, Checkbox, Input, TextArea} from '@heroui/react'
 import {useEffect, useState} from 'react'
 import ReactMarkdown from 'react-markdown'
-import {AlertBox} from '@renderer/ui/AlertBox'
+import {notify} from '@renderer/ui/ToastHost'
 import {MemorySuggestions} from '@renderer/features/tools/MemorySuggestions'
 import {SelectField} from '@renderer/ui/SelectField'
 const request = <T,>(action: string, args: unknown = {}) => window.assistant.invoke<T>('tools:request', {action, args})
@@ -40,9 +40,7 @@ export function LearningRecords() {
   [memoryTitle, setMemoryTitle] = useState(''),
   [body, setBody] = useState(''),
   [paused, setPaused] = useState(false),
-  [busy, setBusy] = useState(false),
-  [error, setError] = useState(''),
-  [notice, setNotice] = useState('')
+  [busy, setBusy] = useState(false)
  async function listing(start = 0) {
   const page = await request<{entries: Session[]; has_more: boolean}>('conversations', {offset: start})
   setSessions(start ? old => [...old, ...page.entries] : page.entries)
@@ -54,12 +52,10 @@ export function LearningRecords() {
  }
  async function run(fn: () => Promise<unknown>) {
   setBusy(true)
-  setError('')
-  setNotice('')
   try {
    await fn()
   } catch (reason) {
-   setError(reason instanceof Error ? reason.message : String(reason))
+   notify.error(reason)
   } finally {
    setBusy(false)
   }
@@ -73,7 +69,7 @@ export function LearningRecords() {
    () =>
     void request<Detail>('conversation-read', {id: detail.conversation_id})
      .then(setDetail)
-     .catch(reason => setError(String(reason))),
+     .catch(reason => notify.error(reason, {title: '读取学习记录失败', key: 'tools:records', dedupeWindow: 10000})),
    2000
   )
   return () => clearInterval(timer)
@@ -269,7 +265,7 @@ export function LearningRecords() {
            void run(async () => {
             const path = await request<string>('agent-export', {id: task.task_id})
             await window.assistant.invoke('library:reveal', {path})
-            setNotice('所选会话成果已保存')
+            notify.success('所选会话成果已保存')
            })
           }
          >
@@ -308,10 +304,14 @@ export function LearningRecords() {
      />
     </div>
     <TextArea aria-label="学习记忆正文" maxLength={1000} value={body} onChange={e => setBody(e.target.value)} />
-    <label className="media-check">
-     <input type="checkbox" checked={paused} onChange={e => setPaused(e.target.checked)} />
-     停用这条记忆
-    </label>
+    <Checkbox className="media-check" isSelected={paused} onChange={setPaused}>
+     <Checkbox.Content>
+      <Checkbox.Control>
+       <Checkbox.Indicator />
+      </Checkbox.Control>
+      停用这条记忆
+     </Checkbox.Content>
+    </Checkbox>
     <div className="row">
      <Button
       variant="tertiary"
@@ -334,7 +334,7 @@ export function LearningRecords() {
         })
         edit()
         setMemories(await request<Memories>('memories'))
-        setNotice('学习记忆已保存')
+        notify.success('学习记忆已保存')
        })
       }
      >
@@ -377,8 +377,6 @@ export function LearningRecords() {
      </article>
     ))}
    </Card>
-   {notice && <p role="status">{notice}</p>}
-   {error && <AlertBox>{error}</AlertBox>}
   </>
  )
 }

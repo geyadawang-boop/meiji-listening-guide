@@ -78,7 +78,8 @@ export class Workflows {
  }
  async transcribe(lectureId: string, signal?: AbortSignal, mode: CorrectionMode = 'quality') {
   const lecture = this.store.lecture(lectureId),
-   report = (stage: string, message: string) => this.progress({lectureId, stage, message})
+   report = (stage: string, message: string, part?: number, total?: number) =>
+    this.progress({lectureId, stage, message, ...(part !== undefined && total !== undefined ? {part, total} : {})})
   if (!lecture.transcript_path) throw new Error('请先为本课次导入智云语音识别原文')
   if (!lecture.ppt_path) throw new Error('请先关联本课次的 PPT/课件，再校订字幕')
   this.store.status(lectureId, '校订中')
@@ -198,14 +199,21 @@ export class Workflows {
            profile: {...profile, apiKey: profile.key},
            onRetry: () => {
             retries++
-            report('格式重试', `批次 ${index + 1} 输出格式未通过校验，重试一次；累计重试 ${retries}`)
+            report(
+             '格式重试',
+             `批次 ${index + 1} 输出格式未通过校验，重试一次；累计重试 ${retries}`,
+             index + 1,
+             batches.length
+            )
            }
           }
          )
          batchSignal.throwIfAborted()
          report(
           '批次返回',
-          `批次 ${index + 1}，模型 ${model}，图片 ${images.length}，耗时 ${Math.round((Date.now() - batchStarted) / 1000)} 秒；等待按原文顺序保存`
+          `批次 ${index + 1}，模型 ${model}，图片 ${images.length}，耗时 ${Math.round((Date.now() - batchStarted) / 1000)} 秒；等待按原文顺序保存`,
+          index + 1,
+          batches.length
          )
          return corrected.map((row, j) => ({
           ...block[j],
@@ -223,7 +231,9 @@ export class Workflows {
          cooldownUntil = Math.max(cooldownUntil, Date.now() + waitMs)
          report(
           '连接重试',
-          `批次 ${index + 1} 暂停 ${Math.ceil(waitMs / 1000)} 秒后重试 ${attempt + 1}/2；累计重试 ${retries}；已保存 ${result.length} 条`
+          `批次 ${index + 1} 暂停 ${Math.ceil(waitMs / 1000)} 秒后重试 ${attempt + 1}/2；累计重试 ${retries}；已保存 ${result.length} 条`,
+          index + 1,
+          batches.length
          )
          await delay(waitMs, undefined, {signal: batchSignal})
         }
@@ -242,7 +252,9 @@ export class Workflows {
        eta = completed ? Math.round((elapsed * (source.segments.length - result.length)) / completed) : 0
       report(
        '片段完成',
-       `已保存 ${result.length}/${source.segments.length} 条；累计 ${Math.round(elapsed)} 秒，预计剩余约 ${eta} 秒（仅按本次速度估算）；重试 ${retries}；可中断后继续`
+       `已保存 ${result.length}/${source.segments.length} 条；累计 ${Math.round(elapsed)} 秒，预计剩余约 ${eta} 秒（仅按本次速度估算）；重试 ${retries}；可中断后继续`,
+       result.length,
+       source.segments.length
       )
      },
      signal
