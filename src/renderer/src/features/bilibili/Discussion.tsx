@@ -1,4 +1,4 @@
-import {Button, Card, Input} from '@heroui/react'
+import {Button, Card, Checkbox, Input} from '@heroui/react'
 import {useState} from 'react'
 import {notify} from '@renderer/ui/ToastHost'
 import {SelectField} from '@renderer/ui/SelectField'
@@ -129,23 +129,27 @@ export function Discussion() {
        .filter(item => !filter || item.text.includes(filter))
        .map(item => (
         <article className="batch-item" key={item.id}>
-         <label className="media-switch">
-          <input
-           disabled={busy}
-           type="checkbox"
-           aria-label={`保留 ${item.id}`}
-           checked={item.selected}
-           onChange={e => change(item.id, 'selected', e.target.checked)}
-          />
-          <strong>
-           {item.author || '观众讨论'}{' '}
-           {item.time_sec != null
-            ? `${Math.floor(item.time_sec / 60)}:${Math.floor(item.time_sec % 60)
-               .toString()
-               .padStart(2, '0')}`
-            : ''}
-          </strong>
-         </label>
+         <Checkbox
+          className="media-switch"
+          isSelected={item.selected}
+          isDisabled={busy}
+          aria-label={`保留 ${item.id}`}
+          onChange={checked => change(item.id, 'selected', checked)}
+         >
+          <Checkbox.Content>
+           <Checkbox.Control>
+            <Checkbox.Indicator />
+           </Checkbox.Control>
+           <strong>
+            {item.author || '观众讨论'}{' '}
+            {item.time_sec != null
+             ? `${Math.floor(item.time_sec / 60)}:${Math.floor(item.time_sec % 60)
+                .toString()
+                .padStart(2, '0')}`
+             : ''}
+           </strong>
+          </Checkbox.Content>
+         </Checkbox>
          <p>{item.text}</p>
          <p className="hint">
           {item.url} · 证据 {item.id}

@@ -61,7 +61,7 @@ export function VisualAnalysisPanel({visible}: {visible: boolean}) {
   <div className="visual-analysis-panel">
    <Card className="knowledge-card">
     <p className="hint">
-     先在本机选择图片或视频并提取画面，点击“识别所选画面”才发送画面到所选千问视觉模型。视频只处理抽样画面，保留时间间隙和源哈希。
+     先在本机选择图片或视频并提取画面，点击“识别所选画面”才发送画面到所选千问视觉模型。视频只处理抽样画面，保留时间间隙和源哈希。{' '}
      <SettingsLink section="qwen">视觉模型设置</SettingsLink>
      <SettingsLink section="runtime">检查运行组件</SettingsLink>
     </p>

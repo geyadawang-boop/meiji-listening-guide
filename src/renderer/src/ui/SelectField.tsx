@@ -38,16 +38,21 @@ export function SelectField({
     placeholder={placeholder || label || '请选择'}
     value={value === '' ? null : value}
     onChange={next => onChange(next == null ? '' : String(next))}
+    onClear={clearable ? () => onChange('') : undefined}
    >
     <Select.Trigger>
      <Select.Value />
+     {clearable ? <Select.ClearButton /> : null}
      <Select.Indicator />
     </Select.Trigger>
     <Select.Popover>
      <ListBox>
       {options.map(option => (
        <ListBox.Item key={option.value} id={option.value} textValue={option.label}>
-        {option.label}
+        <span className="search-select-option">
+         <span>{option.label}</span>
+         {option.description ? <small>{option.description}</small> : null}
+        </span>
         <ListBox.ItemIndicator />
        </ListBox.Item>
       ))}

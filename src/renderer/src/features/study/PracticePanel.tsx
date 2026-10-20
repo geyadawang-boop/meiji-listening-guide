@@ -1,4 +1,4 @@
-import {Button, Input} from '@heroui/react'
+import {Button, Checkbox, Input} from '@heroui/react'
 import {useState} from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -84,28 +84,42 @@ function Question({
    {!!options.length && (
     <>
      <div className="answer-options" role="group" aria-label="选择答案">
-      {options.map(o => (
-       <label className={'answer-option ' + (selected.includes(o.key) ? 'selected' : '')} key={o.key}>
-        <Input
-         type={multiple ? 'checkbox' : 'radio'}
-         name={group + index}
-         value={o.key}
-         disabled={pending || !!q.attempt}
-         checked={selected.includes(o.key)}
-         onChange={e =>
+      {options.map(o =>
+       multiple ? (
+        <Checkbox
+         className={'answer-option ' + (selected.includes(o.key) ? 'selected' : '')}
+         key={o.key}
+         isSelected={selected.includes(o.key)}
+         isDisabled={pending || !!q.attempt}
+         onChange={checked =>
           setDraft(
-           multiple
-            ? (e.target.checked ? [...selected.filter(Boolean), o.key] : selected.filter(k => k !== o.key))
-               .sort()
-               .join(',')
-            : o.key
+           (checked ? [...selected.filter(Boolean), o.key] : selected.filter(k => k !== o.key)).sort().join(',')
           )
          }
-        />
-        <span className="option-letter">{o.key}</span>
-        <span>{o.text}</span>
-       </label>
-      ))}
+        >
+         <Checkbox.Content>
+          <Checkbox.Control>
+           <Checkbox.Indicator />
+          </Checkbox.Control>
+          <span className="option-letter">{o.key}</span>
+          <span>{o.text}</span>
+         </Checkbox.Content>
+        </Checkbox>
+       ) : (
+        <label className={'answer-option ' + (selected.includes(o.key) ? 'selected' : '')} key={o.key}>
+         <Input
+          type="radio"
+          name={group + index}
+          value={o.key}
+          disabled={pending || !!q.attempt}
+          checked={selected.includes(o.key)}
+          onChange={() => setDraft(o.key)}
+         />
+         <span className="option-letter">{o.key}</span>
+         <span>{o.text}</span>
+        </label>
+       )
+      )}
      </div>
      <label className="choice-response-label">
       输入你的选项

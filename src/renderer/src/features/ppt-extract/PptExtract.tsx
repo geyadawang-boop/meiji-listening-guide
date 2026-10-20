@@ -1,8 +1,9 @@
-import {Button, Input, TextArea} from '@heroui/react'
+import {Button, Checkbox, Input, TextArea} from '@heroui/react'
 import type {LibraryFile} from '@shared/types'
 import {useEffect, useRef, useState} from 'react'
 import {defaultPptExtractPrompt, type PptExtractReview, type PptExtractPage} from '@shared/ppt-extract'
 import {notify} from '@renderer/ui/ToastHost'
+import {SettingsLink} from '@renderer/app/settings-navigation'
 const invoke = <T,>(action: string, args?: unknown) => window.assistant.invoke<T>(action, args)
 export function PptExtractPanel({
  visible,
@@ -155,8 +156,7 @@ export function PptExtractPanel({
     </div>
     {sourceDeleted && <p className="hint">原始 PPT 已删除。现有预览可以调整并再次导出；重新分析请另选 PPT。</p>}
     <p className="hint">
-     保存到：{courseName || '未分类资料'}。
-     <SettingsLink section="qwen">视觉模型设置</SettingsLink>
+     保存到：{courseName || '未分类资料'}。 <SettingsLink section="qwen">视觉模型设置</SettingsLink>
     </p>
     <p className="hint">
      整份 PPT 在一个新对话中分析。支持每页一张图片的 PPTX，结果保存到 PPT 资料文件夹；PDF
@@ -230,16 +230,19 @@ export function PptExtractPanel({
         h = c.bottom - c.top
        return (
         <article key={p.page} className={p.keep ? '' : 'removed'}>
-         <label>
-          <input
-           type="checkbox"
-           aria-label={`保留第 ${p.page} 页`}
-           checked={p.keep}
-           disabled={busy || !p.preview}
-           onChange={e => change(p.page, {keep: e.target.checked})}
-          />
-          第 {p.page} 页 · {p.keep ? '保留' : '删除'}
-         </label>
+         <Checkbox
+          isSelected={p.keep}
+          isDisabled={busy || !p.preview}
+          aria-label={`保留第 ${p.page} 页`}
+          onChange={checked => change(p.page, {keep: checked})}
+         >
+          <Checkbox.Content>
+           <Checkbox.Control>
+            <Checkbox.Indicator />
+           </Checkbox.Control>
+           第 {p.page} 页 · {p.keep ? '保留' : '删除'}
+          </Checkbox.Content>
+         </Checkbox>
          <div className="ppt-extract-preview" style={{aspectRatio: p.height ? (p.width * w) / (p.height * h) : 16 / 9}}>
           {p.preview ? (
            <img

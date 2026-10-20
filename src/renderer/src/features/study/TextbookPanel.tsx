@@ -1,18 +1,10 @@
 import {useEffect, useMemo, useRef, useState, type CSSProperties} from 'react'
-import {
- Button,
- Checkbox,
- NumberField,
- ProgressBar,
- Spinner,
- TextArea,
- ToggleButton,
- ToggleButtonGroup
-} from '@heroui/react'
+import {Button, Checkbox, NumberField, ProgressBar, Spinner, TextArea} from '@heroui/react'
 import {ChevronLeft, ChevronRight, Scan, ZoomIn, ZoomOut} from 'lucide-react'
 import {ConfirmDialog} from '@renderer/ui/ConfirmDialog'
 import {StudyField} from '@renderer/features/study/Field'
 import {usePdfPage} from '@renderer/features/study/usePdfPage'
+import {SettingsLink} from '@renderer/app/settings-navigation'
 import type {Book, Draft} from '@renderer/features/study/types'
 import type {Highlight, StudyEntry} from '@shared/study'
 import {highlightLabels} from '@shared/study'
@@ -149,26 +141,32 @@ export function TextbookMenu(props: TextbookProps) {
       <StudyField label="起始页">
        <NumberField
         aria-label="章节起始页"
+        isDisabled={busy}
         minValue={1}
         maxValue={book.pages}
         value={first}
         onChange={value => onFirst(value)}
        >
         <NumberField.Group>
-         <NumberField.Input />
+         <NumberField.DecrementButton />
+         <NumberField.Input onFocus={event => event.currentTarget.select()} />
+         <NumberField.IncrementButton />
         </NumberField.Group>
        </NumberField>
       </StudyField>
       <StudyField label="结束页">
        <NumberField
         aria-label="章节结束页"
+        isDisabled={busy}
         minValue={1}
         maxValue={book.pages}
         value={last}
         onChange={value => onLast(value)}
        >
         <NumberField.Group>
-         <NumberField.Input />
+         <NumberField.DecrementButton />
+         <NumberField.Input onFocus={event => event.currentTarget.select()} />
+         <NumberField.IncrementButton />
         </NumberField.Group>
        </NumberField>
       </StudyField>
@@ -195,10 +193,12 @@ export function TextbookMenu(props: TextbookProps) {
      {!linked ? (
       <p className="study-side-hint study-side-hint--warning">先关联课次，AI 才能读取本课字幕、重点与课件。</p>
      ) : null}
-     <Button variant={draft ? 'tertiary' : 'primary'} size="sm" isDisabled={busy || !canAnalyze} onClick={onAnalyze}>
-      {draft ? '重新生成建议' : '生成划线建议'}
-     </Button>
-     <SettingsLink section="qwen">模型设置</SettingsLink>
+     <div className="study-generate-row">
+      <Button variant={draft ? 'tertiary' : 'primary'} size="sm" isDisabled={busy || !canAnalyze} onClick={onAnalyze}>
+       {draft ? '重新生成建议' : '生成划线建议'}
+      </Button>
+      <SettingsLink section="qwen">模型设置</SettingsLink>
+     </div>
     </section>
    ) : null}
    {busy ? (
@@ -232,8 +232,8 @@ export function TextbookMenu(props: TextbookProps) {
      </div>
      <div className="study-danger-zone study-danger-zone--compact">
       <div>
-       <strong>移除本软件添加的划线</strong>
-       <small>只删除本软件写入的批注，原有批注保留。</small>
+       <strong>移除软件划线</strong>
+       <small>原有批注会保留。</small>
       </div>
       <Button variant="danger-soft" size="sm" isDisabled={busy} onClick={() => setConfirmRemove(true)}>
        移除划线
@@ -363,7 +363,7 @@ export function TextbookContent(props: TextbookProps) {
         onChange={value => onPageNumber(value)}
        >
         <NumberField.Group>
-         <NumberField.Input />
+         <NumberField.Input onFocus={event => event.currentTarget.select()} />
         </NumberField.Group>
        </NumberField>
        <span className="study-page-total">/ {book.pages}</span>
@@ -470,24 +470,27 @@ export function TextbookContent(props: TextbookProps) {
     ) : (
      <>
       {draft || rectangle ? (
-       <ToggleButtonGroup
-        aria-label="划线方式"
-        className="study-inspector-tabs"
-        disallowEmptySelection
-        selectedKeys={new Set([mode])}
-        selectionMode="single"
-        onSelectionChange={keys => {
-         const next = [...keys][0]
-         if (next === 'suggestions' || next === 'manual') setMode(next)
-        }}
-       >
-        <ToggleButton id="suggestions" isDisabled={!draft} size="sm">
+       <div aria-label="划线方式" className="study-segmented study-segmented--full" role="group">
+        <Button
+         aria-pressed={mode === 'suggestions'}
+         className={'study-segmented__button' + (mode === 'suggestions' ? ' study-segmented__button--active' : '')}
+         isDisabled={!draft}
+         size="sm"
+         variant="ghost"
+         onClick={() => setMode('suggestions')}
+        >
          建议 · {groups.length}
-        </ToggleButton>
-        <ToggleButton id="manual" size="sm">
+        </Button>
+        <Button
+         aria-pressed={mode === 'manual'}
+         className={'study-segmented__button' + (mode === 'manual' ? ' study-segmented__button--active' : '')}
+         size="sm"
+         variant="ghost"
+         onClick={() => setMode('manual')}
+        >
          手动框选
-        </ToggleButton>
-       </ToggleButtonGroup>
+        </Button>
+       </div>
       ) : null}
       {mode === 'suggestions' && draft ? (
        <div className="study-inspector-body">
@@ -571,24 +574,22 @@ export function TextbookContent(props: TextbookProps) {
          ) : null}
         </div>
         <StudyField label="划线来源">
-         <ToggleButtonGroup
-          aria-label="划线来源"
-          className="study-source-group"
-          disallowEmptySelection
-          selectedKeys={new Set([source])}
-          selectionMode="single"
-          onSelectionChange={keys => {
-           const next = [...keys][0]
-           if (typeof next === 'string') setSource(next as Highlight['source'])
-          }}
-         >
+         <div aria-label="划线来源" className="study-source-choices" role="group">
           {sourceKeys.map(key => (
-           <ToggleButton key={key} id={key} size="sm">
+           <Button
+            key={key}
+            aria-pressed={source === key}
+            className={'study-source-choice' + (source === key ? ' study-source-choice--active' : '')}
+            size="sm"
+            variant="ghost"
+            fullWidth
+            onClick={() => setSource(key)}
+           >
             <span className={`study-source-dot study-source-dot--${key}`} />
             {highlightLabels[key]}
-           </ToggleButton>
+           </Button>
           ))}
-         </ToggleButtonGroup>
+         </div>
         </StudyField>
         <StudyField label="划线依据" hint="说明这段内容与老师讲授、重点或课件的对应关系，保存后写入批注。">
          <TextArea

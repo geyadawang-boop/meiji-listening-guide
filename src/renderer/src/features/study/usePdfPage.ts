@@ -108,7 +108,7 @@ export function usePdfPage(book: Book | null, pageNumber: number, frameWidth: nu
    renderTask?.cancel()
    page?.cleanup()
   }
- }, [document, pageNumber, frameWidth, zoom])
+ }, [document, pageNumber, frameWidth, zoom, book?.id, version])
 
  return {canvas, viewport, size, rendering, error}
 }

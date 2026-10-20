@@ -60,7 +60,7 @@ export function KnowledgeClassification({entries, refresh}: {entries: KnowledgeE
     <Disclosure.Content>
      <Disclosure.Body className="knowledge-classification-body">
       <p className="hint">
-       按类型、主题、难度、时长和语言整理资料。模型建议使用实际资料文字，保存前可修改；来源改变会拒绝旧草稿。
+       按类型、主题、难度、时长和语言整理资料。模型建议使用实际资料文字，保存前可修改；来源改变会拒绝旧草稿。{' '}
        <SettingsLink section="qwen">模型设置</SettingsLink>
       </p>
       <div className="row">

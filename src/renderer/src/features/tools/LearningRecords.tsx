@@ -1,4 +1,4 @@
-import {Button, Card, Input, TextArea} from '@heroui/react'
+import {Button, Card, Checkbox, Input, TextArea} from '@heroui/react'
 import {useEffect, useState} from 'react'
 import ReactMarkdown from 'react-markdown'
 import {notify} from '@renderer/ui/ToastHost'
@@ -304,10 +304,14 @@ export function LearningRecords() {
      />
     </div>
     <TextArea aria-label="学习记忆正文" maxLength={1000} value={body} onChange={e => setBody(e.target.value)} />
-    <label className="media-check">
-     <input type="checkbox" checked={paused} onChange={e => setPaused(e.target.checked)} />
-     停用这条记忆
-    </label>
+    <Checkbox className="media-check" isSelected={paused} onChange={setPaused}>
+     <Checkbox.Content>
+      <Checkbox.Control>
+       <Checkbox.Indicator />
+      </Checkbox.Control>
+      停用这条记忆
+     </Checkbox.Content>
+    </Checkbox>
     <div className="row">
      <Button
       variant="tertiary"

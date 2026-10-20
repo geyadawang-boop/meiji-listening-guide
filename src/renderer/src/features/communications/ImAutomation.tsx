@@ -1,4 +1,4 @@
-import {Button, Card, Input, TextArea} from '@heroui/react'
+import {Button, Card, Checkbox, Input, TextArea} from '@heroui/react'
 import {useEffect, useState} from 'react'
 import {notify} from '@renderer/ui/ToastHost'
 import {SelectField} from '@renderer/ui/SelectField'
@@ -202,21 +202,26 @@ export function ImAutomation({
     </label>
    </div>
    {libraries.map(library => (
-    <label className="media-check" key={library.library_id}>
-     <input
-      type="checkbox"
-      disabled={!library.available}
-      checked={chosen.includes(library.library_id)}
-      onChange={e => {
-       setChosen(old => (e.target.checked ? [...old, library.library_id] : old.filter(id => id !== library.library_id)))
-       setConfirmed(false)
-      }}
-     />
-     允许本会话查询 {library.label}
-    </label>
+    <Checkbox
+     className="media-check"
+     key={library.library_id}
+     isSelected={chosen.includes(library.library_id)}
+     isDisabled={!library.available}
+     onChange={checked => {
+      setChosen(old => (checked ? [...old, library.library_id] : old.filter(id => id !== library.library_id)))
+      setConfirmed(false)
+     }}
+    >
+     <Checkbox.Content>
+      <Checkbox.Control>
+       <Checkbox.Indicator />
+      </Checkbox.Control>
+      允许本会话查询 {library.label}
+     </Checkbox.Content>
+    </Checkbox>
    ))}
    <p className="hint">
-    使用梅酱当前模型连接。改变模型连接或会话规则会阻止旧任务继续发送；学习记忆不会自动共享到聊天账号。
+    使用梅酱当前模型连接。改变模型连接或会话规则会阻止旧任务继续发送；学习记忆不会自动共享到聊天账号。{' '}
     <SettingsLink section="qwen">模型设置</SettingsLink>
    </p>
    <div className="row">
@@ -257,11 +262,15 @@ export function ImAutomation({
    </div>
    {supported ? (
     <>
-     <label className="media-check">
-      <input type="checkbox" checked={confirmed} onChange={e => setConfirmed(e.target.checked)} />
-      我确认后台处理账号 {scope.account}、会话 {scope.peer}
-      {mode === 'auto_reply' ? '，并允许自动发送回复' : '，只生成待核对草稿'}
-     </label>
+     <Checkbox className="media-check" isSelected={confirmed} onChange={setConfirmed}>
+      <Checkbox.Content>
+       <Checkbox.Control>
+        <Checkbox.Indicator />
+       </Checkbox.Control>
+       我确认后台处理账号 {scope.account}、会话 {scope.peer}
+       {mode === 'auto_reply' ? '，并允许自动发送回复' : '，只生成待核对草稿'}
+      </Checkbox.Content>
+     </Checkbox>
      <div className="row">
       <Button
        variant="primary"

@@ -1,5 +1,5 @@
 import {Button} from '@heroui/react'
-import {Cog} from 'lucide-react'
+import {Settings} from 'lucide-react'
 import {createContext, useContext, type ReactNode} from 'react'
 
 export type SettingsSection =
@@ -21,13 +21,7 @@ type SettingsNavigation = {
 
 const SettingsNavigationContext = createContext<SettingsNavigation | null>(null)
 
-export function SettingsNavigationProvider({
- value,
- children
-}: {
- value: SettingsNavigation
- children: ReactNode
-}) {
+export function SettingsNavigationProvider({value, children}: {value: SettingsNavigation; children: ReactNode}) {
  return <SettingsNavigationContext.Provider value={value}>{children}</SettingsNavigationContext.Provider>
 }
 
@@ -40,11 +34,13 @@ export function useSettingsNavigation() {
 export function SettingsLink({
  section,
  children,
- onSelect
+ onSelect,
+ inline = true
 }: {
  section: SettingsSection
  children: ReactNode
  onSelect?: () => void
+ inline?: boolean
 }) {
  const {open} = useSettingsNavigation()
  return (
@@ -52,12 +48,15 @@ export function SettingsLink({
    variant="ghost"
    size="sm"
    type="button"
+   className={inline ? 'settings-link' : undefined}
    onPress={() => {
     onSelect?.()
     open(section)
    }}
   >
-   <Cog size={14} aria-hidden="true" />
+   <span className="settings-link__badge" aria-hidden="true">
+    <Settings size={12} />
+   </span>
    {children}
   </Button>
  )

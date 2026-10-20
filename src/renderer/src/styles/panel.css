@@ -134,7 +134,8 @@
  }
  .learning-menu h2,
  .learning-menu > p,
- .window-menu-item__label {
+ .window-menu-item__label,
+ .window-menu-group__title {
   display: none;
  }
  .window-menu-item {
@@ -179,6 +180,12 @@
  flex-direction: column;
  align-items: flex-start;
  gap: 2px;
+ width: 100%;
+ text-align: start;
+}
+.study-menu .window-menu-item__name {
+ width: 100%;
+ text-align: start;
 }
 .study-menu .window-menu-item__note {
  white-space: normal;
@@ -231,6 +238,23 @@
  justify-content: flex-end;
  gap: 8px;
 }
+.study-tabs {
+ gap: 0;
+}
+.study-panel {
+ min-width: 0;
+}
+.study-panel--hidden {
+ display: none;
+}
+.app-tabs__list-container {
+ width: max-content;
+ max-width: 100%;
+}
+.app-tabs__tab {
+ width: auto;
+ white-space: nowrap;
+}
 .study-modebar {
  display: flex;
  align-items: center;
@@ -241,12 +265,6 @@
 .study-modebar__status {
  color: var(--muted);
  font-size: 12px;
-}
-.study-panel {
- min-width: 0;
-}
-.study-panel--textbook {
- min-width: 0;
 }
 .study-detail {
  display: flex;
@@ -430,6 +448,18 @@
  grid-template-columns: 1fr 1fr;
  gap: 8px;
 }
+.study-generate-row {
+ display: flex;
+ align-items: center;
+ gap: 6px;
+}
+.study-generate-row .button {
+ width: auto;
+}
+.study-generate-row .button:first-child {
+ flex: 1;
+ min-width: 0;
+}
 .study-book {
  display: flex;
  flex-direction: column;
@@ -494,6 +524,12 @@
 }
 .study-progress .progress-bar {
  grid-column: 1 / -1;
+}
+.file-source-panel {
+ display: flex;
+ flex-direction: column;
+ gap: 18px;
+ min-width: 0;
 }
 .search-select-option {
  display: flex;
@@ -631,8 +667,27 @@
  border-radius: var(--radius-xl);
  background: var(--surface-raised);
 }
-.study-inspector-tabs {
+.study-segmented {
+ display: grid;
+ grid-template-columns: repeat(2, minmax(0, 1fr));
+ gap: 4px;
+ padding: 3px;
+ border: 1px solid var(--line);
+ border-radius: var(--radius-lg);
+ background: var(--surface-subtle);
+}
+.study-segmented--full {
  width: 100%;
+}
+.study-segmented__button {
+ min-width: 0;
+ color: var(--muted);
+}
+.study-segmented__button--active,
+.study-segmented__button--active:hover {
+ color: var(--text);
+ background: var(--surface-raised);
+ box-shadow: 0 1px 2px var(--shadow-color);
 }
 .study-inspector-body {
  display: flex;
@@ -744,10 +799,30 @@
 .study-source-dot--ppt {
  background: var(--study-highlight-ppt);
 }
-.study-source-group {
- display: flex;
- flex-wrap: wrap;
- gap: 4px;
+.study-source-choices {
+ display: grid;
+ grid-template-columns: repeat(2, minmax(0, 1fr));
+ gap: 6px;
+}
+.study-source-choice {
+ justify-content: flex-start;
+ gap: 6px;
+ border: 1px solid var(--line);
+ background: var(--surface-subtle);
+ color: var(--text);
+}
+.study-source-choices .study-source-choice:hover {
+ background: var(--active);
+}
+.study-source-choices .study-source-choice--active,
+.study-source-choices .study-source-choice--active:hover {
+ border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+ background: color-mix(in srgb, var(--accent) 10%, var(--surface-subtle));
+ color: var(--accent);
+}
+.study-source-choice .study-source-dot {
+ width: 9px;
+ height: 9px;
 }
 .study-inspector-footer {
  position: sticky;
@@ -796,6 +871,14 @@
   flex-direction: column;
  }
 }
+/* 侧栏品牌位：新图标为透明彩色字形，不再使用蓝色底块。 */
+.sidebar .brand-mark {
+ display: grid;
+ width: 32px;
+ height: 32px;
+ background: transparent;
+ border-radius: 0;
+}
 /* 文件选择：资料库下拉在上，外部导入在下。 */
 .file-picker-library {
  margin-bottom: 8px;
@@ -841,44 +924,23 @@
 .panel-section .zhiyun-picks > label {
  flex: 1 1 220px;
 }
-.panel-section label,
-.ppt-extract-form label,
-.learning-content .row > label {
+.panel-section label:not(.checkbox__content),
+.ppt-extract-form label:not(.checkbox__content),
+.learning-content .row > label:not(.checkbox__content) {
  display: flex;
  flex-direction: column;
  gap: 6px;
  min-width: 0;
 }
-.panel-section label.media-check,
-.panel-section label.media-switch,
-.ppt-extract-form label.media-check,
-.ppt-extract-form label.media-switch,
-.learning-content .row > label.media-check,
-.learning-content .row > label.media-switch {
+.panel-section .media-check,
+.panel-section .media-switch,
+.ppt-extract-form .media-check,
+.ppt-extract-form .media-switch,
+.learning-content .row > .media-check,
+.learning-content .row > .media-switch {
  flex-direction: row;
  align-items: center;
  gap: 8px;
-}
-.ppt-extract-form .batch-options label {
- flex-direction: row;
- align-items: flex-start;
- gap: 10px;
-}
-.ppt-extract-form .batch-mode-options label,
-.ppt-extract-form .ppt-extract-summary label {
- flex-direction: row;
- align-items: center;
- gap: 8px;
-}
-.ppt-extract-form .ppt-extract-grid article > label {
- flex-direction: row;
- align-items: center;
- gap: 10px;
-}
-.ppt-extract-form .video-course-list label {
- flex-direction: row;
- align-items: center;
- gap: 12px;
 }
 .textarea.srt-editor {
  min-height: 250px;
@@ -1112,7 +1174,8 @@
  background: #17171a;
 }
 .theme-card--system .theme-card__preview {
- background: linear-gradient(135deg, #ffffff 50%, #17171a 50%);
+ background: linear-gradient(135deg, #ffffff 0 50%, #17171a 50% 100%);
+ background-clip: padding-box;
 }
 .theme-card__line {
  height: 5px;
@@ -1123,7 +1186,7 @@
  background: #3d3d44;
 }
 .theme-card--system .theme-card__line {
- background: linear-gradient(90deg, #d8d8d8 50%, #3d3d44 50%);
+ background: #92929b;
 }
 .theme-card__line--short {
  width: 62%;
@@ -1507,4 +1570,142 @@ html[data-platform="linux"] #root {
 }
 html[data-platform="linux"][data-maximized="true"] #root {
  border-radius: 0;
+}
+
+/* 设置深链：嵌在说明文字里的轻量入口，不占按钮盒。 */
+.settings-link-wrap {
+ display: inline;
+ margin-left: 8px;
+}
+.settings-link-wrap:first-child {
+ margin-left: 0;
+}
+.button.settings-link {
+ display: inline-flex;
+ align-items: baseline;
+ gap: 4px;
+ width: auto;
+ height: auto;
+ min-height: 0;
+ margin: 0;
+ padding: 0;
+ border: 0;
+ background: none;
+ box-shadow: none;
+ color: var(--accent);
+ font: inherit;
+ font-weight: 500;
+ line-height: inherit;
+ vertical-align: baseline;
+ white-space: nowrap;
+}
+.button.settings-link:hover {
+ background: none;
+ text-decoration: underline;
+}
+.settings-link__badge {
+ display: inline-flex;
+ align-items: center;
+ justify-content: center;
+ width: 18px;
+ height: 18px;
+ flex: none;
+ align-self: center;
+ border-radius: var(--capsule-radius);
+ background: var(--surface-subtle);
+ color: var(--accent);
+}
+.button .settings-link__badge svg {
+ width: 12px;
+ height: 12px;
+ margin: 0;
+ flex: none;
+ align-self: center;
+}
+
+/* 任务中心行：状态、操作与正文分离，避免按钮在窄列里竖排。 */
+.task-row {
+ display: flex;
+ align-items: center;
+ justify-content: space-between;
+ gap: 16px;
+ padding: 12px 0;
+ border-bottom: 1px solid var(--separator);
+}
+.ppt-export-history .task-row__copy {
+ flex: 1 1 auto;
+ min-width: 0;
+}
+.ppt-export-history .task-row__side {
+ display: flex;
+ align-items: center;
+ justify-content: flex-end;
+ flex: none;
+ flex-wrap: wrap;
+ gap: 10px;
+}
+.ppt-export-history .task-row__actions {
+ display: flex;
+ align-items: center;
+ justify-content: flex-end;
+ flex-wrap: wrap;
+ gap: 8px;
+}
+.task-status-chip {
+ height: 22px;
+ font-size: 11px;
+}
+@media (max-width: 900px) {
+ .task-row {
+  align-items: flex-start;
+  flex-direction: column;
+ }
+ .ppt-export-history .task-row__side {
+  justify-content: flex-end;
+  width: 100%;
+ }
+}
+
+/* 运行组件：说明与安装按钮分列，避免按钮压到下一行文字。 */
+.runtime-component {
+ display: flex;
+ align-items: center;
+ justify-content: space-between;
+ flex-wrap: wrap;
+ gap: 10px 16px;
+ padding: 12px 0;
+ border-bottom: 1px solid var(--separator);
+}
+.runtime-component__copy {
+ display: flex;
+ flex: 1 1 320px;
+ flex-direction: column;
+ gap: 4px;
+ min-width: 0;
+}
+.runtime-component__copy span {
+ color: var(--muted);
+ font-size: 12px;
+}
+.runtime-component > .button {
+ flex: none;
+}
+.runtime-refresh {
+ margin-top: 12px;
+}
+
+/* 视频摘要形式：标签与下拉同排，避免标签浮在控件上方。 */
+.learning-content .notes-summary-row > label {
+ flex-direction: row;
+ align-items: center;
+ gap: 8px;
+ margin: 0;
+}
+
+/* 视频/课件表单：收紧标签与控件的垂直距离。 */
+.ppt-extract-form label {
+ margin: 12px 0;
+}
+.learning-source-card > label {
+ margin: 0;
 }

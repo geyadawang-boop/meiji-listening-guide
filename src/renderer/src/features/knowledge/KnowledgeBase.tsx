@@ -115,7 +115,13 @@ export function KnowledgeBase({visible, close}: {visible: boolean; close: () => 
     visible={visible}
     label="知识库"
     title="知识库"
-    description="对资料正文建立索引，跨资料检索与引用问答。"
+    description={
+     <>
+      保存正文副本与索引，
+      <br />
+      原文件仍在文件管理
+     </>
+    }
     heading={category || '课程知识库'}
     subheading={`${data.stats.totalVideos} 份资料 · ${data.stats.totalChunks} 个原文片段`}
     menu={
@@ -328,7 +334,7 @@ export function KnowledgeBase({visible, close}: {visible: boolean; close: () => 
      </Button>
     </form>
     <p className="hint">
-     检索在本机进行；点击“根据资料回答”会将问题和检索片段交给当前连接的模型。回答附可查看的原文引用。
+     检索在本机进行；点击“根据资料回答”会将问题和检索片段交给当前连接的模型。回答附可查看的原文引用。{' '}
      <SettingsLink section="qwen">模型设置</SettingsLink>
     </p>
     {busy && (

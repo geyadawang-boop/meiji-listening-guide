@@ -1,4 +1,4 @@
-import {ToggleButton, ToggleButtonGroup} from '@heroui/react'
+import {Tabs} from '@heroui/react'
 import {ConfirmDialog} from '@renderer/ui/ConfirmDialog'
 import {WindowPanel} from '@renderer/ui/WindowPanel'
 import {notify} from '@renderer/ui/ToastHost'
@@ -39,6 +39,9 @@ function collectIssues(entries: StudyEntry[]): ScheduleIssue[] {
   if (!entry.chapter.trim()) issues.push({id: entry.id, message: '填写教材章节'})
   if (entry.endsAt && !Number.isFinite(Date.parse(entry.endsAt)))
    issues.push({id: entry.id, message: '填写有效的结束时间，或勾选时间待定'})
+  if (entry.zhiyunCourseId && !/^\d+$/.test(entry.zhiyunCourseId))
+   issues.push({id: entry.id, message: '智云课程编号只能是数字'})
+  if (entry.subId && !/^\d+$/.test(entry.subId)) issues.push({id: entry.id, message: '智云课次编号只能是数字'})
  }
  return issues
 }
@@ -426,40 +429,51 @@ export function Study({
     }}
     menu={tab === 'schedule' ? <ScheduleMenu {...scheduleProps} /> : <TextbookMenu {...textbookProps} />}
    >
-    <div className="study-modebar">
-     <ToggleButtonGroup
-      aria-label="课表与教材"
-      disallowEmptySelection
-      selectedKeys={new Set([tab])}
-      selectionMode="single"
-      onSelectionChange={keys => {
-       const next = [...keys][0]
-       if (next === 'schedule' || next === 'textbook') setTab(next)
-      }}
+    <Tabs
+     className="study-tabs"
+     selectedKey={tab}
+     onSelectionChange={key => {
+      if (key === 'schedule' || key === 'textbook') setTab(key)
+     }}
+    >
+     <div className="study-modebar">
+      <Tabs.ListContainer className="app-tabs__list-container">
+       <Tabs.List aria-label="课表与教材">
+        <Tabs.Tab className="app-tabs__tab" id="schedule">
+         课表
+         <Tabs.Indicator />
+        </Tabs.Tab>
+        <Tabs.Tab className="app-tabs__tab" id="textbook">
+         教材划线
+         <Tabs.Indicator />
+        </Tabs.Tab>
+       </Tabs.List>
+      </Tabs.ListContainer>
+      <small className="study-modebar__status">
+       {busy
+        ? `${progress?.stage || '正在处理'}…`
+        : tab === 'schedule'
+          ? '课表设置'
+          : book
+            ? `${book.pages} 页教材`
+            : '未选择教材'}
+      </small>
+     </div>
+     <Tabs.Panel
+      className={'study-panel' + (tab !== 'schedule' ? ' study-panel--hidden' : '')}
+      id="schedule"
+      shouldForceMount
      >
-      <ToggleButton id="schedule" size="sm">
-       课表
-      </ToggleButton>
-      <ToggleButton id="textbook" size="sm">
-       教材划线
-      </ToggleButton>
-     </ToggleButtonGroup>
-     <small className="study-modebar__status">
-      {busy
-       ? `${progress?.stage || '正在处理'}…`
-       : tab === 'schedule'
-         ? '课表设置'
-         : book
-           ? `${book.pages} 页教材`
-           : '未选择教材'}
-     </small>
-    </div>
-    <div className="study-panel" hidden={tab !== 'schedule'}>
-     <ScheduleContent {...scheduleProps} />
-    </div>
-    <div className="study-panel study-panel--textbook" hidden={tab !== 'textbook'}>
-     <TextbookContent {...textbookProps} />
-    </div>
+      <ScheduleContent {...scheduleProps} />
+     </Tabs.Panel>
+     <Tabs.Panel
+      className={'study-panel' + (tab !== 'textbook' ? ' study-panel--hidden' : '')}
+      id="textbook"
+      shouldForceMount
+     >
+      <TextbookContent {...textbookProps} />
+     </Tabs.Panel>
+    </Tabs>
    </WindowPanel>
    {confirmClose ? (
     <ConfirmDialog

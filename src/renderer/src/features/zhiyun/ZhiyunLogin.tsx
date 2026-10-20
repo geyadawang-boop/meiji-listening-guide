@@ -3,7 +3,7 @@ import {useEffect, useRef, useState} from 'react'
 import {notify} from '@renderer/ui/ToastHost'
 const invoke = (action: string, args?: unknown) => window.assistant.invoke(action, args)
 
-/** 智云登录视图：嵌入「智云课堂」窗口内部，负责网页覆盖层的位置同步。 */
+/** 智云登录视图：嵌入设置的智云账号分区，负责网页覆盖层的位置同步。 */
 export function ZhiyunLoginPanel() {
  const slot = useRef<HTMLDivElement>(null)
  async function navigate(action: string) {
@@ -51,7 +51,7 @@ export function ZhiyunLoginPanel() {
     <Button variant="tertiary" size="sm" onClick={() => void navigate('zhiyun:login')}>
      智云首页
     </Button>
-    <span>登录完成后切回「搜索与导出」</span>
+    <span>登录完成后关闭设置，回到智云导入</span>
    </div>
    <div className="zhiyun-login-slot" ref={slot} />
   </div>

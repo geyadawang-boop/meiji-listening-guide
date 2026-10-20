@@ -110,7 +110,7 @@ export function SavedLearningNotes() {
     )}
    </Card>
    <Card className="knowledge-card">
-    <h3>我的笔记</h3>
+    <h3>研究笔记</h3>
     <div className="row">
      <Input
       aria-label="笔记检索词"

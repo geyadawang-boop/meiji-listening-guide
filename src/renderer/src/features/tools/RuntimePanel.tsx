@@ -69,24 +69,25 @@ export function RuntimePanel() {
     </p>
    )}
    {data?.components.map(c => (
-    <article className="knowledge-item" key={c.id}>
-     <strong>{c.label}</strong>
-     <span>
-      {' '}
-      · {(c.bytes / 1048576).toFixed(1)} MiB ·{' '}
-      {c.validation === 'verified'
-       ? '已校验'
-       : c.validation === 'invalid'
-         ? '校验失败'
-         : c.validation === 'unsupported_target'
-           ? '目标不支持'
-           : c.validation === 'missing'
-             ? '文件缺失'
-             : c.installed
-               ? '已安装'
-               : '未安装'}
-     </span>
-     {c.reason && <p className="hint">{c.reason}</p>}
+    <article className="runtime-component" key={c.id}>
+     <div className="runtime-component__copy">
+      <strong>{c.label}</strong>
+      <span>
+       {(c.bytes / 1048576).toFixed(1)} MiB ·{' '}
+       {c.validation === 'verified'
+        ? '已校验'
+        : c.validation === 'invalid'
+          ? '校验失败'
+          : c.validation === 'unsupported_target'
+            ? '目标不支持'
+            : c.validation === 'missing'
+              ? '文件缺失'
+              : c.installed
+                ? '已安装'
+                : '未安装'}
+      </span>
+      {c.reason && <p className="hint">{c.reason}</p>}
+     </div>
      <Button
       variant="tertiary"
       size="sm"
@@ -97,7 +98,13 @@ export function RuntimePanel() {
      </Button>
     </article>
    ))}
-   <Button variant="tertiary" size="sm" isDisabled={busy || refreshing} onClick={() => void refresh()}>
+   <Button
+    className="runtime-refresh"
+    variant="tertiary"
+    size="sm"
+    isDisabled={busy || refreshing}
+    onClick={() => void refresh()}
+   >
     {refreshing ? '正在校验组件…' : '刷新组件状态'}
    </Button>
   </section>

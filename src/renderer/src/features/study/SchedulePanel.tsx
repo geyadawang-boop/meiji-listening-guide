@@ -79,10 +79,10 @@ export function ScheduleMenu(props: ScheduleProps) {
     </SearchField.Group>
    </SearchField>
    <div className="study-menu__actions">
-    <Button variant="tertiary" size="sm" isDisabled={busy} onClick={openImport}>
+    <Button variant="tertiary" size="sm" fullWidth isDisabled={busy} onClick={openImport}>
      识别课表
     </Button>
-    <Button variant="tertiary" size="sm" isDisabled={busy || !courses.length} onClick={onAdd}>
+    <Button variant="tertiary" size="sm" fullWidth isDisabled={busy || !courses.length} onClick={onAdd}>
      手动添加
     </Button>
    </div>
@@ -226,7 +226,7 @@ export function ScheduleContent(props: ScheduleProps) {
      <strong>{dirty ? '有未保存的修改' : '课表已保存'}</strong>
      <small>
       {issues.length
-       ? `还有 ${issues.length} 个条目需要完善`
+       ? `还有 ${issues.length} 处信息需要完善`
        : dirty
          ? '保存后会同步更新已关联课次的名称和聊天标题'
          : '所有条目均已保存'}
@@ -246,7 +246,7 @@ export function ScheduleContent(props: ScheduleProps) {
       onDelete()
      }}
     >
-     只删除这条课表配置，不会删除关联的课次、聊天记录或已经写入教材的划线。
+     只删除这条课表配置，点击「保存课表」后才会写入。不会删除关联的课次、聊天记录或已经写入教材的划线。
     </ConfirmDialog>
    ) : null}
   </>

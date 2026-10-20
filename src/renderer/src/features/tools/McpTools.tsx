@@ -1,4 +1,4 @@
-import {Button, Card, Input} from '@heroui/react'
+import {Button, Card, Checkbox, Input} from '@heroui/react'
 import {useEffect, useState} from 'react'
 import {notify} from '@renderer/ui/ToastHost'
 const invoke = <T,>(action: string, args?: unknown) => window.assistant.invoke<T>(action, args)
@@ -127,25 +127,29 @@ export function McpToolsPanel() {
        {server.tools.map(tool => (
         <details key={tool.name}>
          <summary>
-          <label className="media-check">
-           <input
-            type="checkbox"
-            disabled={busy || !tool.read_only_declared}
-            checked={server.allowed_tools.includes(tool.name)}
-            onChange={() =>
-             void run(() =>
-              editServer(
-               server,
-               server.allowed_tools.includes(tool.name)
-                ? server.allowed_tools.filter(name => name !== tool.name)
-                : [...server.allowed_tools, tool.name],
-               false
-              )
+          <Checkbox
+           className="media-check"
+           isSelected={server.allowed_tools.includes(tool.name)}
+           isDisabled={busy || !tool.read_only_declared}
+           onChange={() =>
+            void run(() =>
+             editServer(
+              server,
+              server.allowed_tools.includes(tool.name)
+               ? server.allowed_tools.filter(name => name !== tool.name)
+               : [...server.allowed_tools, tool.name],
+              false
              )
-            }
-           />
-           {tool.name} · {tool.read_only_declared ? '声明只读' : '未声明只读，禁用'}
-          </label>
+            )
+           }
+          >
+           <Checkbox.Content>
+            <Checkbox.Control>
+             <Checkbox.Indicator />
+            </Checkbox.Control>
+            {tool.name} · {tool.read_only_declared ? '声明只读' : '未声明只读，禁用'}
+           </Checkbox.Content>
+          </Checkbox>
          </summary>
          <p>{tool.description}</p>
          <pre>{JSON.stringify(tool.input_schema, null, 2)}</pre>

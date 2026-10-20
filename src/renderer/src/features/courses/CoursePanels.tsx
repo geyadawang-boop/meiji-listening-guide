@@ -1,4 +1,4 @@
-import {Button, Input, TextArea} from '@heroui/react'
+import {Button, Checkbox, Input, TextArea} from '@heroui/react'
 import {StudyIcon} from '@renderer/ui/StudyIcon'
 import {SelectField} from '@renderer/ui/SelectField'
 import {useState} from 'react'
@@ -462,12 +462,17 @@ export function Materials({
    {detail.questions.map(q => (
     <article key={q.id} className="question-card">
      <div className="row">
-      <input
-       type="checkbox"
+      <Checkbox
+       isSelected={selected.includes(q.id)}
        aria-label="选中题目"
-       checked={selected.includes(q.id)}
-       onChange={e => setSelected(e.target.checked ? [...selected, q.id] : selected.filter(id => id !== q.id))}
-      />
+       onChange={checked => setSelected(checked ? [...selected, q.id] : selected.filter(id => id !== q.id))}
+      >
+       <Checkbox.Content>
+        <Checkbox.Control>
+         <Checkbox.Indicator />
+        </Checkbox.Control>
+       </Checkbox.Content>
+      </Checkbox>
       <strong>{q.type}</strong>
       <small>
        {q.year} · {q.sourceFile}

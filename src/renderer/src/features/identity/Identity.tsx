@@ -90,7 +90,7 @@ export function IdentityEditor({
       <div className="identity-large-avatar">
        <IdentityAvatar role={selected} />
       </div>
-      <div>
+      <div className="row">
        <Button variant="tertiary" size="sm" type="button" isDisabled={busy} onClick={() => void chooseAvatar()}>
         更换头像
        </Button>

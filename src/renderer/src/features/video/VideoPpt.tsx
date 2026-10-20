@@ -1,4 +1,4 @@
-import {Button, Card, Input, TextArea} from '@heroui/react'
+import {Button, Card, Checkbox, Input, TextArea} from '@heroui/react'
 import {learningViews, LearningIcon, type LearningView} from '@renderer/features/video/LearningNav'
 import {VideoMindmap} from '@renderer/features/video/VideoMindmap'
 import {BiliResourcesPanel} from '@renderer/features/bilibili/BiliResources'
@@ -36,7 +36,9 @@ export function VideoPpt({
  select,
  close,
  courseId,
- courseName
+ courseName,
+ restoreTaskId,
+ onTaskRestored
 }: {
  visible: boolean
  view: LearningView
@@ -44,6 +46,8 @@ export function VideoPpt({
  close: () => void
  courseId: string
  courseName?: string
+ restoreTaskId?: string
+ onTaskRestored?: () => void
 }) {
  const [url, setUrl] = useState(''),
   [prompt, setPrompt] = useState(defaultVideoPrompt),
@@ -102,6 +106,21 @@ export function VideoPpt({
    setBusy(false)
   }
  }
+ useEffect(() => {
+  if (!visible || !restoreTaskId) return
+  void run(async () => {
+   const restored = await invoke<{source: VideoSource; review: VideoReview | null}>('video-ppt:restore', {
+    id: restoreTaskId
+   })
+   setSource(restored.source)
+   setReview(restored.review)
+   setSaved(null)
+   setChecked(false)
+   setProgress('已恢复任务，原视频和候选页仍在')
+   onTaskRestored?.()
+  })
+ }, [visible, restoreTaskId])
+
  async function load(args: unknown) {
   setReview(null)
   setSource(null)
@@ -281,35 +300,40 @@ export function VideoPpt({
           .map(e => {
            const item = batch.find(i => i.page === e.page)
            return (
-            <label key={e.page} className={selected.includes(e.page) ? 'selected' : ''}>
-             <input
-              type="checkbox"
-              aria-label={`选择 P${e.page} ${e.title}`}
-              disabled={busy}
-              checked={selected.includes(e.page)}
-              onChange={ev => setSelected(s => (ev.target.checked ? [...s, e.page] : s.filter(p => p !== e.page)))}
-             />
-             <span className="video-course-number">P{e.page}</span>
-             <span className="video-course-title">
-              {e.title}
-              {item?.error && <small role="alert">{item.error}</small>}
-             </span>
-             <span className="hint">{item?.status || time(e.duration)}</span>
-             {item?.path && (
-              <Button
-               variant="tertiary"
-               size="sm"
-               type="button"
-               isDisabled={busy}
-               onClick={ev => {
-                ev.preventDefault()
-                void open(item.path!)
-               }}
-              >
-               打开 PDF
-              </Button>
-             )}
-            </label>
+            <Checkbox
+             key={e.page}
+             className={selected.includes(e.page) ? 'selected' : ''}
+             isSelected={selected.includes(e.page)}
+             isDisabled={busy}
+             aria-label={`选择 P${e.page} ${e.title}`}
+             onChange={checked => setSelected(s => (checked ? [...s, e.page] : s.filter(p => p !== e.page)))}
+            >
+             <Checkbox.Content>
+              <Checkbox.Control>
+               <Checkbox.Indicator />
+              </Checkbox.Control>
+              <span className="video-course-number">P{e.page}</span>
+              <span className="video-course-title">
+               {e.title}
+               {item?.error && <small role="alert">{item.error}</small>}
+              </span>
+              <span className="hint">{item?.status || time(e.duration)}</span>
+              {item?.path && (
+               <Button
+                variant="tertiary"
+                size="sm"
+                type="button"
+                isDisabled={busy}
+                onClick={ev => {
+                 ev.preventDefault()
+                 void open(item.path!)
+                }}
+               >
+                打开 PDF
+               </Button>
+              )}
+             </Checkbox.Content>
+            </Checkbox>
            )
           })}
         </div>
@@ -352,7 +376,7 @@ export function VideoPpt({
        <div>
         <h3>视频字幕</h3>
         <p className="hint">
-         读取所选分集的站内字幕；没有字幕时可用离线模型转写。结果保存到当前课程的“语音原文”。
+         读取所选分集的站内字幕；没有字幕时可用离线模型转写。结果保存到当前课程的“语音原文”。{' '}
          <SettingsLink section="runtime">检查运行组件</SettingsLink>
         </p>
        </div>
@@ -670,7 +694,8 @@ export function VideoPpt({
       </div>
       {subtitle && (
        <p className="hint">
-        当前字幕：{subtitle.title} · {subtitle.count} 条 · {subtitle.source}
+        当前字幕：{subtitle.title} · {subtitle.count} 条 · {subtitle.source}{' '}
+        <SettingsLink section="qwen">模型设置</SettingsLink>
        </p>
       )}
       {summary && (
@@ -763,8 +788,9 @@ export function VideoPpt({
     )}
     {isVideo && (
      <p className="hint">
-      保存到：{courseName || '未分类资料'}。全程后台下载、裁剪和去重，PDF 检查成功后清理本次视频和临时图片。
+      保存到：{courseName || '未分类资料'}。全程后台下载、裁剪和去重，PDF 检查成功后清理本次视频和临时图片。{' '}
       <SettingsLink section="qwen">模型设置</SettingsLink>
+      <SettingsLink section="runtime">检查运行组件</SettingsLink>
      </p>
     )}
    </div>
@@ -831,10 +857,14 @@ export function VideoPpt({
       <strong>
        保留 {kept} 页 · 删除 {review.pages.length - kept} 页
       </strong>
-      <label>
-       <input type="checkbox" checked={checked} disabled={busy} onChange={e => setChecked(e.target.checked)} />
-       已检查裁剪、重复和页面内容
-      </label>
+      <Checkbox isSelected={checked} isDisabled={busy} onChange={setChecked}>
+       <Checkbox.Content>
+        <Checkbox.Control>
+         <Checkbox.Indicator />
+        </Checkbox.Control>
+        已检查裁剪、重复和页面内容
+       </Checkbox.Content>
+      </Checkbox>
       <Button
        variant="primary"
        size="sm"
@@ -875,21 +905,24 @@ export function VideoPpt({
         h = c.bottom - c.top
        return (
         <article key={p.page} className={p.keep ? '' : 'removed'}>
-         <label>
-          <input
-           type="checkbox"
-           disabled={busy}
-           checked={p.keep}
-           onChange={e => {
-            setChecked(false)
-            setReview({
-             ...review,
-             pages: review.pages.map(q => (q.page === p.page ? {...q, keep: e.target.checked} : q))
-            })
-           }}
-          />
-          第 {p.page} 页 · {time(p.time)} · {p.keep ? '保留' : '删除'}
-         </label>
+         <Checkbox
+          isSelected={p.keep}
+          isDisabled={busy}
+          onChange={checked => {
+           setChecked(false)
+           setReview({
+            ...review,
+            pages: review.pages.map(q => (q.page === p.page ? {...q, keep: checked} : q))
+           })
+          }}
+         >
+          <Checkbox.Content>
+           <Checkbox.Control>
+            <Checkbox.Indicator />
+           </Checkbox.Control>
+           第 {p.page} 页 · {time(p.time)} · {p.keep ? '保留' : '删除'}
+          </Checkbox.Content>
+         </Checkbox>
          <div className="ppt-extract-preview" style={{aspectRatio: (p.width * w) / (p.height * h)}}>
           <img
            alt={`视频课件第 ${p.page} 页`}

@@ -1,6 +1,6 @@
 import {useEffect, useState} from 'react'
 import {MessagesSquare} from 'lucide-react'
-import {Button, Card, Input, TextArea} from '@heroui/react'
+import {Button, Card, Checkbox, Input, TextArea} from '@heroui/react'
 import {notify} from '@renderer/ui/ToastHost'
 import {SelectField} from '@renderer/ui/SelectField'
 import {ImAutomation} from '@renderer/features/communications/ImAutomation'
@@ -487,10 +487,14 @@ export function CommunicationsPanel() {
         <p className="hint">本机个人微信为只读模式，可复制草稿到官方客户端。</p>
        ) : (
         <>
-         <label className="media-check">
-          <input type="checkbox" checked={confirm} onChange={e => setConfirm(e.target.checked)} />
-          我已核对账号 {row.account}、会话 {peer} 和正文，确认发送
-         </label>
+         <Checkbox className="media-check" isSelected={confirm} onChange={setConfirm}>
+          <Checkbox.Content>
+           <Checkbox.Control>
+            <Checkbox.Indicator />
+           </Checkbox.Control>
+           我已核对账号 {row.account}、会话 {peer} 和正文，确认发送
+          </Checkbox.Content>
+         </Checkbox>
          <Button
           variant="tertiary"
           size="sm"

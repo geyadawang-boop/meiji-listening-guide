@@ -1,4 +1,4 @@
-import {Button, Label, Slider} from '@heroui/react'
+import {Button, Checkbox, Label, Slider, Tabs} from '@heroui/react'
 import {useState, useRef, useEffect, type CSSProperties} from 'react'
 import {defaultAppearance, resolveAppearance, type Appearance, type AppearanceState} from '@shared/appearance'
 import type {Course} from '@shared/types'
@@ -213,65 +213,77 @@ export function AppearanceEditor({
    <div className="appearance-layout">
     <fieldset className="appearance-controls appearance-controls--background" disabled={busy}>
      <div className="appearance-scope-block">
-      <div className="appearance-scope" role="group" aria-label="设置范围">
-       <button disabled={busy} className={scope === 'global' ? 'selected' : ''} onClick={() => changeScope('global')}>
-        全局
-       </button>
-       <button
-        disabled={busy || !courses.length}
-        className={scope === 'course' ? 'selected' : ''}
-        onClick={() => changeScope('course')}
-       >
-        课程
-       </button>
-      </div>
-      {scope === 'global' && courseId && state.courses[courseId] && (
-       <div className="appearance-notice">
-        {courses.find(c => c.id === courseId)?.name} 使用独立外观。
-        <Button
-         variant="tertiary"
-         size="sm"
-         isDisabled={busy}
-         onClick={() =>
-          void run(async () => commit(await window.assistant.invoke<AppearanceState>('appearance:clear', {courseId})))
-         }
-        >
-         让当前课程跟随全局
-        </Button>
-       </div>
-      )}
-      {scope === 'course' && (
-       <div className="appearance-course">
-        <label>
-         选择课程
-         <SelectField
-          label="外观设置课程"
+      <Tabs
+       className="appearance-scope-tabs"
+       selectedKey={scope}
+       onSelectionChange={key => {
+        if (key === 'global' || key === 'course') changeScope(key)
+       }}
+      >
+       <Tabs.ListContainer className="app-tabs__list-container">
+        <Tabs.List aria-label="设置范围">
+         <Tabs.Tab className="app-tabs__tab" id="global" isDisabled={busy}>
+          全局
+          <Tabs.Indicator />
+         </Tabs.Tab>
+         <Tabs.Tab className="app-tabs__tab" id="course" isDisabled={busy || !courses.length}>
+          课程
+          <Tabs.Indicator />
+         </Tabs.Tab>
+        </Tabs.List>
+       </Tabs.ListContainer>
+       <Tabs.Panel id="global">
+        {courseId && state.courses[courseId] && (
+         <div className="appearance-notice">
+          {courses.find(c => c.id === courseId)?.name} 使用独立外观。
+          <Button
+           variant="tertiary"
+           size="sm"
+           isDisabled={busy}
+           onClick={() =>
+            void run(async () => commit(await window.assistant.invoke<AppearanceState>('appearance:clear', {courseId})))
+           }
+          >
+           让当前课程跟随全局
+          </Button>
+         </div>
+        )}
+       </Tabs.Panel>
+       <Tabs.Panel id="course">
+        <div className="appearance-course">
+         <label>
+          选择课程
+          <SelectField
+           label="外观设置课程"
+           isDisabled={busy}
+           value={editingCourseId}
+           onChange={next => {
+            setEditingCourseId(next)
+            setValue(resolveAppearance(stateRef.current, next))
+           }}
+           options={courses.map(c => ({value: c.id, label: c.name}))}
+          />
+         </label>
+         <span>{state.courses[editingCourseId] ? '独立设置' : '跟随全局'}</span>
+         <Button
+          variant="tertiary"
+          size="sm"
           isDisabled={busy}
-          value={editingCourseId}
-          onChange={next => {
-           setEditingCourseId(next)
-           setValue(resolveAppearance(stateRef.current, next))
-          }}
-          options={courses.map(c => ({value: c.id, label: c.name}))}
-         />
-        </label>
-        <span>{state.courses[editingCourseId] ? '独立设置' : '跟随全局'}</span>
-        <Button
-         variant="tertiary"
-         size="sm"
-         isDisabled={busy}
-         onClick={() =>
-          void run(async () => {
-           const next = await window.assistant.invoke<AppearanceState>('appearance:clear', {courseId: editingCourseId})
-           commit(next)
-           setValue(next.global)
-          })
-         }
-        >
-         跟随全局
-        </Button>
-       </div>
-      )}
+          onClick={() =>
+           void run(async () => {
+            const next = await window.assistant.invoke<AppearanceState>('appearance:clear', {
+             courseId: editingCourseId
+            })
+            commit(next)
+            setValue(next.global)
+           })
+          }
+         >
+          跟随全局
+         </Button>
+        </div>
+       </Tabs.Panel>
+      </Tabs>
      </div>
      <section>
       <h3>聊天背景</h3>
@@ -392,18 +404,30 @@ export function AppearanceEditor({
       {slider('消息间距', 'messageGap', 8, 48)}
       {slider('气泡圆角', 'bubbleRadius', 0, 28)}
       {slider('聊天内容宽度', 'contentWidth', 560, 1040, 20)}
-      <label className="appearance-check">
-       <input type="checkbox" checked={value.showNames} onChange={e => update({showNames: e.target.checked})} />
-       显示发送者名字
-      </label>
-      <label className="appearance-check">
-       <input
-        type="checkbox"
-        checked={value.assistantBubble}
-        onChange={e => update({assistantBubble: e.target.checked})}
-       />
-       助手消息使用气泡
-      </label>
+      <Checkbox
+       className="appearance-check"
+       isSelected={value.showNames}
+       onChange={checked => update({showNames: checked})}
+      >
+       <Checkbox.Content>
+        <Checkbox.Control>
+         <Checkbox.Indicator />
+        </Checkbox.Control>
+        显示发送者名字
+       </Checkbox.Content>
+      </Checkbox>
+      <Checkbox
+       className="appearance-check"
+       isSelected={value.assistantBubble}
+       onChange={checked => update({assistantBubble: checked})}
+      >
+       <Checkbox.Content>
+        <Checkbox.Control>
+         <Checkbox.Indicator />
+        </Checkbox.Control>
+        助手消息使用气泡
+       </Checkbox.Content>
+      </Checkbox>
      </section>
     </fieldset>
    </div>

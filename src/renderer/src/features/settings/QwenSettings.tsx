@@ -135,7 +135,7 @@ export function QwenSettings({
      <h2>通义千问连接</h2>
      <p className="hint">模型通过 DashScope OpenAI 兼容 API 直连。旧登录凭据不会迁移到此连接。</p>
     </div>
-    <div>
+    <div className="row">
      <Button
       variant="tertiary"
       size="sm"

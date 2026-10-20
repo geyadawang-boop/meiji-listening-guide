@@ -27,7 +27,10 @@ export function AppWindows({
  courseId,
  courseName,
  reloadCourse,
- zhiyunImported
+ zhiyunImported,
+ videoRestoreId,
+ openVideoTask,
+ clearVideoTask
 }: {
  current: AppWindowKey
  setModal: (value: AppWindowKey) => void
@@ -36,6 +39,9 @@ export function AppWindows({
  courseName?: string
  reloadCourse: () => Promise<unknown>
  zhiyunImported: (lectureId: string, courseId: string) => Promise<void>
+ videoRestoreId: string
+ openVideoTask: (id: string) => void
+ clearVideoTask: () => void
 }) {
  const videoVisible = learningViews.some(item => item.id === current)
  return (
@@ -43,7 +49,12 @@ export function AppWindows({
    <Study visible={current === 'study'} courses={courses} close={() => setModal(null)} refresh={reloadCourse} />
    <ToolsWorkbench visible={current === 'tools'} close={() => setModal(null)} />
    <KnowledgeBase visible={current === 'knowledge'} close={() => setModal(null)} />
-   <TaskCenter visible={current === 'tasks'} close={() => setModal(null)} open={setModal} />
+   <TaskCenter
+    visible={current === 'tasks'}
+    close={() => setModal(null)}
+    open={setModal}
+    restoreVideoTask={openVideoTask}
+   />
    <RecognitionTools
     visible={current === 'recognition'}
     close={() => setModal(null)}
@@ -58,6 +69,8 @@ export function AppWindows({
     close={() => setModal(null)}
     courseId={courseId}
     courseName={courseName}
+    restoreTaskId={videoRestoreId}
+    onTaskRestored={clearVideoTask}
    />
    <ZhiyunImporter
     visible={current === 'zhiyun'}

@@ -164,7 +164,7 @@ export function SettingsHub({
      </Card>
      <Card className="knowledge-card">
       <h3>研究网页搜索</h3>
-      <p className="hint">研究工具中的「网页搜索（后台）」使用此服务；题目搜索仍使用上面的 Tavily。</p>
+      <p className="hint">研究中的「网页搜索（后台）」使用此服务；题目搜索仍使用上面的 Tavily。</p>
       <label>
        研究网页搜索服务
        <SelectField
@@ -233,9 +233,7 @@ export function SettingsHub({
     <div className="panel-section">
      <Card className="knowledge-card">
       <h3>智云课堂账号</h3>
-      <p className="hint">
-       登录后回到智云导入搜索课程。登录网页只在本应用的独立会话中打开，不会读取其他浏览器账号。
-      </p>
+      <p className="hint">登录后回到智云导入搜索课程。登录网页只在本应用的独立会话中打开，不会读取其他浏览器账号。</p>
       <ZhiyunLoginPanel />
      </Card>
     </div>

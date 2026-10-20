@@ -1,4 +1,4 @@
-import {Button, Card, Input} from '@heroui/react'
+import {Button, Card, Checkbox, Input} from '@heroui/react'
 import {useEffect, useRef, useState} from 'react'
 import {Bookmark} from 'lucide-react'
 import {notify} from '@renderer/ui/ToastHost'
@@ -258,29 +258,33 @@ export function BiliResourcesPanel({
        </div>
        <div className="batch-options">
         {item.series.episodes.map(part => (
-         <label key={part.url}>
-          <input
-           type="checkbox"
-           disabled={busy}
-           aria-label={`同步 ${item.title} P${part.page} ${part.title}`}
-           checked={item.pages.includes(part.page)}
-           onChange={event =>
-            setBasket(current =>
-             current.map(row =>
-              row.url === item.url
-               ? {
-                  ...row,
-                  pages: event.target.checked ? [...row.pages, part.page] : row.pages.filter(page => page !== part.page)
-                 }
-               : row
-             )
+         <Checkbox
+          key={part.url}
+          isSelected={item.pages.includes(part.page)}
+          isDisabled={busy}
+          aria-label={`同步 ${item.title} P${part.page} ${part.title}`}
+          onChange={checked =>
+           setBasket(current =>
+            current.map(row =>
+             row.url === item.url
+              ? {
+                 ...row,
+                 pages: checked ? [...row.pages, part.page] : row.pages.filter(page => page !== part.page)
+                }
+              : row
             )
-           }
-          />
-          <span>
-           P{part.page} · {part.title}
-          </span>
-         </label>
+           )
+          }
+         >
+          <Checkbox.Content>
+           <Checkbox.Control>
+            <Checkbox.Indicator />
+           </Checkbox.Control>
+           <span>
+            P{part.page} · {part.title}
+           </span>
+          </Checkbox.Content>
+         </Checkbox>
         ))}
        </div>
       </details>

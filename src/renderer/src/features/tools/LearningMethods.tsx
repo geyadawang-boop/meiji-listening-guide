@@ -1,4 +1,4 @@
-import {Button, Card, Input, TextArea} from '@heroui/react'
+import {Button, Card, Checkbox, Input, TextArea} from '@heroui/react'
 import {useEffect, useState} from 'react'
 import {notify} from '@renderer/ui/ToastHost'
 const invoke = <T,>(action: string, args?: unknown) => window.assistant.invoke<T>(action, args)
@@ -60,10 +60,14 @@ export function LearningMethodsPanel() {
        读取已保存要求
       </Button>
       <TextArea aria-label="固定学习要求" maxLength={4000} value={rules} onChange={e => setRules(e.target.value)} />
-      <label className="media-check">
-       <input type="checkbox" checked={rulesEnabled} onChange={e => setRulesEnabled(e.target.checked)} />
-       在后续任务中启用
-      </label>
+      <Checkbox className="media-check" isSelected={rulesEnabled} onChange={setRulesEnabled}>
+       <Checkbox.Content>
+        <Checkbox.Control>
+         <Checkbox.Indicator />
+        </Checkbox.Control>
+        在后续任务中启用
+       </Checkbox.Content>
+      </Checkbox>
       <Button
        variant="tertiary"
        size="sm"
@@ -181,18 +185,23 @@ export function LearningMethodsPanel() {
      <Card className="knowledge-card">
       <h3>内置工具组</h3>
       {data.extensions.plugins.map(plugin => (
-       <label className="media-check" key={plugin.id}>
-        <input
-         type="checkbox"
-         disabled={busy}
-         checked={plugin.enabled}
-         onChange={() => void run(() => editExtension({kind: 'plugin', id: plugin.id, enabled: !plugin.enabled}))}
-        />
-        <span>
-         {plugin.name}
-         <small>{plugin.description}</small>
-        </span>
-       </label>
+       <Checkbox
+        className="media-check"
+        key={plugin.id}
+        isSelected={plugin.enabled}
+        isDisabled={busy}
+        onChange={() => void run(() => editExtension({kind: 'plugin', id: plugin.id, enabled: !plugin.enabled}))}
+       >
+        <Checkbox.Content>
+         <Checkbox.Control>
+          <Checkbox.Indicator />
+         </Checkbox.Control>
+         <span>
+          {plugin.name}
+          <small>{plugin.description}</small>
+         </span>
+        </Checkbox.Content>
+       </Checkbox>
       ))}
      </Card>
     </>

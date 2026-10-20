@@ -1,9 +1,10 @@
-import {Button, Card} from '@heroui/react'
+import {Button, Card, Checkbox} from '@heroui/react'
 import {useEffect, useState} from 'react'
 import type {SubtitleSyncTask} from '@shared/subtitle-sync'
 import type {SubtitleDerivedTask} from '@shared/subtitle-derived'
 import {noteTitles, type VideoNoteMode} from '@shared/video-notes'
 import {notify} from '@renderer/ui/ToastHost'
+import {SettingsLink} from '@renderer/app/settings-navigation'
 const invoke = <T,>(action: string, args?: unknown) => window.assistant.invoke<T>(action, args)
 export function SubtitleBatchRecords({
  visible,
@@ -26,7 +27,7 @@ export function SubtitleBatchRecords({
   setDerived(await invoke('subtitle-derived:list'))
  }
  useEffect(() => {
-  if (visible) void load().catch(reason => notify.error(reason, {title: '读取任务记录失败'}))
+  if (visible) void load().catch(reason => notify.error(reason, {title: '读取任务失败'}))
  }, [visible])
  const action = (fn: () => Promise<void>) =>
   void run(async () => {
@@ -41,7 +42,7 @@ export function SubtitleBatchRecords({
      <header>
       <h3>同步与笔记任务</h3>
       <Button variant="ghost" size="sm" isDisabled={busy} onClick={() => action(async () => {})}>
-       刷新任务记录
+       刷新任务
       </Button>
      </header>
      {tasks
@@ -125,47 +126,56 @@ export function SubtitleBatchRecords({
       </Button>
      </header>
      <p className="hint">
-      只整理勾选的分集和形式。生成时会将这些字幕交给当前连接的模型；字幕同步和本地检索不会调用模型。
+      只整理勾选的分集和形式。生成时会将这些字幕交给当前连接的模型；字幕同步和本地检索不会调用模型。{' '}
+      <SettingsLink section="qwen">模型设置</SettingsLink>
      </p>
      <div className="batch-options">
       {draft.task.items
        .filter(item => item.status === '已完成')
        .map(item => (
-        <label key={item.url}>
-         <input
-          type="checkbox"
-          aria-label={`整理 ${item.title}`}
-          disabled={busy}
-          checked={draft.urls.includes(item.url)}
-          onChange={event =>
-           setDraft({
-            ...draft,
-            urls: event.target.checked ? [...draft.urls, item.url] : draft.urls.filter(url => url !== item.url)
-           })
-          }
-         />
-         <span>
-          P{item.page} · {item.title}
-         </span>
-        </label>
+        <Checkbox
+         key={item.url}
+         isSelected={draft.urls.includes(item.url)}
+         isDisabled={busy}
+         aria-label={`整理 ${item.title}`}
+         onChange={checked =>
+          setDraft({
+           ...draft,
+           urls: checked ? [...draft.urls, item.url] : draft.urls.filter(url => url !== item.url)
+          })
+         }
+        >
+         <Checkbox.Content>
+          <Checkbox.Control>
+           <Checkbox.Indicator />
+          </Checkbox.Control>
+          <span>
+           P{item.page} · {item.title}
+          </span>
+         </Checkbox.Content>
+        </Checkbox>
        ))}
      </div>
      <div className="row batch-mode-options">
       {(Object.keys(noteTitles) as VideoNoteMode[]).map(mode => (
-       <label key={mode}>
-        <input
-         type="checkbox"
-         disabled={busy}
-         checked={draft.modes.includes(mode)}
-         onChange={event =>
-          setDraft({
-           ...draft,
-           modes: event.target.checked ? [...draft.modes, mode] : draft.modes.filter(value => value !== mode)
-          })
-         }
-        />
-        {noteTitles[mode]}
-       </label>
+       <Checkbox
+        key={mode}
+        isSelected={draft.modes.includes(mode)}
+        isDisabled={busy}
+        onChange={checked =>
+         setDraft({
+          ...draft,
+          modes: checked ? [...draft.modes, mode] : draft.modes.filter(value => value !== mode)
+         })
+        }
+       >
+        <Checkbox.Content>
+         <Checkbox.Control>
+          <Checkbox.Indicator />
+         </Checkbox.Control>
+         {noteTitles[mode]}
+        </Checkbox.Content>
+       </Checkbox>
       ))}
      </div>
      <Button

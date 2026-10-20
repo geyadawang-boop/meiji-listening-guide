@@ -51,10 +51,11 @@ src/renderer/
 ```
 
 规则：
-- 一个 feature 一个目录，如 `features/chat`、`features/courses`、`features/knowledge`。
+- 一个 feature 一个目录，如 `features/chat`、`features/courses`、`features/knowledge`、`features/tasks`。
 - feature 之间不允许 import 对方页面组件；共享展示组件上移到 `ui/`，共享状态上移到 `app/` 的 provider。
   例外白名单（后续重构逐步消除）：`features/bilibili` 可引用 `features/video/SubtitleBatchRecords`；`features/{chat,study,settings}` 可引用 `features/identity` 的 Context/Avatar。
 - `App.tsx` 只做应用壳与组合；新功能不得继续往 App.tsx 堆状态（下一阶段已排期拆分）。
+- 跨页设置入口统一使用 `app/settings-navigation` 的 `SettingsLink` / `openSettings`，设置页通过 `initialSection` 直达分区；禁止在各页面复制设置控件。
 - 禁止新增内联样式（`style=`）；样式一律进 `styles/` 或 ui 组件类名。
 
 ### 2.3 共享层

@@ -1,10 +1,11 @@
 import {useEffect, useState} from 'react'
-import {Button, Card, Chip, Input, TextArea} from '@heroui/react'
+import {Button, Card, Checkbox, Chip, Input, TextArea} from '@heroui/react'
 import {WindowMenuButton, WindowPanel} from '@renderer/ui/WindowPanel'
 import ReactMarkdown from 'react-markdown'
 import {LearningRecords} from '@renderer/features/tools/LearningRecords'
 import {SavedLearningNotes} from '@renderer/features/tools/SavedLearningNotes'
 import {notify} from '@renderer/ui/ToastHost'
+import {SettingsLink} from '@renderer/app/settings-navigation'
 import remarkGfm from 'remark-gfm'
 import type {Settings} from '@shared/types'
 function Result({text}: {text: string}) {
@@ -174,23 +175,22 @@ export function ToolsWorkbench({visible, close}: {visible: boolean; close: () =>
  return (
   <WindowPanel
    visible={visible}
-   label="工具与工作流"
-   title="工具与工作流"
+   label="研究"
+   title="研究"
    description={
     <>
-     按所选来源研究，
+     从知识库与外部来源研究，
      <br />
-     管理方法和外部工具。
+     保存可核对的研究笔记。
     </>
    }
    heading={tab}
    subheading={
     <>
-     使用梅酱当前连接的模型
-     <SettingsLink section="qwen">模型设置</SettingsLink>
+     使用梅酱当前连接的模型 <SettingsLink section="qwen">模型设置</SettingsLink>
     </>
    }
-   menu={['研究与工作流', '学习记录', '我的笔记'].map(name => (
+   menu={['研究与工作流', '知识会话', '研究笔记'].map(name => (
     <WindowMenuButton key={name} active={tab === name} onSelect={() => setTab(name)}>
      {name}
     </WindowMenuButton>
@@ -219,22 +219,27 @@ export function ToolsWorkbench({visible, close}: {visible: boolean; close: () =>
       </div>
       <div className="discussion-list">
        {materials.map(material => (
-        <label className="media-check" key={material.binding.bvid}>
-         <input
-          type="checkbox"
-          checked={chosen.some(item => item.binding.bvid === material.binding.bvid)}
-          disabled={busy || (chosen.length >= 6 && !chosen.some(item => item.binding.bvid === material.binding.bvid))}
-          onChange={() =>
-           setChosen(old =>
-            old.some(item => item.binding.bvid === material.binding.bvid)
-             ? old.filter(item => item.binding.bvid !== material.binding.bvid)
-             : [...old, material]
-           )
-          }
-         />
-         {material.title}
-         <small>{material.kind}</small>
-        </label>
+        <Checkbox
+         className="media-check"
+         key={material.binding.bvid}
+         isSelected={chosen.some(item => item.binding.bvid === material.binding.bvid)}
+         isDisabled={busy || (chosen.length >= 6 && !chosen.some(item => item.binding.bvid === material.binding.bvid))}
+         onChange={() =>
+          setChosen(old =>
+           old.some(item => item.binding.bvid === material.binding.bvid)
+            ? old.filter(item => item.binding.bvid !== material.binding.bvid)
+            : [...old, material]
+          )
+         }
+        >
+         <Checkbox.Content>
+          <Checkbox.Control>
+           <Checkbox.Indicator />
+          </Checkbox.Control>
+          {material.title}
+          <small>{material.kind}</small>
+         </Checkbox.Content>
+        </Checkbox>
        ))}
       </div>
       {offset !== null && (
@@ -252,10 +257,14 @@ export function ToolsWorkbench({visible, close}: {visible: boolean; close: () =>
        maxLength={flow ? 800 : 1500}
        onChange={e => setQuestion(e.target.value)}
       />
-      <label className="media-check">
-       <input type="checkbox" checked={flow} onChange={e => setFlow(e.target.checked)} />
-       两步工作流：先整理材料，再综合回答
-      </label>
+      <Checkbox className="media-check" isSelected={flow} onChange={setFlow}>
+       <Checkbox.Content>
+        <Checkbox.Control>
+         <Checkbox.Indicator />
+        </Checkbox.Control>
+        两步工作流：先整理材料，再综合回答
+       </Checkbox.Content>
+      </Checkbox>
       {!flow && (
        <div className="row">
         {[
@@ -272,12 +281,26 @@ export function ToolsWorkbench({visible, close}: {visible: boolean; close: () =>
          ['organize', '分类建议'],
          ['conversations', '历史问答']
         ].map(([id, label]) => (
-         <label className="media-check" key={id}>
-          <input type="checkbox" checked={channels.includes(id)} onChange={() => toggle(id, channels, setChannels)} />
-          {label}
-         </label>
+         <Checkbox
+          className="media-check"
+          key={id}
+          isSelected={channels.includes(id)}
+          onChange={() => toggle(id, channels, setChannels)}
+         >
+          <Checkbox.Content>
+           <Checkbox.Control>
+            <Checkbox.Indicator />
+           </Checkbox.Control>
+           {label}
+          </Checkbox.Content>
+         </Checkbox>
         ))}
        </div>
+      )}
+      {!flow && (
+       <p className="hint">
+        网页搜索服务与 SearXNG 地址在 <SettingsLink section="search">搜索设置</SettingsLink>。
+       </p>
       )}
       {!flow && (channels.includes('web_pages') || channels.includes('arxiv_fulltext')) && (
        <label>
@@ -297,37 +320,45 @@ export function ToolsWorkbench({visible, close}: {visible: boolean; close: () =>
       {!flow && (
        <>
         <h4>
-         本轮方法
-         <SettingsLink section="methods">管理方法</SettingsLink>
+         本轮方法 <SettingsLink section="methods">管理方法</SettingsLink>
         </h4>
         {data.extensions.skills
          .filter(skill => skill.enabled)
          .map(skill => (
-          <label className="media-check" key={skill.id}>
-           <input
-            type="checkbox"
-            checked={skills.includes(skill.id)}
-            onChange={() => toggle(skill.id, skills, setSkills)}
-           />
-           {skill.name}
-          </label>
+          <Checkbox
+           className="media-check"
+           key={skill.id}
+           isSelected={skills.includes(skill.id)}
+           onChange={() => toggle(skill.id, skills, setSkills)}
+          >
+           <Checkbox.Content>
+            <Checkbox.Control>
+             <Checkbox.Indicator />
+            </Checkbox.Control>
+            {skill.name}
+           </Checkbox.Content>
+          </Checkbox>
          ))}
         <h4>
-         本轮外部工具
-         <SettingsLink section="mcp">管理 MCP</SettingsLink>
+         本轮外部工具 <SettingsLink section="mcp">管理 MCP</SettingsLink>
         </h4>
         {data.mcp.servers
          .filter(server => server.enabled)
          .flatMap(server =>
           server.allowed_tools.map(name => (
-           <label key={server.id + name} className="media-check">
-            <input
-             type="checkbox"
-             checked={mcp.includes(server.id + ':' + name)}
-             onChange={() => toggle(server.id + ':' + name, mcp, setMcp)}
-            />
-            {server.name} · {name}
-           </label>
+           <Checkbox
+            className="media-check"
+            key={server.id + name}
+            isSelected={mcp.includes(server.id + ':' + name)}
+            onChange={() => toggle(server.id + ':' + name, mcp, setMcp)}
+           >
+            <Checkbox.Content>
+             <Checkbox.Control>
+              <Checkbox.Indicator />
+             </Checkbox.Control>
+             {server.name} · {name}
+            </Checkbox.Content>
+           </Checkbox>
           ))
          )}
        </>
@@ -424,14 +455,18 @@ export function ToolsWorkbench({visible, close}: {visible: boolean; close: () =>
         </Button>
        )}
        {task.outcome_unknown && (
-        <label className="media-check">
-         <input
-          type="checkbox"
-          checked={retryConsent.includes(task.workflow_id)}
-          onChange={() => toggle(task.workflow_id, retryConsent, setRetryConsent)}
-         />
-         已核对保存记录，同意重新请求未确认的步骤（可能再次消耗模型额度）
-        </label>
+        <Checkbox
+         className="media-check"
+         isSelected={retryConsent.includes(task.workflow_id)}
+         onChange={() => toggle(task.workflow_id, retryConsent, setRetryConsent)}
+        >
+         <Checkbox.Content>
+          <Checkbox.Control>
+           <Checkbox.Indicator />
+          </Checkbox.Control>
+          已核对保存记录，同意重新请求未确认的步骤（可能再次消耗模型额度）
+         </Checkbox.Content>
+        </Checkbox>
        )}
        {['completed', 'legacy_saved'].includes(task.status) && (
         <Button
@@ -508,8 +543,8 @@ export function ToolsWorkbench({visible, close}: {visible: boolean; close: () =>
      ))}
     </>
    )}
-   {tab === '我的笔记' && <SavedLearningNotes />}
-   {tab === '学习记录' && <LearningRecords />}
+   {tab === '研究笔记' && <SavedLearningNotes />}
+   {tab === '知识会话' && <LearningRecords />}
   </WindowPanel>
  )
 }

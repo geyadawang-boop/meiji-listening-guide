@@ -166,10 +166,10 @@ export function ZhiyunImporter({
  return (
   <WindowPanel
    visible={visible}
-   label="智云课堂"
-   title="智云课堂"
-   description="搜索智云课程，导出语音原文与课件。"
-   heading="智云课堂"
+   label="智云导入"
+   title="智云导入"
+   description="搜索智云课程，导出语音原文与课件；登录在设置中完成。"
+   heading="智云导入"
    subheading={
     lessonsLoading
      ? course
@@ -207,83 +207,83 @@ export function ZhiyunImporter({
    close={close}
   >
    <div className="panel-section">
-     <form
-      className="panel-inline-form"
-      onSubmit={e => {
-       e.preventDefault()
-       if (!searching) void search()
-      }}
-     >
-      <Input
-       aria-label="搜索智云课程"
-       placeholder="搜索课程名称，或粘贴智云课程链接"
-       value={keyword}
-       disabled={locked}
-       onChange={e => setKeyword(e.target.value)}
-      />
-      <Button type="submit" variant="tertiary" size="sm" isDisabled={locked || !keyword.trim()}>
-       搜索
-      </Button>
-     </form>
-     <div className="row zhiyun-picks">
-      {activeGroup && activeGroup.terms.length > 1 && (
-       <label>
-        选择学期
-        <SelectField
-         label="选择智云学期"
-         placeholder="选择学期"
-         value={course?.id || ''}
-         isDisabled={locked}
-         onChange={next => {
-          const value = activeGroup.terms.find(t => t.id === next)
-          if (value && value.id !== course?.id) void loadLessons(value)
-         }}
-         options={activeGroup.terms.map(t => ({
-          value: t.id,
-          label: t.term || '未标学期'
-         }))}
-        />
-       </label>
-      )}
+    <form
+     className="panel-inline-form"
+     onSubmit={e => {
+      e.preventDefault()
+      if (!searching) void search()
+     }}
+    >
+     <Input
+      aria-label="搜索智云课程"
+      placeholder="搜索课程名称，或粘贴智云课程链接"
+      value={keyword}
+      disabled={locked}
+      onChange={e => setKeyword(e.target.value)}
+     />
+     <Button type="submit" variant="tertiary" size="sm" isDisabled={locked || !keyword.trim()}>
+      搜索
+     </Button>
+    </form>
+    <div className="row zhiyun-picks">
+     {activeGroup && activeGroup.terms.length > 1 && (
       <label>
-       选择课次
+       选择学期
        <SelectField
-        label="选择智云课次"
-        placeholder="选择具体课次"
-        value={subId}
-        isDisabled={locked || !lessons.length}
-        onChange={next => setSubId(next)}
-        options={[
-         {value: '', label: '选择具体课次'},
-         ...lessons.map(row => ({
-          value: row.id,
-          label: row.title + (row.teacher ? ' · ' + row.teacher : '')
-         }))
-        ]}
+        label="选择智云学期"
+        placeholder="选择学期"
+        value={course?.id || ''}
+        isDisabled={locked}
+        onChange={next => {
+         const value = activeGroup.terms.find(t => t.id === next)
+         if (value && value.id !== course?.id) void loadLessons(value)
+        }}
+        options={activeGroup.terms.map(t => ({
+         value: t.id,
+         label: t.term || '未标学期'
+        }))}
        />
       </label>
-     </div>
-     {course && !lessons.length && !lessonsLoading && !searching && <p className="hint">本课程暂无可读取的课次</p>}
-     <div className="row">
-      <Button
-       variant="primary"
-       size="sm"
-       isDisabled={locked || !lesson}
-       onClick={() => void exportResource('transcript')}
-      >
-       导出语音识别-原文
+     )}
+     <label>
+      选择课次
+      <SelectField
+       label="选择智云课次"
+       placeholder="选择具体课次"
+       value={subId}
+       isDisabled={locked || !lessons.length}
+       onChange={next => setSubId(next)}
+       options={[
+        {value: '', label: '选择具体课次'},
+        ...lessons.map(row => ({
+         value: row.id,
+         label: row.title + (row.teacher ? ' · ' + row.teacher : '')
+        }))
+       ]}
+      />
+     </label>
+    </div>
+    {course && !lessons.length && !lessonsLoading && !searching && <p className="hint">本课程暂无可读取的课次</p>}
+    <div className="row">
+     <Button
+      variant="primary"
+      size="sm"
+      isDisabled={locked || !lesson}
+      onClick={() => void exportResource('transcript')}
+     >
+      导出语音识别-原文
+     </Button>
+     <Button variant="tertiary" size="sm" isDisabled={locked || !lesson} onClick={() => void exportResource('ppt')}>
+      导出 PPT
+     </Button>
+     {exporting && (
+      <Button variant="ghost" size="sm" onClick={() => void invoke('cancel')}>
+       取消导出
       </Button>
-      <Button variant="tertiary" size="sm" isDisabled={locked || !lesson} onClick={() => void exportResource('ppt')}>
-       导出 PPT
-      </Button>
-      {exporting && (
-       <Button variant="ghost" size="sm" onClick={() => void invoke('cancel')}>
-        取消导出
-       </Button>
-      )}
-     </div>
-     <p className="hint">原文保存到“语音原文”，课件保存到“PPT”；自动关联同一课次。</p>
-     {saved && <Input aria-label="智云资源保存路径" readOnly value={saved} />}
+     )}
+    </div>
+    <p className="hint">原文保存到“语音原文”，课件保存到“PPT”；自动关联同一课次。</p>
+    {saved && <Input aria-label="智云资源保存路径" readOnly value={saved} />}
    </div>
   </WindowPanel>
  )
