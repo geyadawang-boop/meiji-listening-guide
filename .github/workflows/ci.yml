@@ -389,6 +389,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Verify (typecheck + format + lint)
         run: pnpm verify
+      - name: Verify subtitle correction regressions
+        run: node scripts/correction-regression.mts
       - name: Build
         run: pnpm build
 
