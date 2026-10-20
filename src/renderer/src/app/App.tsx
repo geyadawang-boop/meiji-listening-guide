@@ -1,3 +1,5 @@
+import {CorrectionControls} from '@renderer/features/courses/CorrectionControls'
+import type {CorrectionMode} from '@shared/correction'
 import {Button, Checkbox, Chip, Disclosure, Input, Kbd, ScrollShadow, Surface, TextArea, Tooltip} from '@heroui/react'
 import {learningViews, type LearningView} from '@renderer/features/video/LearningNav'
 import {Wallpaper, chatStyle} from '@renderer/features/appearance/Appearance'
@@ -428,10 +430,10 @@ export default function App() {
    const path = await invoke<string>('export', {id: lectureId, kind, format})
    notify.success('文件已导出', {description: path, timeout: 6000})
   })
- async function generate(action: string) {
+ async function generate(action: string, mode?: CorrectionMode) {
   const id = lectureId
   try {
-   await invoke(action, {id, ...(action === 'practice:generate' ? {withSearch} : {})})
+   await invoke(action, {id, ...(mode ? {mode} : {}), ...(action === 'practice:generate' ? {withSearch} : {})})
   } finally {
    await reloadLecture(id)
    await reloadCourse()
@@ -479,15 +481,13 @@ export default function App() {
         ? '请先关联 PPT/课件'
         : ''
  const correctionButton = lecture && (
-  <Button
-   variant="primary"
-   size="sm"
-   isDisabled={busy || !!missingSource}
-   onClick={() => void task(() => generate('subtitles:generate'))}
-  >
-   <StudyIcon name="sparkle" />
-   {lecture.correction ? '继续校订字幕' : lecture.segments.length ? '重新校订字幕' : '原文 + PPT 校订字幕'}
-  </Button>
+  <CorrectionControls
+   key={lecture.lecture.id}
+   lectureId={lecture.lecture.id}
+   disabled={busy || !!missingSource}
+   label={lecture.correction ? '继续校订字幕' : lecture.segments.length ? '重新校订字幕' : '原文 + PPT 校订字幕'}
+   run={mode => void task(() => generate('subtitles:generate', mode))}
+  />
  )
  return (
   <SettingsNavigationProvider value={{open: openSettings}}>
@@ -1369,11 +1369,10 @@ export default function App() {
                 onClick={() => {
                  setMenu(false)
                  setTab('subtitles')
-                 void task(() => generate('subtitles:generate'))
                 }}
                >
                 <CirclePlay size={16} />
-                校订完整字幕
+                字幕校订设置
                </Button>
                <Button
                 variant="ghost"
