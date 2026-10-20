@@ -251,7 +251,6 @@
 }
 .knowledge-card textarea {
  width: 100%;
- min-height: 120px;
  resize: vertical;
  box-sizing: border-box;
 }
@@ -330,93 +329,6 @@
 }
 .bili-browse-grid .row {
  gap: 8px;
-}
-
-/* ===== study.css ===== */
-.study-menu label {
- display: block;
- margin: 12px 0;
-}
-.study-menu label input:not([type="checkbox"]),
-.study-menu label select,
-.study-menu textarea {
- width: 100%;
- margin-top: 6px;
-}
-.study-menu textarea {
- min-height: 120px;
-}
-.study-menu small {
- display: block;
- overflow-wrap: anywhere;
- color: var(--muted);
- margin: 8px 0;
-}
-.study-menu > button {
- margin: 5px 4px;
-}
-.study-menu .row {
- gap: 10px;
-}
-.study-menu .row label {
- min-width: 0;
- flex: 1;
-}
-.study-legend {
- display: grid;
- grid-template-columns: 1fr 1fr;
- gap: 10px;
- margin: 16px 0;
-}
-.study-legend span {
- font-size: 13px;
-}
-.study-legend i {
- display: inline-block;
- width: 16px;
- height: 12px;
- border-radius: 4px;
- margin-right: 8px;
-}
-.textbook-preview {
- position: relative;
- width: 100%;
- user-select: none;
- cursor: crosshair;
- line-height: 0;
- box-shadow: 0 4px 24px #0001;
-}
-.textbook-preview img {
- width: 100%;
- display: block;
- pointer-events: none;
-}
-.textbook-preview span {
- position: absolute;
- background: #fbb5c26b;
- border: 1px solid #d17498;
- pointer-events: none;
-}
-.highlight-review {
- padding: 20px;
- margin-top: 24px;
- border: 1px solid var(--line);
- border-radius: 18px;
-}
-.highlight-review > label {
- display: flex;
- gap: 12px;
- padding: 12px;
- border-bottom: 1px solid var(--line);
-}
-.highlight-review strong {
- display: block;
- margin: 7px 0;
-}
-.study-empty {
- padding: 100px 20px;
- text-align: center;
- color: var(--muted);
 }
 
 /* ===== style.css ===== */
@@ -691,36 +603,8 @@ a {
  flex-wrap: wrap;
  margin-bottom: 16px;
 }
-.progress {
- border: 1px solid var(--line-strong);
- background: var(--surface-subtle);
- padding: 12px 14px;
- border-radius: 8px;
- display: flex;
- gap: 8px;
- align-items: center;
- flex-wrap: wrap;
- font-size: 12px;
- margin-bottom: 18px;
-}
-.progress > span:first-child {
- color: var(--blue);
-}
-.progress button {
- padding: 4px 8px;
- margin-left: auto;
-}
-.progress.failed,
 .warning {
  color: #cf4b48;
-}
-.pulse {
- animation: pulse 1s infinite;
-}
-@keyframes pulse {
- 50% {
-  opacity: 0.25;
- }
 }
 .empty {
  display: flex;
@@ -797,13 +681,11 @@ a {
 .srt-editor,
 .prompt-editor {
  width: 100%;
- min-height: 250px;
  font-family: Consolas, "Microsoft YaHei", monospace;
  font-size: 12px;
  margin-bottom: 12px;
 }
 .prompt-editor {
- min-height: 360px;
  margin-top: 14px;
 }
 .notes h3,
@@ -970,9 +852,6 @@ a {
 .material button {
  font-size: 11px;
  padding: 6px 8px;
-}
-.question-card form textarea {
- min-height: 100px;
 }
 ::-webkit-scrollbar {
  width: 7px;
@@ -1567,7 +1446,6 @@ a {
  font-weight: 600;
 }
 .identity-editor textarea {
- min-height: 260px;
  resize: vertical;
  font-weight: 400;
  line-height: 1.7;
@@ -1729,48 +1607,6 @@ a {
 }
 .workspace.wallpaper-workspace > .chat-wallpaper {
  z-index: -1;
-}
-.chat-styled .agent-thread {
- max-width: var(--chat-width);
-}
-.chat-styled .message-agent {
- font-size: var(--chat-font);
- line-height: var(--chat-line);
- margin-bottom: var(--chat-gap);
- grid-template-columns: var(--chat-avatar-size) minmax(0, 1fr);
-}
-.chat-styled .message-agent.mine {
- grid-template-columns: minmax(0, 1fr) var(--chat-avatar-size);
-}
-.chat-styled .chat-avatar {
- width: var(--chat-avatar-size);
- height: var(--chat-avatar-size);
- border-radius: var(--chat-avatar-radius);
-}
-.chat-styled .chat-author {
- min-height: var(--chat-avatar-size);
-}
-.chat-styled .chat-bubble p {
- line-height: var(--chat-line);
-}
-.chat-styled .message-agent.mine .chat-bubble {
- border-radius: var(--chat-bubble-radius);
- background: var(--appearance-user-bg);
- color: var(--text);
-}
-.chat-styled[data-bubbles="true"] .message-agent.theirs .chat-bubble {
- border-radius: var(--chat-bubble-radius);
- padding: 16px 20px;
- background: color-mix(in srgb, var(--appearance-accent) 8%, var(--surface-raised));
- color: var(--text);
-}
-.chat-styled[data-names="false"] .chat-author {
- visibility: hidden;
- height: var(--chat-avatar-size);
- margin-bottom: 8px;
-}
-.chat-styled .agent-composer {
- border-color: color-mix(in srgb, var(--appearance-accent) 35%, var(--line-strong));
 }
 @media (max-width: 1100px) {
  .appearance-editor {
@@ -1949,7 +1785,6 @@ a {
 .ppt-extract-form textarea {
  display: block;
  width: 100%;
- min-height: 110px;
  margin-top: 12px;
  line-height: 1.7;
 }
@@ -2138,7 +1973,6 @@ a {
 }
 .video-option-body textarea {
  margin: 0 0 14px;
- min-height: 150px;
  font-size: 14px;
 }
 @media (prefers-reduced-motion: reduce) {

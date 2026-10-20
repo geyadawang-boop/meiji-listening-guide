@@ -20,12 +20,14 @@ import {
  Boxes,
  Check,
  ChevronDown,
+ ChevronRight,
  CirclePlay,
  CloudDownload,
  Cog,
  FileText,
  Folder,
  History,
+ ListChecks,
  MessageSquare,
  MessagesSquare,
  Plus,
@@ -37,10 +39,11 @@ import {
  Wrench
 } from 'lucide-react'
 import {useEffect, useRef, useState, type ReactNode} from 'react'
-import type {ChatSession, Course, Detail, LectureDetail, Progress, Settings} from '@shared/types'
+import type {ChatSession, Course, Detail, JobState, LectureDetail, Progress, Settings} from '@shared/types'
 import {milliseconds, time} from '@shared/srt'
 import {invoke, basename, Modal, Markdown} from '@renderer/ui/UiParts'
-import {AlertBox} from '@renderer/ui/AlertBox'
+import {errorMessage, notify} from '@renderer/ui/ToastHost'
+import {TaskStatus} from '@renderer/ui/TaskStatus'
 import {SelectField} from '@renderer/ui/SelectField'
 import {
  NewCourse,
@@ -51,16 +54,47 @@ import {
  Materials
 } from '@renderer/features/courses/CoursePanels'
 import {SettingsHub} from '@renderer/features/settings/SettingsHub'
-type RailTarget = LearningView | 'zhiyun' | 'files' | 'recognition' | 'knowledge' | 'tools' | 'study' | null
+import {
+ SettingsLink,
+ SettingsNavigationProvider,
+ type SettingsSection
+} from '@renderer/app/settings-navigation'
+type RailTarget =
+ | LearningView
+ | 'zhiyun'
+ | 'files'
+ | 'recognition'
+ | 'knowledge'
+ | 'tools'
+ | 'study'
+ | 'tasks'
+ | null
+type ModalTarget =
+ | 'course'
+ | 'lecture'
+ | 'settings'
+ | 'materials'
+ | 'zhiyun'
+ | 'courseware'
+ | 'transcript'
+ | 'files'
+ | LearningView
+ | 'study'
+ | 'knowledge'
+ | 'recognition'
+ | 'tools'
+ | 'tasks'
+ | null
 const railItems: {target: RailTarget; label: string; shortcut: string; icon: ReactNode}[] = [
  {target: null, label: '课程对话', shortcut: '1', icon: <MessageSquare />},
- {target: 'zhiyun', label: '智云课堂', shortcut: '2', icon: <CloudDownload />},
- {target: 'files', label: '文件管理', shortcut: '3', icon: <Folder />},
+ {target: 'zhiyun', label: '智云导入', shortcut: '2', icon: <CloudDownload />},
+ {target: 'files', label: '文件与成果', shortcut: '3', icon: <Folder />},
  {target: 'recognition', label: '识别工具', shortcut: '4', icon: <Scan />},
- {target: 'videoPpt', label: 'B站视频', shortcut: '5', icon: <CirclePlay />},
+ {target: 'videoPpt', label: '视频学习', shortcut: '5', icon: <CirclePlay />},
  {target: 'knowledge', label: '知识库', shortcut: '6', icon: <BookOpen />},
- {target: 'tools', label: '研究工具', shortcut: '7', icon: <Wrench />},
- {target: 'study', label: '课表与教材', shortcut: '8', icon: <StudyIcon name="notes" />}
+ {target: 'tools', label: '研究', shortcut: '7', icon: <Wrench />},
+ {target: 'study', label: '课表与教材', shortcut: '8', icon: <StudyIcon name="notes" />},
+ {target: 'tasks', label: '任务中心', shortcut: '9', icon: <ListChecks />}
 ]
 export default function App() {
  const [sessionDraft, setSessionDraft] = useState<{
@@ -79,22 +113,41 @@ export default function App() {
   [lecture, setLecture] = useState<LectureDetail | null>(null),
   [tab, setTab] = useState<'chat' | 'activity' | 'subtitles' | 'notes' | 'practice'>('chat')
  const [settings, setSettings] = useState<Settings | null>(null),
-  [modal, setModal] = useState<
-   | 'course'
-   | 'lecture'
-   | 'settings'
-   | 'materials'
-   | 'zhiyun'
-   | 'courseware'
-   | 'transcript'
-   | 'files'
-   | LearningView
-   | 'study'
-   | 'knowledge'
-   | 'recognition'
-   | 'tools'
-   | null
-  >(null)
+  [modal, setModal] = useState<ModalTarget>(null)
+ const [settingsSection, setSettingsSection] = useState<SettingsSection>('appearance'),
+  [settingsReturn, setSettingsReturn] = useState<ModalTarget>(null)
+ function openSettings(section: SettingsSection) {
+  setSettingsSection(section)
+  if (modal !== 'settings') setSettingsReturn(modal)
+  setModal('settings')
+ }
+ function openSettingsHome() {
+  setSettingsReturn(null)
+  setModal('settings')
+ }
+ function closeSettings() {
+  const target = settingsReturn
+  setSettingsReturn(null)
+  setModal(target)
+ }
+ const settingsBackLabel =
+  settingsReturn === 'zhiyun'
+   ? '返回智云导入'
+   : settingsReturn === 'files'
+     ? '返回文件与成果'
+     : settingsReturn === 'knowledge'
+       ? '返回知识库'
+       : settingsReturn === 'tools'
+         ? '返回研究'
+         : settingsReturn === 'recognition'
+           ? '返回识别工具'
+           : settingsReturn === 'study'
+             ? '返回课表与教材'
+             : settingsReturn === 'tasks'
+               ? '返回任务中心'
+               : settingsReturn && learningViews.some(item => item.id === settingsReturn)
+                 ? '返回视频学习'
+                 : '返回课程对话'
  const [platform, setPlatform] = useState('')
  const modKey = platform === 'darwin' ? ('command' as const) : ('ctrl' as const)
  const railActive = (target: RailTarget) =>
@@ -111,7 +164,7 @@ export default function App() {
    if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return
    if (event.key === '0') {
     event.preventDefault()
-    setModal('settings')
+    openSettingsHome()
     return
    }
    const index = Number(event.key) - 1
@@ -123,9 +176,8 @@ export default function App() {
   window.addEventListener('keydown', onKeyDown)
   return () => window.removeEventListener('keydown', onKeyDown)
  }, [])
- const [error, setError] = useState(''),
-  [busy, setBusy] = useState(false),
-  [progress, setProgress] = useState<Progress | null>(null)
+ const [busy, setBusy] = useState(false),
+  [jobProgress, setJobProgress] = useState<Progress | null>(null)
  const [search, setSearch] = useState(''),
   [srtEdit, setSrtEdit] = useState<string | null>(null),
   [input, setInput] = useState(''),
@@ -151,9 +203,10 @@ export default function App() {
   importedLecture = useRef(''),
   current = useRef({courseId: '', lectureId: '', sessionId: ''}),
   request = useRef(''),
-  operation = useRef(false)
+  operation = useRef(false),
+  activeJob = useRef('')
  current.current = {courseId, lectureId, sessionId}
- async function reloadCourse(id = courseId) {
+ async function reloadCourse(id = current.current.courseId) {
   const result = await invoke<Detail>('course:detail', {id})
   if (current.current.courseId === id) {
    setDetail(result)
@@ -180,16 +233,16 @@ export default function App() {
  async function task(fn: () => Promise<unknown>) {
   if (operation.current) return false
   operation.current = true
+  activeJob.current = ''
   setBusy(true)
-  setError('')
-  setProgress(null)
+  setJobProgress(null)
   try {
    await fn()
    setActivities(a => [...a, {stage: '完成', message: '操作已完成', at: new Date().toLocaleTimeString()}])
    return true
   } catch (e) {
-   const message = e instanceof Error ? e.message : String(e)
-   setError(message)
+   const message = errorMessage(e)
+   notify.error(e)
    setActivities(a => [...a, {stage: '失败', message, error: true, at: new Date().toLocaleTimeString()}])
    return false
   } finally {
@@ -200,14 +253,15 @@ export default function App() {
  useEffect(() => {
   void invoke<AppearanceState>('appearance:get')
    .then(setAppearance)
-   .catch(e => setError(String(e)))
+   .catch(e => notify.error(e, {title: '读取数据失败'}))
  }, [])
  useEffect(() => {
   void invoke<Identity>('identity:get')
    .then(setIdentity)
-   .catch(e => setError(String(e)))
+   .catch(e => notify.error(e, {title: '读取数据失败'}))
  }, [])
  useEffect(() => {
+  let disposed = false
   void Promise.all([invoke<Course[]>('courses'), invoke<Settings>('settings:get'), invoke<ChatSession[]>('sessions')])
    .then(([c, s, cs]) => {
     setSessions(cs)
@@ -216,16 +270,52 @@ export default function App() {
     const first = sortCoursesForNavigation(c)[0]
     if (first) setCourseId(first.id)
    })
-   .catch(e => setError(String(e)))
-  return window.assistant.onEvent(e => {
-   if (e.kind === 'progress' && e.data.stage === '片段完成' && e.data.lectureId === current.current.lectureId)
-    void reloadLecture(e.data.lectureId).catch(() => {})
-   if (e.kind === 'progress' && (!e.data.lectureId || e.data.lectureId === current.current.lectureId)) {
-    setProgress(e.data)
-    setActivities(a => [...a, {...e.data, at: new Date().toLocaleTimeString()}])
+   .catch(e => notify.error(e, {title: '读取数据失败'}))
+  const unsubscribe = window.assistant.onEvent(e => {
+   if (e.kind === 'progress') {
+    setJobProgress(e.data)
+    if (e.data.stage === '片段完成' && e.data.lectureId === current.current.lectureId)
+     void reloadLecture(e.data.lectureId).catch(() => {})
+    if (!e.data.lectureId || e.data.lectureId === current.current.lectureId)
+     setActivities(a => [...a, {...e.data, at: new Date().toLocaleTimeString()}])
+    return
+   }
+   if (e.kind === 'job') {
+    if (activeJob.current !== e.data.key) return
+    activeJob.current = ''
+    operation.current = false
+    setBusy(false)
+    if (e.data.error) notify.error(e.data.error, {title: '任务停止'})
+    if (e.data.lectureId) {
+     void reloadLecture(e.data.lectureId).catch(() => {})
+     void reloadCourse().catch(() => {})
+    }
+    return
    }
    if (e.kind === 'chat' && e.requestId === request.current) setChatText(t => t + e.text)
   })
+  void invoke<JobState | null>('job:current')
+   .then(state => {
+    if (disposed) return
+    if (!state) {
+     if (activeJob.current) {
+      activeJob.current = ''
+      operation.current = false
+      setBusy(false)
+     }
+     return
+    }
+    if (!state.lectureId) return
+    activeJob.current = state.key
+    operation.current = true
+    setBusy(true)
+    if (state.progress) setJobProgress(state.progress)
+   })
+   .catch(() => {})
+  return () => {
+   disposed = true
+   unsubscribe()
+  }
  }, [])
  useEffect(() => {
   const media = window.matchMedia('(prefers-color-scheme: dark)')
@@ -242,7 +332,6 @@ export default function App() {
   setSessionId('')
   setLecture(null)
   setLectureId('')
-  setProgress(null)
   setSrtEdit(null)
   setChatText('')
   setPendingChat('')
@@ -266,7 +355,7 @@ export default function App() {
       importedLecture.current = ''
      }
     })
-    .catch(e => setError(String(e)))
+    .catch(e => notify.error(e, {title: '读取课程失败'}))
  }, [courseId])
  useEffect(() => {
   threadEnd.current?.scrollIntoView({block: 'end'})
@@ -274,8 +363,7 @@ export default function App() {
  useEffect(() => {
   setLecture(null)
   setSrtEdit(null)
-  setProgress(null)
-  if (lectureId) void reloadLecture(lectureId).catch(e => setError(String(e)))
+  if (lectureId) void reloadLecture(lectureId).catch(e => notify.error(e, {title: '读取课次失败'}))
  }, [lectureId])
  function jump(timestamp: string | number) {
   const stamp = typeof timestamp === 'number' ? timestamp : milliseconds(timestamp)
@@ -299,7 +387,7 @@ export default function App() {
   } catch (e) {
    const message = e instanceof Error ? e.message : String(e)
    setModelsError(message)
-   if (!silent) setError(message)
+   if (!silent) notify.error(e, {title: '读取模型失败'})
   } finally {
    setModelsLoading(false)
   }
@@ -319,7 +407,7 @@ export default function App() {
     })
    )
   } catch (e) {
-   setError(e instanceof Error ? e.message : String(e))
+   notify.error(e, {title: '切换模型失败'})
   }
  }
  useEffect(() => {
@@ -349,7 +437,7 @@ export default function App() {
  const exportResult = (kind: string, format: string) =>
   void task(async () => {
    const path = await invoke<string>('export', {id: lectureId, kind, format})
-   setProgress({stage: '已导出', message: path})
+   notify.success('文件已导出', {description: path, timeout: 6000})
   })
  async function generate(action: string) {
   const id = lectureId
@@ -366,12 +454,12 @@ export default function App() {
   const file = e.dataTransfer.files[0]
   if (file) {
    if (!courseId) {
-    setError('请先新建课程，再拖入原文或 PPT')
+    notify.warning('请先新建课程，再拖入原文或 PPT')
     return
    }
    const path = window.assistant.filePath(file)
    if (!path) {
-    setError('未获取到本地路径，请从文件资源管理器拖入或使用文件选择')
+    notify.warning('未获取到本地路径，请从文件资源管理器拖入或使用文件选择')
     return
    }
    if (/\.(pptx?|pdf)$/i.test(path)) {
@@ -383,7 +471,7 @@ export default function App() {
     setPptDraft('')
     setModal(lectureId ? 'transcript' : 'lecture')
    } else {
-    setError('请拖入 PPT、PPTX、PDF 课件，或 Word、TXT、Markdown、SRT 原文')
+    notify.warning('请拖入 PPT、PPTX、PDF 课件，或 Word、TXT、Markdown、SRT 原文')
     return
    }
    setTab('chat')
@@ -413,7 +501,8 @@ export default function App() {
   </Button>
  )
  return (
-  <IdentityContext.Provider value={identity}>
+  <SettingsNavigationProvider value={{open: openSettings}}>
+   <IdentityContext.Provider value={identity}>
    <TitleBar />
    <div className="app" data-background={activeAppearance.background}>
     <AppWindows
@@ -471,14 +560,7 @@ export default function App() {
       </form>
      </Modal>
     )}
-    {busy && (
-     <div className="busy-indicator">
-      <span className="pulse">●</span> {progress ? `${progress.stage} · ${progress.message}` : '正在处理，请稍等'}{' '}
-      <Button variant="ghost" size="sm" onClick={() => void invoke('cancel')}>
-       取消任务
-      </Button>
-     </div>
-    )}
+    <TaskStatus busy={busy} progress={jobProgress} onCancel={() => void invoke('cancel')} />
     <nav className="app-icon-rail">
      {railItems.map(item => (
       <Tooltip key={item.label} delay={0} closeDelay={0}>
@@ -509,7 +591,7 @@ export default function App() {
        isIconOnly
        aria-label="设置"
        className={modal === 'settings' ? 'active' : ''}
-       onClick={() => setModal('settings')}
+       onClick={openSettingsHome}
       >
        <Cog />
       </Button>
@@ -547,22 +629,28 @@ export default function App() {
       sessions={sessions}
       selectedSession={sessionId}
       removeSession={async (cid, sid) => {
+       let failure: unknown
        const ok = await task(async () => {
-        const remaining = await invoke<ChatSession[]>('session:delete', {courseId: cid, id: sid, confirmed: true})
-        setSessions(v => [...v.filter(s => s.course_id !== cid), ...remaining])
-        if (selectedSessions.current[cid] === sid) selectedSessions.current[cid] = remaining[0].id
-        if (cid === courseId) {
-         if (sessionId === sid) {
-          setSessionId(remaining[0].id)
-          setInput('')
-          setChatText('')
-          setPendingChat('')
-          request.current = ''
+        try {
+         const remaining = await invoke<ChatSession[]>('session:delete', {courseId: cid, id: sid, confirmed: true})
+         setSessions(v => [...v.filter(s => s.course_id !== cid), ...remaining])
+         if (selectedSessions.current[cid] === sid) selectedSessions.current[cid] = remaining[0].id
+         if (cid === courseId) {
+          if (sessionId === sid) {
+           setSessionId(remaining[0].id)
+           setInput('')
+           setChatText('')
+           setPendingChat('')
+           request.current = ''
+          }
+          await reloadCourse(cid)
          }
-         await reloadCourse(cid)
+        } catch (e) {
+         failure = e
+         throw e
         }
        })
-       if (!ok) throw new Error('会话未删除，请查看错误提示')
+       if (!ok) throw failure ?? new Error('会话未删除，请重试')
       }}
       selectSession={(cid, sid) => {
        selectedSessions.current[cid] = sid
@@ -587,24 +675,30 @@ export default function App() {
            ''
          })
         })
-        .catch(e => setError(String(e)))
+        .catch(e => notify.error(e, {title: '读取课程失败'}))
       }
       select={setCourseId}
       remove={async id => {
+       let failure: unknown
        const ok = await task(async () => {
-        await invoke('course:delete', {id, confirmed: true})
-        const remaining = await invoke<Course[]>('courses')
-        setCourses(remaining)
-        setSessions(v => v.filter(s => s.course_id !== id))
-        if (id === courseId) {
-         setCourseId(remaining[0]?.id || '')
-         setDetail(null)
-         setLecture(null)
-         setLectureId('')
-         setTab('chat')
+        try {
+         await invoke('course:delete', {id, confirmed: true})
+         const remaining = await invoke<Course[]>('courses')
+         setCourses(remaining)
+         setSessions(v => v.filter(s => s.course_id !== id))
+         if (id === courseId) {
+          setCourseId(remaining[0]?.id || '')
+          setDetail(null)
+          setLecture(null)
+          setLectureId('')
+          setTab('chat')
+         }
+        } catch (e) {
+         failure = e
+         throw e
         }
        })
-       if (!ok) throw new Error('课程未删除，请查看错误提示')
+       if (!ok) throw failure ?? new Error('课程未删除，请重试')
       }}
      />
     </aside>
@@ -635,7 +729,6 @@ export default function App() {
        </Button>
       </div>
      </header>
-     {error && <AlertBox onClose={() => setError('')}>{error}</AlertBox>}
      {!courseId ? (
       <div className="welcome">
        <div className="welcome-symbol">
@@ -822,23 +915,6 @@ export default function App() {
              </Disclosure.Content>
             </Disclosure>
            </div>
-           {progress && (
-            <div className={`progress ${progress.error ? 'failed' : ''}`}>
-             <span className={busy ? 'pulse' : ''}>●</span>
-             <strong>{progress.stage}</strong>
-             <span>{progress.message}</span>
-             {progress.part && (
-              <small>
-               第 {progress.part}/{progress.total} 段
-              </small>
-             )}
-             {busy && (
-              <Button variant="ghost" size="sm" onClick={() => void invoke('cancel')}>
-               取消任务
-              </Button>
-             )}
-            </div>
-           )}
            <div className="tab-content">
             {tab === 'subtitles' && (
              <>
@@ -859,6 +935,7 @@ export default function App() {
                  void task(async () => {
                   await invoke('subtitles:import', {id: lectureId})
                   await reloadLecture()
+                  notify.success('SRT 字幕已导入')
                  })
                 }
                >
@@ -870,7 +947,6 @@ export default function App() {
                  <Button
                   variant="ghost"
                   size="sm"
-                  isIconOnly
                   isDisabled={busy || !!lecture.correction}
                   onClick={() => setSrtEdit(srtEdit === null ? lecture.srt : null)}
                  >
@@ -911,6 +987,7 @@ export default function App() {
                    await invoke('subtitles:save', {id: lectureId, srt: srtEdit})
                    await reloadLecture()
                    setSrtEdit(null)
+                   notify.success('字幕已校验并保存')
                   })
                  }
                 >
@@ -939,8 +1016,11 @@ export default function App() {
                      <p>{s.text}</p>
                      {s.uncertain && <small className="warning">待核对：{s.reason}</small>}
                      {s.originalText && s.originalText !== s.text && (
-                      <details>
-                       <summary>对照识别原文</summary>
+                      <details className="subtitle-original">
+                       <summary>
+                        <ChevronRight className="subtitle-original-chevron" size={14} aria-hidden="true" />
+                        对照识别原文
+                       </summary>
                        <p>{s.originalText}</p>
                        <small>{s.reason}</small>
                       </details>
@@ -971,14 +1051,17 @@ export default function App() {
                 isDisabled={busy || !lecture.segments.length || !!lecture.correction}
                 onClick={() => void task(() => generate('notes:generate'))}
                >
+                <StudyIcon name="notes" />
                 {lecture.notes ? '重新提取重点' : '生成听课重点笔记'}
                </Button>
                {lecture.notes && (
                 <>
                  <Button variant="tertiary" size="sm" onClick={() => exportResult('notes', 'md')}>
+                  <StudyIcon name="download" />
                   Markdown
                  </Button>
                  <Button variant="tertiary" size="sm" onClick={() => exportResult('notes', 'docx')}>
+                  <StudyIcon name="download" />
                   Word
                  </Button>
                 </>
@@ -1050,7 +1133,7 @@ export default function App() {
                 )}
                {lecture.practice &&
                 ['md', 'docx', 'pdf'].map(f => (
-                 <Button variant="ghost" size="sm" isIconOnly key={f} onClick={() => exportResult('practice', f)}>
+                 <Button variant="ghost" size="sm" key={f} onClick={() => exportResult('practice', f)}>
                   <StudyIcon name="download" />
                   {f === 'md' ? 'Markdown' : f === 'docx' ? 'Word' : 'PDF'}
                  </Button>
@@ -1065,6 +1148,7 @@ export default function App() {
                />
                搜索有来源的拓展题（较慢，需配置搜索服务）
               </label>
+              <SettingsLink section="search">配置搜索服务</SettingsLink>
               {lecture.practice ? (
                <PracticePanel
                 key={lectureId}
@@ -1333,6 +1417,16 @@ export default function App() {
                <History size={16} />
                任务轨迹
               </Button>
+              <div className="menu-divider" />
+              <SettingsLink section="identity" onSelect={() => setMenu(false)}>
+               助手角色
+              </SettingsLink>
+              <SettingsLink section="appearance" onSelect={() => setMenu(false)}>
+               聊天外观
+              </SettingsLink>
+              <SettingsLink section="prompts" onSelect={() => setMenu(false)}>
+               任务提示词
+              </SettingsLink>
              </div>
             )}
            </div>
@@ -1387,6 +1481,10 @@ export default function App() {
                <RefreshCw size={14} aria-hidden="true" />
                {modelsLoading ? '正在读取…' : '刷新可用模型'}
               </Button>
+              <div className="menu-divider" />
+              <SettingsLink section="qwen" onSelect={() => setModelMenu(false)}>
+               管理模型
+              </SettingsLink>
              </div>
             )}
            </div>
@@ -1422,7 +1520,6 @@ export default function App() {
     </main>
     {modal === 'files' && (
      <FileManager
-      initialCourse={detail?.course.name}
       busy={busy}
       close={() => setModal(null)}
       changed={async () => {
@@ -1445,6 +1542,7 @@ export default function App() {
         if (exams.length) await invoke('files:add', {courseId: c.id, kind: 'past_exam', paths: exams})
         setModal(null)
         await reloadCourse(c.id)
+        notify.success('课程已创建')
        })
       }
      />
@@ -1452,6 +1550,7 @@ export default function App() {
     {modal === 'lecture' && (
      <NewLecture
       courseId={courseId}
+      courseName={detail?.course.name}
       draft={sourceDraft}
       pptDraft={pptDraft}
       close={() => {
@@ -1470,6 +1569,7 @@ export default function App() {
         setPptDraft('')
         setTab('subtitles')
         setModal(null)
+        notify.success('课次已创建')
        })
       }
      />
@@ -1477,6 +1577,7 @@ export default function App() {
     {modal === 'transcript' && (
      <AddTranscript
       courseId={courseId}
+      courseName={detail?.course.name}
       draft={sourceDraft}
       close={() => setModal(null)}
       busy={busy}
@@ -1487,6 +1588,7 @@ export default function App() {
         await reloadCourse()
         setSourceDraft('')
         setModal(null)
+        notify.success('语音原文已更新')
        })
       }
      />
@@ -1494,6 +1596,7 @@ export default function App() {
     {modal === 'courseware' && (
      <AddCourseware
       courseId={courseId}
+      courseName={detail?.course.name}
       draft={pptDraft}
       close={() => {
        setPptDraft('')
@@ -1506,6 +1609,7 @@ export default function App() {
         await reloadLecture()
         setPptDraft('')
         setModal(null)
+        notify.success('课件已更新')
        })
       }
      />
@@ -1514,9 +1618,10 @@ export default function App() {
      <SettingsHub
       visible
       initial={settings}
+      initialSection={settingsSection}
       busy={busy}
-      error={error}
-      close={() => setModal(null)}
+      close={closeSettings}
+      backLabel={settingsBackLabel}
       save={async value => {
        let ok = false
        await task(async () => {
@@ -1548,6 +1653,7 @@ export default function App() {
      />
     )}
    </div>
-  </IdentityContext.Provider>
+   </IdentityContext.Provider>
+  </SettingsNavigationProvider>
  )
 }

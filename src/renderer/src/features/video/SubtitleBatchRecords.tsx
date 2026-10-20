@@ -3,7 +3,7 @@ import {useEffect, useState} from 'react'
 import type {SubtitleSyncTask} from '@shared/subtitle-sync'
 import type {SubtitleDerivedTask} from '@shared/subtitle-derived'
 import {noteTitles, type VideoNoteMode} from '@shared/video-notes'
-import {AlertBox} from '@renderer/ui/AlertBox'
+import {notify} from '@renderer/ui/ToastHost'
 const invoke = <T,>(action: string, args?: unknown) => window.assistant.invoke<T>(action, args)
 export function SubtitleBatchRecords({
  visible,
@@ -20,20 +20,16 @@ export function SubtitleBatchRecords({
  refresh: () => Promise<void>
  courseName?: string
 }) {
- const [derived, setDerived] = useState<SubtitleDerivedTask[]>([]),
-  [notice, setNotice] = useState(''),
-  [error, setError] = useState('')
+ const [derived, setDerived] = useState<SubtitleDerivedTask[]>([])
  const [draft, setDraft] = useState<{task: SubtitleSyncTask; urls: string[]; modes: VideoNoteMode[]} | null>(null)
  async function load() {
   setDerived(await invoke('subtitle-derived:list'))
  }
  useEffect(() => {
-  if (visible) void load().catch(reason => setError(String(reason)))
+  if (visible) void load().catch(reason => notify.error(reason, {title: '读取任务记录失败'}))
  }, [visible])
  const action = (fn: () => Promise<void>) =>
   void run(async () => {
-   setNotice('')
-   setError('')
    await fn()
    await refresh()
    await load()
@@ -81,7 +77,7 @@ export function SubtitleBatchRecords({
                  id: task.id,
                  url: item.url
                 })
-                if (result) setNotice('指定字幕已同步，来源标为用户指定 SRT')
+                if (result) notify.success('指定字幕已同步，来源标为用户指定 SRT')
                })
               }
              >
@@ -101,7 +97,7 @@ export function SubtitleBatchRecords({
           onClick={() =>
            action(async () => {
             await invoke('subtitle-sync:resume', {id: task.id})
-            setNotice('同步记录已核对并继续处理')
+            notify.info('同步记录已核对，正在继续处理')
            })
           }
          >
@@ -183,7 +179,7 @@ export function SubtitleBatchRecords({
          urls: draft.urls,
          modes: draft.modes
         })
-        setNotice(
+        notify.success(
          `笔记任务结束：完成 ${result.items.filter(item => item.status === '已完成').length}，失败 ${result.items.filter(item => item.status === '失败').length}`
         )
         setDraft(null)
@@ -241,7 +237,7 @@ export function SubtitleBatchRecords({
                    existing?.path ||
                    (await invoke<string>('video-ppt:notes-export', {path: item.outputs![0].path, format}))
                   await invoke('library:reveal', {path})
-                  setNotice(`${format.toUpperCase()} 已保存：${path}`)
+                  notify.success(`${format.toUpperCase()} 已保存`, {description: path, timeout: 6000})
                  })
                 }
                >
@@ -260,7 +256,7 @@ export function SubtitleBatchRecords({
          onClick={() =>
           action(async () => {
            await invoke('subtitle-derived:resume', {id: task.id})
-           setNotice('笔记任务已核对并继续处理')
+           notify.info('笔记任务已核对，正在继续处理')
           })
          }
         >
@@ -270,12 +266,6 @@ export function SubtitleBatchRecords({
       ))}
     </section>
    )}
-   {notice && (
-    <p className="learning-status" role="status">
-     {notice}
-    </p>
-   )}
-   {error && <AlertBox>{error}</AlertBox>}
   </>
  )
 }

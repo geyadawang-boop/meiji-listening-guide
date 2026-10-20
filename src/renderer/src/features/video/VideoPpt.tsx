@@ -1,11 +1,11 @@
 import {Button, Card, Input, TextArea} from '@heroui/react'
-import {SubtitleBatchRecords} from '@renderer/features/video/SubtitleBatchRecords'
 import {learningViews, LearningIcon, type LearningView} from '@renderer/features/video/LearningNav'
 import {VideoMindmap} from '@renderer/features/video/VideoMindmap'
 import {BiliResourcesPanel} from '@renderer/features/bilibili/BiliResources'
-import {AlertBox} from '@renderer/ui/AlertBox'
+import {notify} from '@renderer/ui/ToastHost'
 import {WindowMenuButton, WindowPanel} from '@renderer/ui/WindowPanel'
 import {SelectField} from '@renderer/ui/SelectField'
+import {SettingsLink} from '@renderer/app/settings-navigation'
 import {FileText, SlidersHorizontal} from 'lucide-react'
 import type {VideoNoteMode, VideoNoteResult} from '@shared/video-notes'
 import ReactMarkdown from 'react-markdown'
@@ -15,11 +15,9 @@ import {
  type VideoSource,
  type VideoReview,
  type VideoSeries,
- type VideoBatchItem,
- type PendingVideoTask
+ type VideoBatchItem
 } from '@shared/video-ppt'
 import type {SubtitleSyncTask} from '@shared/subtitle-sync'
-import type {LibraryFile} from '@shared/types'
 type BiliSubtitle = {
  title: string
  page: number
@@ -38,8 +36,7 @@ export function VideoPpt({
  select,
  close,
  courseId,
- courseName,
- files
+ courseName
 }: {
  visible: boolean
  view: LearningView
@@ -47,14 +44,12 @@ export function VideoPpt({
  close: () => void
  courseId: string
  courseName?: string
- files: () => void
 }) {
  const [url, setUrl] = useState(''),
   [prompt, setPrompt] = useState(defaultVideoPrompt),
   [source, setSource] = useState<VideoSource | null>(null),
   [review, setReview] = useState<VideoReview | null>(null),
   [busy, setBusy] = useState(false),
-  [error, setError] = useState(''),
   [progress, setProgress] = useState(''),
   [checked, setChecked] = useState(false),
   [saved, setSaved] = useState<{
@@ -63,23 +58,19 @@ export function VideoPpt({
    removed: number
    cleaned: boolean
    cleanupWarning: string
-  } | null>(null),
-  [pdfs, setPdfs] = useState<LibraryFile[]>([])
+  } | null>(null)
  const working = useRef(false)
  const [series, setSeries] = useState<VideoSeries | null>(null),
   [selected, setSelected] = useState<number[]>([]),
   [batch, setBatch] = useState<VideoBatchItem[]>([]),
   [filter, setFilter] = useState('')
- const [pending, setPending] = useState<PendingVideoTask[]>([])
  const [subtitle, setSubtitle] = useState<BiliSubtitle | null>(null),
   [subtitlePage, setSubtitlePage] = useState(1),
   [subtitleSaved, setSubtitleSaved] = useState('')
  const [summaryMode, setSummaryMode] = useState<VideoNoteMode>('detailed')
  const [summary, setSummary] = useState<VideoNoteResult | null>(null)
  const [subtitleBatch, setSubtitleBatch] = useState<VideoBatchItem[]>([])
- const [syncTasks, setSyncTasks] = useState<SubtitleSyncTask[]>([]),
-  [syncCategory, setSyncCategory] = useState('')
- const [outputs, setOutputs] = useState<LibraryFile[]>([])
+ const [syncCategory, setSyncCategory] = useState('')
  useEffect(() => setSummary(null), [subtitle])
  function openFromResources(url: string, kind: 'videoPpt' | 'videoSubtitles') {
   setUrl(url)
@@ -90,22 +81,6 @@ export function VideoPpt({
   setSubtitleSaved('')
   select(kind)
  }
- async function refresh() {
-  const files = (await invoke<LibraryFile[]>('library:list')).filter(
-   f => !courseName || !f.course || f.course === courseName
-  )
-  setPdfs(files.filter(f => f.category === 'PPT' && f.name.endsWith('-视频课件.pdf')))
-  setOutputs(
-   files.filter(
-    f => (f.category === '语音原文' || f.category === '笔记') && /\.(srt|vtt|txt|md|docx|pdf|svg)$/i.test(f.name)
-   )
-  )
-  setPending(await invoke('video-ppt:pending'))
-  setSyncTasks(await invoke('subtitle-sync:list'))
- }
- useEffect(() => {
-  if (visible) void refresh().catch(e => setError(String(e)))
- }, [visible, courseName])
  useEffect(
   () =>
    window.assistant.onEvent(e => {
@@ -118,17 +93,13 @@ export function VideoPpt({
   if (working.current) return
   working.current = true
   setBusy(true)
-  setError('')
   try {
    await fn()
   } catch (e) {
-   setError(e instanceof Error ? e.message : String(e))
+   notify.error(e)
   } finally {
    working.current = false
    setBusy(false)
-   void refresh().catch(e =>
-    setError(current => current || '任务列表刷新失败：' + (e instanceof Error ? e.message : String(e)))
-   )
   }
  }
  async function load(args: unknown) {
@@ -147,8 +118,7 @@ export function VideoPpt({
  const isResources = view === 'biliResources',
   isVideo = view === 'videoPpt',
   isSubtitles = view === 'videoSubtitles',
-  isNotes = view === 'videoNotes',
-  isTasks = view === 'videoTasks'
+  isNotes = view === 'videoNotes'
  const kept = review?.pages.filter(p => p.keep).length || 0
  return (
   <WindowPanel
@@ -186,7 +156,7 @@ export function VideoPpt({
     {isResources && (
      <BiliResourcesPanel visible={visible} useVideo={openFromResources} courseId={courseId} courseName={courseName} />
     )}
-    {!isTasks && !isNotes && !isResources && (
+    {!isNotes && !isResources && (
      <div className="learning-source-card">
       <label>
        B 站视频网址
@@ -217,6 +187,7 @@ export function VideoPpt({
            setReview(null)
            setSaved(null)
            setSaved(await invoke('video-ppt:auto', {url, prompt, courseId: courseId || undefined}))
+           notify.success('视频课件已生成')
           })
          }
         >
@@ -234,6 +205,7 @@ export function VideoPpt({
             setReview(null)
             setSaved(null)
             setSaved(await invoke('video-ppt:auto', {path, prompt, courseId: courseId || undefined}))
+            notify.success('视频课件已生成')
            }
           })
          }
@@ -249,7 +221,7 @@ export function VideoPpt({
       )}
      </div>
     )}
-    {!isTasks && !isNotes && !isResources && (
+    {!isNotes && !isResources && (
      <section className="video-course-picker" aria-label="选择课程分集">
       <header>
        <div>
@@ -379,7 +351,10 @@ export function VideoPpt({
       <header>
        <div>
         <h3>视频字幕</h3>
-        <p className="hint">读取所选分集的站内字幕；没有字幕时可用离线模型转写。结果保存到当前课程的“语音原文”。</p>
+        <p className="hint">
+         读取所选分集的站内字幕；没有字幕时可用离线模型转写。结果保存到当前课程的“语音原文”。
+         <SettingsLink section="runtime">检查运行组件</SettingsLink>
+        </p>
        </div>
       </header>
       <div className="row">
@@ -395,6 +370,7 @@ export function VideoPpt({
           if (result) {
            setSubtitle(result)
            setSubtitleSaved(result.savedPath || '')
+           if (result.savedPath) notify.success('B 站字幕已保存', {description: result.savedPath, timeout: 6000})
           }
          })
         }
@@ -444,6 +420,7 @@ export function VideoPpt({
           })
           setSubtitle(result)
           setSubtitleSaved(result.savedPath || '')
+          if (result.savedPath) notify.success('字幕已保存', {description: result.savedPath, timeout: 6000})
          })
         }
        >
@@ -461,6 +438,7 @@ export function VideoPpt({
           if (result) {
            setSubtitle(result)
            setSubtitleSaved(result.savedPath || '')
+           if (result.savedPath) notify.success('B 站字幕已保存', {description: result.savedPath, timeout: 6000})
           }
          })
         }
@@ -489,14 +467,14 @@ export function VideoPpt({
          onClick={() =>
           void run(async () => {
            const target = series?.episodes.find(e => e.page === subtitlePage)?.url || url
-           setSubtitleSaved(
-            await invoke<string>('video-ppt:subtitle-save', {
-             url: target,
-             title: subtitle.title,
-             srt: subtitle.srt,
-             courseId: courseId || undefined
-            })
-           )
+           const path = await invoke<string>('video-ppt:subtitle-save', {
+            url: target,
+            title: subtitle.title,
+            srt: subtitle.srt,
+            courseId: courseId || undefined
+           })
+           setSubtitleSaved(path)
+           notify.success('字幕 SRT 已保存', {description: path, timeout: 6000})
           })
          }
         >
@@ -613,7 +591,6 @@ export function VideoPpt({
            category: syncCategory.trim() || courseName || '',
            courseId: courseId || undefined
           })
-          setSyncTasks(current => [task, ...current.filter(item => item.id !== task.id)])
           setProgress(
            `同步结束：完成 ${task.items.filter(item => item.status === '已完成').length}，失败 ${task.items.filter(item => item.status === '失败').length}`
           )
@@ -625,16 +602,6 @@ export function VideoPpt({
       </div>
       <p className="hint">笔记、导图和 PDF 沿用对应页面的生成按钮，由你选择是否生成。</p>
      </Card>
-    )}
-    {(isTasks || isSubtitles) && (
-     <SubtitleBatchRecords
-      visible={visible}
-      tasks={syncTasks}
-      busy={busy}
-      run={run}
-      refresh={refresh}
-      courseName={courseName}
-     />
     )}
     {isNotes && (
      <section className="video-course-picker" aria-label="视频课程摘要">
@@ -657,6 +624,7 @@ export function VideoPpt({
           if (result) {
            setSubtitle(result)
            setSubtitleSaved(result.savedPath || '')
+           if (result.savedPath) notify.success('B 站字幕已保存', {description: result.savedPath, timeout: 6000})
           }
          })
         }
@@ -686,14 +654,14 @@ export function VideoPpt({
         onClick={() =>
          void run(async () => {
           setSummary(null)
-          setSummary(
-           await invoke('video-ppt:summary', {
-            mode: summaryMode,
-            srt: subtitle!.srt,
-            title: subtitle!.title,
-            courseId: courseId || undefined
-           })
-          )
+          const result = await invoke<VideoNoteResult | null>('video-ppt:summary', {
+           mode: summaryMode,
+           srt: subtitle!.srt,
+           title: subtitle!.title,
+           courseId: courseId || undefined
+          })
+          setSummary(result)
+          if (result) notify.success('课程笔记已生成并保存')
          })
         }
        >
@@ -796,10 +764,10 @@ export function VideoPpt({
     {isVideo && (
      <p className="hint">
       保存到：{courseName || '未分类资料'}。全程后台下载、裁剪和去重，PDF 检查成功后清理本次视频和临时图片。
+      <SettingsLink section="qwen">模型设置</SettingsLink>
      </p>
     )}
    </div>
-   {error && <AlertBox>{error}</AlertBox>}
    {progress && (
     <div className="learning-status" role="status">
      <span>{progress}</span>
@@ -881,8 +849,8 @@ export function VideoPpt({
            pages: review.pages.map(({page, keep, crop}) => ({page, keep, crop}))
           })
          )
-         await refresh()
          setProgress('PDF 已保存并逐页检查')
+         notify.success('视频课件 PDF 已保存')
         })
        }
       >
@@ -980,133 +948,6 @@ export function VideoPpt({
       在文件夹中查看
      </Button>
     </footer>
-   )}
-   {isTasks && !!pending.length && (
-    <section className="ppt-export-history">
-     <h3>未完成的任务</h3>
-     {pending.map(t => (
-      <article key={t.id}>
-       <div>
-        <strong>{t.name}</strong>
-        {t.kind === 'subtitle' && (
-         <p className="hint">{t.savedPath ? '字幕已保存，待核对并清理临时视频' : '字幕转写可继续'}</p>
-        )}
-        {t.error && (
-         <p className="hint" role="alert">
-          {t.error}
-         </p>
-        )}
-       </div>
-       <Button
-        variant="tertiary"
-        size="sm"
-        isDisabled={busy}
-        onClick={() =>
-         void run(async () => {
-          await invoke('video-ppt:reveal', {id: t.id})
-         })
-        }
-       >
-        查看保留文件
-       </Button>
-       {t.kind === 'subtitle' ? (
-        <Button
-         variant="tertiary"
-         size="sm"
-         isDisabled={busy || !!t.error}
-         onClick={() =>
-          void run(async () => {
-           const result = await invoke<BiliSubtitle>('video-ppt:resume-subtitle', {id: t.id})
-           setSubtitle(result)
-           setSubtitleSaved(result.savedPath || '')
-           setProgress('字幕任务已完成，临时视频已清理')
-           select('videoSubtitles')
-          })
-         }
-        >
-         {t.savedPath ? '核对字幕并清理' : '继续字幕转写'}
-        </Button>
-       ) : (
-        <Button
-         variant="tertiary"
-         size="sm"
-         isDisabled={busy || !!t.error}
-         onClick={() =>
-          void run(async () => {
-           const restored = await invoke<{source: VideoSource; review: VideoReview | null}>('video-ppt:restore', {
-            id: t.id
-           })
-           setSource(restored.source)
-           setReview(restored.review)
-           setSaved(null)
-           setChecked(false)
-           setProgress('已恢复任务，原视频和候选页仍在')
-           select('videoPpt')
-          })
-         }
-        >
-         继续检查
-        </Button>
-       )}
-      </article>
-     ))}
-    </section>
-   )}
-   {(isVideo || isTasks) && (
-    <section className="ppt-export-history" aria-label="视频课件 PDF">
-     <header>
-      <h3>已保存的 PDF</h3>
-      <Button variant="tertiary" size="sm" onClick={files}>
-       查看课程文件
-      </Button>
-     </header>
-     {pdfs.map(f => (
-      <article key={f.path}>
-       <strong>{f.name}</strong>
-       <Button variant="tertiary" size="sm" onClick={() => void open(f.path)}>
-        打开 PDF
-       </Button>
-       <Button variant="tertiary" size="sm" onClick={() => void open(f.path, true)}>
-        定位
-       </Button>
-      </article>
-     ))}
-    </section>
-   )}
-   {isTasks && !!outputs.length && (
-    <section className="ppt-export-history">
-     <header>
-      <h3>课程字幕与笔记</h3>
-      <Button variant="tertiary" size="sm" onClick={files}>
-       查看全部文件
-      </Button>
-     </header>
-     {outputs.map(file => (
-      <article key={file.path}>
-       <div>
-        <strong>{file.name}</strong>
-        <p className="hint">
-         {file.category} · {file.course || '未分类'}
-        </p>
-       </div>
-       {!/\.(vtt|svg)$/i.test(file.name) && (
-        <Button variant="tertiary" size="sm" isDisabled={busy} onClick={() => void open(file.path)}>
-         打开
-        </Button>
-       )}
-       <Button variant="tertiary" size="sm" isDisabled={busy} onClick={() => void open(file.path, true)}>
-        定位
-       </Button>
-      </article>
-     ))}
-    </section>
-   )}
-   {isTasks && !pending.length && !pdfs.length && !outputs.length && (
-    <div className="learning-empty">
-     <LearningIcon view="videoTasks" />
-     <h3>暂无视频任务</h3>
-     <p>完成的课件和需要继续的任务会显示在这里。</p>
-    </div>
    )}
   </WindowPanel>
  )

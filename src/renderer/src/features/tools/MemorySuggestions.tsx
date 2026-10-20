@@ -1,6 +1,6 @@
 import {Button, Card, Input, TextArea} from '@heroui/react'
 import {useEffect, useState} from 'react'
-import {AlertBox} from '@renderer/ui/AlertBox'
+import {notify} from '@renderer/ui/ToastHost'
 import {SelectField} from '@renderer/ui/SelectField'
 type Candidate = {
  candidate_id: string
@@ -19,9 +19,7 @@ export function MemorySuggestions({saved}: {saved: () => Promise<void>}) {
   [title, setTitle] = useState(''),
   [body, setBody] = useState(''),
   [kind, setKind] = useState('progress'),
-  [busy, setBusy] = useState(false),
-  [error, setError] = useState(''),
-  [notice, setNotice] = useState('')
+  [busy, setBusy] = useState(false)
  const suggestions = tasks.flatMap(task =>
   (task.memory_candidates || [])
    .filter(c => c.status === 'pending')
@@ -33,12 +31,10 @@ export function MemorySuggestions({saved}: {saved: () => Promise<void>}) {
  }
  async function run(fn: () => Promise<void>) {
   setBusy(true)
-  setError('')
-  setNotice('')
   try {
    await fn()
   } catch (e) {
-   setError(e instanceof Error ? e.message : String(e))
+   notify.error(e)
   } finally {
    setBusy(false)
   }
@@ -111,7 +107,7 @@ export function MemorySuggestions({saved}: {saved: () => Promise<void>}) {
         setSelected('')
         await refresh()
         await saved()
-        setNotice('已保存你核对过的记忆建议')
+        notify.success('已保存你核对过的记忆建议')
        })
       }
      >
@@ -119,8 +115,6 @@ export function MemorySuggestions({saved}: {saved: () => Promise<void>}) {
      </Button>
     </>
    )}
-   {notice && <p role="status">{notice}</p>}
-   {error && <AlertBox>{error}</AlertBox>}
   </Card>
  )
 }

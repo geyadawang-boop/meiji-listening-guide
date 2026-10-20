@@ -49,9 +49,11 @@ export function NewLecture({
  close,
  create,
  busy,
- courseId
+ courseId,
+ courseName
 }: {
  courseId: string
+ courseName?: string
  draft: string
  pptDraft: string
  close: () => void
@@ -75,12 +77,20 @@ export function NewLecture({
     </label>
     <FilePicker
      courseId={courseId}
+     courseName={courseName}
      transcript
      label="语音识别原文（必选）"
      paths={original}
      set={p => setOriginal(p.slice(-1))}
     />
-    <FilePicker courseId={courseId} courseware label="PPT/课件" paths={ppt} set={p => setPpt(p.slice(-1))} />
+    <FilePicker
+     courseId={courseId}
+     courseName={courseName}
+     courseware
+     label="PPT/课件"
+     paths={ppt}
+     set={p => setPpt(p.slice(-1))}
+    />
     <p className="hint">
      支持智云原文 Word、TXT、Markdown、SRT。导入 PPTX
      后，软件先在本地提取页面文字与嵌入图片，再交给千问结合语音原文分批校订。
@@ -99,12 +109,14 @@ export function NewLecture({
 }
 export function AddTranscript({
  courseId,
+ courseName,
  draft,
  close,
  save,
  busy
 }: {
  courseId: string
+ courseName?: string
  draft: string
  close: () => void
  save: (path: string) => Promise<boolean>
@@ -121,6 +133,7 @@ export function AddTranscript({
    >
     <FilePicker
      courseId={courseId}
+     courseName={courseName}
      transcript
      label="选择或拖入智云原文"
      paths={paths}
@@ -144,9 +157,11 @@ export function AddCourseware({
  close,
  busy,
  save,
- courseId
+ courseId,
+ courseName
 }: {
  courseId: string
+ courseName?: string
  draft: string
  close: () => void
  busy: boolean
@@ -163,6 +178,7 @@ export function AddCourseware({
    >
     <FilePicker
      courseId={courseId}
+     courseName={courseName}
      courseware
      label="选择或拖入 PPT/课件"
      paths={paths}

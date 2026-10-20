@@ -1,10 +1,11 @@
 import {Button, Input, ToggleButton, ToggleButtonGroup} from '@heroui/react'
 import {useEffect, useState} from 'react'
 import type {Course, LibraryFile} from '@shared/types'
-import {Folder, Trash2} from 'lucide-react'
-import {AlertBox} from '@renderer/ui/AlertBox'
+import {Download, Folder, Trash2} from 'lucide-react'
+import {notify} from '@renderer/ui/ToastHost'
 import {WindowMenuButton, WindowPanel} from '@renderer/ui/WindowPanel'
 import {ConfirmDialog} from '@renderer/ui/ConfirmDialog'
+import {MediaDownloads} from '@renderer/features/bilibili/MediaDownloads'
 const categories = ['全部', 'PPT', '语音原文', '笔记', '历年卷']
 export function FileManager({
  busy,
@@ -20,13 +21,11 @@ export function FileManager({
  const [files, setFiles] = useState<LibraryFile[]>([]),
   [filter, setFilter] = useState('全部'),
   [search, setSearch] = useState(''),
-  [error, setError] = useState(''),
   [pending, setPending] = useState<LibraryFile | null>(null),
-  [working, setWorking] = useState(false)
+  [working, setWorking] = useState(false),
+  [source, setSource] = useState<'course' | 'media'>('course')
  const [courses, setCourses] = useState<Course[]>([]),
-  [course, setCourse] = useState(initialCourse),
-  [creating, setCreating] = useState(false),
-  [name, setName] = useState('')
+  [course, setCourse] = useState(initialCourse)
  async function load() {
   const [f, c] = await Promise.all([
    window.assistant.invoke<LibraryFile[]>('library:list'),
@@ -35,37 +34,20 @@ export function FileManager({
   setFiles(f)
   setCourses(c)
  }
- async function create() {
-  if (!name.trim()) return
-  setWorking(true)
-  setError('')
-  try {
-   const c = await window.assistant.invoke<Course>('course:create', {name: name.trim()})
-   await load()
-   await changed()
-   setCourse(c.name)
-   setCreating(false)
-   setName('')
-  } catch (e) {
-   setError(String(e))
-  } finally {
-   setWorking(false)
-  }
- }
  useEffect(() => {
-  void load().catch(e => setError(String(e)))
+  void load().catch(e => notify.error(e, {title: '读取文件失败'}))
  }, [])
  async function remove() {
   if (!pending) return
   setWorking(true)
-  setError('')
   try {
    await window.assistant.invoke('library:delete', {path: pending.path, confirmed: true})
    setPending(null)
    await load()
    await changed()
+   notify.success('文件已移入回收站')
   } catch (e) {
-   setError(String(e))
+   notify.error(e, {title: '删除文件失败'})
   } finally {
    setWorking(false)
   }
@@ -78,22 +60,27 @@ export function FileManager({
  return (
   <WindowPanel
    visible
-   label="文件管理"
-   title="文件管理"
-   description="管理原始文件：导入、归类、打开与清理。"
-   heading="文件管理"
-   subheading={`${course} · ${visible.length} 个文件`}
-   menu={['全部课程', ...courseNames].map(c => (
-    <WindowMenuButton key={c} active={course === c} icon={<Folder aria-hidden="true" />} onSelect={() => setCourse(c)}>
-     {c} · {files.filter(f => c === '全部课程' || f.course === c).length}
-    </WindowMenuButton>
-   ))}
+   label="文件与成果"
+   title="文件与成果"
+   description="管理原始文件、下载与导出成果；文件不会自动进入知识库。"
+   heading="文件与成果"
+   subheading={source === 'course' ? `${course} · ${visible.length} 个文件` : '媒体下载任务与已下载文件'}
+   menu={
+    source === 'course' ? (
+     ['全部课程', ...courseNames].map(c => (
+      <WindowMenuButton key={c} active={course === c} icon={<Folder aria-hidden="true" />} onSelect={() => setCourse(c)}>
+       {c} · {files.filter(f => c === '全部课程' || f.course === c).length}
+      </WindowMenuButton>
+     ))
+    ) : (
+     <WindowMenuButton active icon={<Download aria-hidden="true" />} onSelect={() => setSource('media')}>
+      媒体下载
+     </WindowMenuButton>
+    )
+   }
    actions={
     <>
-     <Button variant="tertiary" size="sm" isDisabled={busy || working} onClick={() => setCreating(true)}>
-      新建课程文件夹
-     </Button>
-     <Button variant="ghost" size="sm" onClick={() => void load().catch(e => setError(String(e)))}>
+     <Button variant="ghost" size="sm" onClick={() => void load().catch(e => notify.error(e, {title: '读取文件失败'}))}>
       刷新
      </Button>
      <Button variant="tertiary" size="sm" onClick={() => void window.assistant.invoke('library:open')}>
@@ -104,107 +91,111 @@ export function FileManager({
    close={close}
   >
    <div className="panel-section">
-    {creating && (
-     <form
-      className="panel-inline-form"
-      onSubmit={e => {
-       e.preventDefault()
-       void create()
-      }}
-     >
-      <Input
-       autoFocus
-       aria-label="新课程名称"
-       placeholder="输入课程名称"
-       value={name}
-       onChange={e => setName(e.target.value)}
-      />
-      <Button type="submit" variant="primary" size="sm" isDisabled={working || !name.trim()}>
-       创建
-      </Button>
-      <Button variant="ghost" size="sm" type="button" isDisabled={working} onClick={() => setCreating(false)}>
-       取消
-      </Button>
-     </form>
-    )}
-    <div className="file-management-tools">
-     <Input
-      aria-label="搜索资料文件"
-      placeholder="搜索文件或课程…"
-      value={search}
-      onChange={e => setSearch(e.target.value)}
-     />
-    </div>
     <ToggleButtonGroup
-     aria-label="文件分类"
+     aria-label="文件来源"
      selectionMode="single"
      disallowEmptySelection
-     selectedKeys={new Set([filter])}
+     selectedKeys={new Set([source])}
      onSelectionChange={keys => {
       const next = [...keys][0]
-      if (typeof next === 'string') setFilter(next)
+      if (next === 'course' || next === 'media') setSource(next)
      }}
      size="sm"
      className="file-category-group"
     >
-     {categories.map((c, index) => (
-      <ToggleButton key={c} id={c}>
-       {index > 0 && <ToggleButtonGroup.Separator />}
-       {c} {selectedFiles.filter(f => c === '全部' || f.category === c).length}
-      </ToggleButton>
-     ))}
+     <ToggleButton id="course">课程资料</ToggleButton>
+     <ToggleButtonGroup.Separator />
+     <ToggleButton id="media">媒体下载</ToggleButton>
     </ToggleButtonGroup>
-    {error && <AlertBox>{error}</AlertBox>}
-    <div className="file-management-list">
-     {visible.map(f => (
-      <article key={f.path}>
-       <span className="file-type-icon">
-        <Folder />
-       </span>
-       <div>
-        <strong title={f.name}>{f.name}</strong>
-        <small>
-         {f.category} · {f.course || '未分类'} · {(f.size / 1024 / 1024).toFixed(2)} MB
-        </small>
-       </div>
-       {/\.(pdf|pptx?|docx?|txt|md|srt)$/i.test(f.name) && (
-        <Button
-         variant="tertiary"
-         size="sm"
-         aria-label={`打开文件 ${f.name}`}
-         onClick={() =>
-          void window.assistant.invoke('library:open-file', {path: f.path}).catch(e => setError(String(e)))
-         }
-        >
-         {/\.pdf$/i.test(f.name) ? '打开 PDF' : '打开'}
-        </Button>
-       )}
-       <Button
-        variant="tertiary"
-        size="sm"
-        onClick={() => void window.assistant.invoke('library:reveal', {path: f.path}).catch(e => setError(String(e)))}
-       >
-        定位
-       </Button>
-       <Button
-        variant="danger-soft"
-        size="sm"
-        isIconOnly
-        aria-label={`删除文件 ${f.name}`}
-        isDisabled={busy || working}
-        onClick={() => setPending(f)}
-       >
-        <Trash2 />
-       </Button>
-      </article>
-     ))}
-     {!visible.length && (
-      <div className="empty">
-       <h3>这里还没有文件</h3>
-       <p>导入或导出资料后会显示在这里。</p>
+    {source === 'course' ? (
+     <>
+      <div className="file-management-tools">
+       <Input
+        aria-label="搜索资料文件"
+        placeholder="搜索文件或课程…"
+        value={search}
+        onChange={e => setSearch(e.target.value)}
+       />
       </div>
-     )}
-    </div>
+      <ToggleButtonGroup
+       aria-label="文件分类"
+       selectionMode="single"
+       disallowEmptySelection
+       selectedKeys={new Set([filter])}
+       onSelectionChange={keys => {
+        const next = [...keys][0]
+        if (typeof next === 'string') setFilter(next)
+       }}
+       size="sm"
+       className="file-category-group"
+      >
+       {categories.map((c, index) => (
+        <ToggleButton key={c} id={c}>
+         {index > 0 && <ToggleButtonGroup.Separator />}
+         {c} {selectedFiles.filter(f => c === '全部' || f.category === c).length}
+        </ToggleButton>
+       ))}
+      </ToggleButtonGroup>
+      <div className="file-management-list">
+       {visible.map(f => (
+        <article key={f.path}>
+         <span className="file-type-icon">
+          <Folder />
+         </span>
+         <div>
+          <strong title={f.name}>{f.name}</strong>
+          <small>
+           {f.category} · {f.course || '未分类'} · {(f.size / 1024 / 1024).toFixed(2)} MB
+          </small>
+         </div>
+         {/\.(pdf|pptx?|docx?|txt|md|srt)$/i.test(f.name) && (
+          <Button
+           variant="tertiary"
+           size="sm"
+           aria-label={`打开文件 ${f.name}`}
+           onClick={() =>
+            void window.assistant
+             .invoke('library:open-file', {path: f.path})
+             .catch(e => notify.error(e, {title: '打开文件失败'}))
+           }
+          >
+           {/\.pdf$/i.test(f.name) ? '打开 PDF' : '打开'}
+          </Button>
+         )}
+         <Button
+          variant="tertiary"
+          size="sm"
+          onClick={() =>
+           void window.assistant
+            .invoke('library:reveal', {path: f.path})
+            .catch(e => notify.error(e, {title: '定位文件失败'}))
+          }
+         >
+          定位
+         </Button>
+         <Button
+          variant="danger-soft"
+          size="sm"
+          isIconOnly
+          aria-label={`删除文件 ${f.name}`}
+          isDisabled={busy || working}
+          onClick={() => setPending(f)}
+         >
+          <Trash2 />
+         </Button>
+        </article>
+       ))}
+       {!visible.length && (
+        <div className="empty">
+         <h3>这里还没有文件</h3>
+         <p>导入或导出资料后会显示在这里。</p>
+        </div>
+       )}
+      </div>
+     </>
+    ) : (
+     <MediaDownloads visible />
+    )}
     {pending && (
      <ConfirmDialog
       title="将文件移入回收站？"

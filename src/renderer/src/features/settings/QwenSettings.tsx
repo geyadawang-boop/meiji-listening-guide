@@ -1,6 +1,7 @@
 import {Button, Input} from '@heroui/react'
 import {useEffect, useState} from 'react'
 import {SelectField} from '@renderer/ui/SelectField'
+import {notify} from '@renderer/ui/ToastHost'
 import type {Profile, Settings} from '@shared/types'
 const invoke = <T,>(action: string, args?: unknown) => window.assistant.invoke<T>(action, args)
 const fallback: Profile = {
@@ -52,7 +53,7 @@ export function QwenSettings({
  useEffect(() => {
   if (!hasKey) {
    setAvailable(false)
-   setNotice('填写并保存千问 API Key 后自动读取可用模型')
+   setNotice('填写并保存通义千问 API Key 后自动读取可用模型')
    return
   }
   if (busy) return
@@ -78,6 +79,7 @@ export function QwenSettings({
      }
      setAvailable(false)
      setNotice(error instanceof Error ? error.message : String(error))
+     notify.error(error, {title: '读取可用模型失败'})
     })
     .finally(() => {
      if (!cancelled) setReading(false)
@@ -107,6 +109,7 @@ export function QwenSettings({
       return
      }
      setNotice('连接测试失败：' + (error instanceof Error ? error.message : String(error)))
+     notify.error(error, {title: '连接测试失败'})
     })
     .finally(() => {
      if (!cancelled) setTesting(false)
@@ -139,32 +142,32 @@ export function QwenSettings({
       isDisabled={disabled}
       onClick={() => void invoke('external', {url: 'https://bailian.console.aliyun.com/'})}
      >
-      获取千问 API Key
+      获取通义千问 API Key
      </Button>
      <Button variant="primary" size="sm" isDisabled={disabled} onClick={save}>
-      保存并使用千问
+      保存模型设置
      </Button>
     </div>
    </header>
    <label>
     API 地址
     <Input
-     aria-label="千问 API 地址"
+     aria-label="通义千问 API 地址"
      disabled={disabled}
      value={profile.baseUrl}
      onChange={e => patch({baseUrl: e.target.value})}
     />
    </label>
    <label>
-    千问 API Key
+    通义千问 API Key
     <Input
-     aria-label="千问 API Key"
+     aria-label="通义千问 API Key"
      type="password"
      autoComplete="off"
      spellCheck={false}
      disabled={disabled}
      value={profile.apiKey || ''}
-     placeholder={profile.hasKey ? '已加密保存，留空保持原密钥' : '填写千问 API Key'}
+     placeholder={profile.hasKey ? '已加密保存，留空保持原密钥' : '填写通义千问 API Key'}
      onChange={e => patch({apiKey: e.target.value || undefined})}
     />
    </label>

@@ -1,6 +1,5 @@
 import {Button} from '@heroui/react'
 import type {ReactNode} from 'react'
-import {AlertBox} from '@renderer/ui/AlertBox'
 import {Modal} from '@renderer/ui/UiParts'
 
 /** 统一确认弹窗：HeroUI Modal + 官方关闭按钮 + 危险操作二次确认。 */
@@ -9,7 +8,6 @@ export function ConfirmDialog({
  children,
  confirmLabel = '删除',
  busy = false,
- error,
  onCancel,
  onConfirm
 }: {
@@ -17,7 +15,6 @@ export function ConfirmDialog({
  children: ReactNode
  confirmLabel?: string
  busy?: boolean
- error?: string
  onCancel: () => void
  onConfirm: () => void
 }) {
@@ -28,7 +25,6 @@ export function ConfirmDialog({
     if (!busy) onCancel()
    }}
   >
-   {error && <AlertBox>{error}</AlertBox>}
    <div className="confirm-body">{children}</div>
    <footer>
     <Button variant="ghost" size="sm" type="button" isDisabled={busy} onClick={onCancel}>

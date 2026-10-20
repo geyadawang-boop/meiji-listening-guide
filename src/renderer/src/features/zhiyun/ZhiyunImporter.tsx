@@ -3,8 +3,8 @@ import {useEffect, useMemo, useRef, useState} from 'react'
 import type {ZhiyunCourse, ZhiyunLesson} from '@shared/types'
 import {WindowMenuButton, WindowPanel} from '@renderer/ui/WindowPanel'
 import {SelectField} from '@renderer/ui/SelectField'
-import {AlertBox} from '@renderer/ui/AlertBox'
-import {ZhiyunLoginPanel} from '@renderer/features/zhiyun/ZhiyunLogin'
+import {notify} from '@renderer/ui/ToastHost'
+import {useSettingsNavigation} from '@renderer/app/settings-navigation'
 const invoke = <T,>(action: string, args?: unknown) => window.assistant.invoke<T>(action, args)
 const courseLabel = (course: ZhiyunCourse) => [course.title, course.teacher, course.term].filter(Boolean).join(' · ')
 const courseKey = (course: Pick<ZhiyunCourse, 'title' | 'teacher'>) => course.title + '\u0000' + course.teacher
@@ -20,7 +20,7 @@ export function ZhiyunImporter({
  localCourseId: string
  imported: (lectureId: string, courseId: string) => Promise<void>
 }) {
- const [view, setView] = useState<'search' | 'login'>('search')
+ const settings = useSettingsNavigation()
  const [keyword, setKeyword] = useState(''),
   [courses, setCourses] = useState<ZhiyunCourse[]>([]),
   [course, setCourse] = useState<ZhiyunCourse | null>(null),
@@ -29,7 +29,6 @@ export function ZhiyunImporter({
  const [searching, setSearching] = useState(false),
   [lessonsLoading, setLessonsLoading] = useState(false),
   [exporting, setExporting] = useState(false),
-  [error, setError] = useState(''),
   [progress, setProgress] = useState(''),
   [saved, setSaved] = useState(''),
   [page, setPage] = useState(1),
@@ -57,7 +56,6 @@ export function ZhiyunImporter({
   const request = ++lessonRequest.current
   setCourse(value)
   setLessonsLoading(true)
-  setError('')
   setProgress('')
   try {
    const rows = await requestLessons(value.id)
@@ -69,7 +67,7 @@ export function ZhiyunImporter({
    if (request !== lessonRequest.current) return null
    setLessons([])
    setSubId('')
-   setError(e instanceof Error ? e.message : String(e))
+   notify.error(e, {title: '读取课次失败'})
    return null
   } finally {
    if (request === lessonRequest.current) setLessonsLoading(false)
@@ -96,7 +94,6 @@ export function ZhiyunImporter({
  const activeGroup = course ? groups.find(group => group.key === courseKey(course)) : undefined
  async function search(next = 1) {
   setSearching(true)
-  setError('')
   if (next === 1) {
    setCourse(null)
    setLessons([])
@@ -134,7 +131,7 @@ export function ZhiyunImporter({
    setHasMore(result.hasMore)
    if (!result.courses.length && next === 1) setProgress('没有找到课程，请换一个名称搜索')
   } catch (e) {
-   setError(e instanceof Error ? e.message : String(e))
+   notify.error(e, {title: '搜索智云课程失败'})
   } finally {
    setSearching(false)
   }
@@ -142,7 +139,6 @@ export function ZhiyunImporter({
  async function exportResource(kind: 'transcript' | 'ppt') {
   if (!course || !subId || exporting || lessonsLoading) return
   setExporting(true)
-  setError('')
   setSaved('')
   setProgress(kind === 'transcript' ? '正在准备语音识别原文…' : '正在准备 PPT…')
   try {
@@ -157,9 +153,10 @@ export function ZhiyunImporter({
     setSaved(result.path)
     await imported(result.lectureId, result.courseId)
     setProgress('导出并关联课次完成')
+    notify.success('智云资源已导出并关联课次', {description: result.path, timeout: 6000})
    } else setProgress('已取消导出')
   } catch (e) {
-   setError(e instanceof Error ? e.message : String(e))
+   notify.error(e, {title: '导出智云资源失败'})
   } finally {
    setExporting(false)
   }
@@ -203,22 +200,13 @@ export function ZhiyunImporter({
     </>
    }
    actions={
-    view === 'login' ? (
-     <Button variant="ghost" size="sm" onClick={() => setView('search')}>
-      返回搜索与导出
-     </Button>
-    ) : (
-     <Button variant="tertiary" size="sm" isDisabled={locked} onClick={() => setView('login')}>
-      登录智云课堂
-     </Button>
-    )
+    <Button variant="tertiary" size="sm" isDisabled={locked} onClick={() => settings.open('zhiyun')}>
+     登录智云课堂
+    </Button>
    }
    close={close}
   >
-   {visible && view === 'login' ? (
-    <ZhiyunLoginPanel />
-   ) : (
-    <div className="panel-section">
+   <div className="panel-section">
      <form
       className="panel-inline-form"
       onSubmit={e => {
@@ -237,7 +225,6 @@ export function ZhiyunImporter({
        搜索
       </Button>
      </form>
-     {error && <AlertBox>{error}</AlertBox>}
      <div className="row zhiyun-picks">
       {activeGroup && activeGroup.terms.length > 1 && (
        <label>
@@ -297,8 +284,7 @@ export function ZhiyunImporter({
      </div>
      <p className="hint">原文保存到“语音原文”，课件保存到“PPT”；自动关联同一课次。</p>
      {saved && <Input aria-label="智云资源保存路径" readOnly value={saved} />}
-    </div>
-   )}
+   </div>
   </WindowPanel>
  )
 }

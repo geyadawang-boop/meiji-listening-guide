@@ -42,7 +42,7 @@ import {SettingsStore} from '@main/config/settings'
 import {Api} from '@main/ai/api'
 import {modelRouter} from '@main/ai/model-router'
 import {Workflows} from '@main/learning/workflows'
-import {type EventPayload} from '@shared/types'
+import {type EventPayload, type JobState} from '@shared/types'
 import {parseSrt} from '@shared/srt'
 import {markdown} from '@main/documents/exports'
 import {ensureLibrary, libraryDirectory, folderName, reserveFile} from '@main/library/library'
@@ -56,6 +56,7 @@ let store: Store | undefined, mainWindow: BrowserWindow | undefined
 let shutdownBackends: (() => Promise<void>) | undefined,
  quitting = false
 const jobs = new Map<string, AbortController>()
+let activeJob: JobState | null = null
 function showMainWindow() {
  if (mainWindow && !mainWindow.isDestroyed()) {
   if (mainWindow.isMinimized()) mainWindow.restore()
@@ -128,6 +129,12 @@ async function startApplication() {
   }
  })
  const emit = (e: EventPayload) => {
+  if (
+   activeJob &&
+   e.kind === 'progress' &&
+   (!e.data.lectureId || !activeJob.lectureId || e.data.lectureId === activeJob.lectureId)
+  )
+   activeJob = {...activeJob, progress: e.data}
   if (!window.isDestroyed()) window.webContents.send('assistant:event', e)
  }
  window.on('maximize', () => emit({kind: 'window', data: {maximized: true}}))
@@ -317,21 +324,25 @@ async function startApplication() {
  }
  async function job<T>(key: string, fn: (signal: AbortSignal) => Promise<T>): Promise<T> {
   if (jobs.size) throw new Error('当前已有任务运行，请等待完成或取消')
-  const controller = new AbortController()
+  const controller = new AbortController(),
+   lectureId = key.startsWith('lecture:') ? key.slice(8) : undefined
+  let failure: string | undefined
+  activeJob = {key, lectureId}
   jobs.set(key, controller)
   try {
    return await fn(controller.signal)
   } catch (error) {
    const message = controller.signal.aborted ? '任务已取消' : error instanceof Error ? error.message : '任务失败'
-   emit({
-    kind: 'progress',
-    data: {lectureId: key.startsWith('lecture:') ? key.slice(8) : undefined, stage: '任务停止', message, error: true}
-   })
+   failure = message
+   emit({kind: 'progress', data: {lectureId, stage: '任务停止', message, error: true}})
    throw new Error(message)
   } finally {
    jobs.delete(key)
+   if (activeJob?.key === key) activeJob = null
+   emit({kind: 'job', data: {key, lectureId, state: 'finished', ...(failure ? {error: failure} : {})}})
   }
  }
+ const jobState = () => activeJob
  const pick = async (kind: string, course?: string) => {
   const extensions =
    kind === 'srt'
@@ -472,6 +483,7 @@ async function startApplication() {
   identity,
   job,
   jobs,
+  jobState,
   knowledge,
   libraryRoot,
   media,

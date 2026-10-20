@@ -1,7 +1,8 @@
 import {Button, Card, Input, TextArea} from '@heroui/react'
 import {useEffect, useState} from 'react'
-import {AlertBox} from '@renderer/ui/AlertBox'
+import {notify} from '@renderer/ui/ToastHost'
 import {SelectField} from '@renderer/ui/SelectField'
+import {SettingsLink} from '@renderer/app/settings-navigation'
 type Scope = {
  connection_id: string
  revision: string
@@ -67,8 +68,6 @@ export function ImAutomation({
   [offset, setOffset] = useState<number | null>(null),
   [confirmed, setConfirmed] = useState(false),
   [busy, setBusy] = useState(false),
-  [error, setError] = useState(''),
-  [notice, setNotice] = useState(''),
   [cleanup, setCleanup] = useState<{
    preview_id: string
    count: number
@@ -108,12 +107,10 @@ export function ImAutomation({
  }
  async function run(fn: () => Promise<unknown>) {
   setBusy(true)
-  setError('')
-  setNotice('')
   try {
    await fn()
   } catch (e) {
-   setError(e instanceof Error ? e.message : String(e))
+   notify.error(e)
   } finally {
    setBusy(false)
   }
@@ -126,7 +123,7 @@ export function ImAutomation({
   let stopped = false
   const timer = setTimeout(() => {
    void Promise.all([status(), list()]).catch(e => {
-    if (!stopped) setError(String(e))
+    if (!stopped) notify.error(e, {title: '刷新通讯状态失败', key: 'im:refresh', dedupeWindow: 10000})
    })
   }, 5000)
   return () => {
@@ -220,6 +217,7 @@ export function ImAutomation({
    ))}
    <p className="hint">
     使用梅酱当前模型连接。改变模型连接或会话规则会阻止旧任务继续发送；学习记忆不会自动共享到聊天账号。
+    <SettingsLink section="qwen">模型设置</SettingsLink>
    </p>
    <div className="row">
     <Button
@@ -247,7 +245,7 @@ export function ImAutomation({
        })
        setConfirmed(false)
        await refresh()
-       setNotice('会话规则已保存；后台运行需单独开启')
+       notify.success('会话规则已保存；后台运行需单独开启')
       })
      }
     >
@@ -285,7 +283,7 @@ export function ImAutomation({
          await request('runs', {...scope, action: 'start', peers: [scope.peer], resume_on_restart: false})
          setConfirmed(false)
          await status()
-         setNotice('已开启所选会话后台处理')
+         notify.success('已开启所选会话后台处理')
         })
        }
       >
@@ -301,7 +299,7 @@ export function ImAutomation({
          setConfirmed(false)
          await status()
          await list()
-         setNotice('后台处理已暂停，保存的待办保留')
+         notify.info('后台处理已暂停，保存的待办保留')
         })
        }
       >
@@ -401,7 +399,7 @@ export function ImAutomation({
          await request('cleanup', {...scope, preview_id: cleanup.preview_id, user_confirmed: true})
          setCleanup(undefined)
          await refresh()
-         setNotice('已清理本会话可删除记录')
+         notify.success('已清理本会话可删除记录')
         })
        }
       >
@@ -410,8 +408,6 @@ export function ImAutomation({
      </>
     )}
    </details>
-   {notice && <p role="status">{notice}</p>}
-   {error && <AlertBox>{error}</AlertBox>}
   </Card>
  )
 }

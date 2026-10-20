@@ -29,7 +29,8 @@ export function isRetryableApiError(error: unknown): boolean {
 }
 async function requestError(response: Response, nativeFile: boolean, hasFile: boolean) {
  let hint = ''
- if (response.status === 400) {
+ if (response.status === 404) hint = '服务端未找到当前模型或接口，请在设置中重新选择文本/视觉模型，并确认 API 地址'
+ else if (response.status === 400) {
   // Classify internally; never return provider text, which may echo credentials or request data.
   try {
    const body = (await response.json()) as {error?: {code?: string; param?: string; message?: string}}

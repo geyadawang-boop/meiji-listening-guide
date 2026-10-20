@@ -1,6 +1,6 @@
 import {Button, Card, Input} from '@heroui/react'
 import {useState} from 'react'
-import {AlertBox} from '@renderer/ui/AlertBox'
+import {notify} from '@renderer/ui/ToastHost'
 import {SelectField} from '@renderer/ui/SelectField'
 const invoke = <T,>(action: string, args?: unknown) => window.assistant.invoke<T>(action, args)
 type Item = {
@@ -48,17 +48,13 @@ export function Discussion() {
   [pack, setPack] = useState<Pack | null>(null),
   [category, setCategory] = useState('观众讨论'),
   [busy, setBusy] = useState(false),
-  [error, setError] = useState(''),
-  [notice, setNotice] = useState(''),
   [filter, setFilter] = useState('')
  async function run(fn: () => Promise<void>) {
   setBusy(true)
-  setError('')
-  setNotice('')
   try {
    await fn()
   } catch (reason) {
-   setError(reason instanceof Error ? reason.message : String(reason))
+   notify.error(reason)
   } finally {
    setBusy(false)
   }
@@ -191,7 +187,7 @@ export function Discussion() {
           note: item.note || ''
          }))
         })
-        setNotice(`所选讨论已保存并导入知识库：${result.path}`)
+        notify.success('所选讨论已保存并导入知识库', {description: result.path, timeout: 6000})
         setPack(null)
        })
       }
@@ -205,12 +201,6 @@ export function Discussion() {
      正在读取，范围内结果会保留采集回执…
     </p>
    )}
-   {notice && (
-    <p role="status" className="learning-status">
-     {notice}
-    </p>
-   )}
-   {error && <AlertBox>{error}</AlertBox>}
   </Card>
  )
 }

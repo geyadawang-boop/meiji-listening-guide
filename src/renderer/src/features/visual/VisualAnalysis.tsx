@@ -1,7 +1,8 @@
 import {Button, Card, Input} from '@heroui/react'
 import {useEffect, useState} from 'react'
 import {SelectField} from '@renderer/ui/SelectField'
-import {AlertBox} from '@renderer/ui/AlertBox'
+import {notify} from '@renderer/ui/ToastHost'
+import {SettingsLink} from '@renderer/app/settings-navigation'
 
 type Frame = {time: number; status: string; text?: string; error?: string}
 type Task = {
@@ -24,7 +25,6 @@ export function VisualAnalysisPanel({visible}: {visible: boolean}) {
  const [cap, setCap] = useState(6)
  const [policy, setPolicy] = useState('balanced')
  const [busy, setBusy] = useState(false)
- const [error, setError] = useState('')
  const [progress, setProgress] = useState('')
 
  async function refresh() {
@@ -32,7 +32,7 @@ export function VisualAnalysisPanel({visible}: {visible: boolean}) {
  }
 
  useEffect(() => {
-  if (visible) void refresh().catch(reason => setError(String(reason)))
+  if (visible) void refresh().catch(reason => notify.error(reason, {title: '读取识别记录失败'}))
  }, [visible])
 
  useEffect(
@@ -45,14 +45,13 @@ export function VisualAnalysisPanel({visible}: {visible: boolean}) {
 
  async function run(fn: () => Promise<void>) {
   setBusy(true)
-  setError('')
   setProgress('')
   try {
    await fn()
    await refresh()
   } catch (reason) {
-   setError(reason instanceof Error ? reason.message : String(reason))
-   void refresh()
+   notify.error(reason)
+   void refresh().catch(() => {})
   } finally {
    setBusy(false)
   }
@@ -63,6 +62,8 @@ export function VisualAnalysisPanel({visible}: {visible: boolean}) {
    <Card className="knowledge-card">
     <p className="hint">
      先在本机选择图片或视频并提取画面，点击“识别所选画面”才发送画面到所选千问视觉模型。视频只处理抽样画面，保留时间间隙和源哈希。
+     <SettingsLink section="qwen">视觉模型设置</SettingsLink>
+     <SettingsLink section="runtime">检查运行组件</SettingsLink>
     </p>
     <div className="row">
      <label>
@@ -115,7 +116,6 @@ export function VisualAnalysisPanel({visible}: {visible: boolean}) {
      </Button>
     </div>
    )}
-   {error && <AlertBox>{error}</AlertBox>}
    {tasks.map(task => {
     const completed = task.frames.filter(frame => frame.status === '已完成').length
     const recoverable = completed > 0 && Boolean(task.outputRecovery || task.outputPending || task.outputJournal)
@@ -220,7 +220,11 @@ export function VisualAnalysisPanel({visible}: {visible: boolean}) {
         ），当前文件会被保留。
        </p>
       )}
-      {task.preparation?.error && <AlertBox>{task.preparation.error}</AlertBox>}
+      {task.preparation?.error && (
+       <p className="hint" role="alert">
+        {task.preparation.error}
+       </p>
+      )}
       <p className="hint">
        共 {task.frames.length} 个画面 · 已完成 {completed} · 未完成{' '}
        {task.frames.filter(frame => frame.status !== '已完成').length}

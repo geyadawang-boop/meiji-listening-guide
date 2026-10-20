@@ -17,6 +17,9 @@ importers:
       '@huggingface/transformers':
         specifier: 4.3.1
         version: 4.3.1(@types/node@24.19.1)
+      '@internationalized/date':
+        specifier: 3.12.4
+        version: 3.12.4
       ajv:
         specifier: 8.20.0
         version: 8.20.0

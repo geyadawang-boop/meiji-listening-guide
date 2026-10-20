@@ -24,7 +24,7 @@ export async function transcribeLocalVideo(video: string, signal: AbortSignal, p
  const resources = app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'resources')
  const model = join(resources, 'asr/onnx-small')
  if (!existsSync(join(model, 'acquisition.json')))
-  throw new Error('本地字幕模型或视频组件未安装，请在运行环境安装同版本组件')
+  throw new Error('本地字幕模型或视频组件未安装，请在「运行组件」中安装同版本组件')
  signal.throwIfAborted()
  const ffmpeg = await checkedMediaExecutable(
   resources,

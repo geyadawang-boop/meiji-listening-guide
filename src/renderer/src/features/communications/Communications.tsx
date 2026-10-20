@@ -1,7 +1,7 @@
 import {useEffect, useState} from 'react'
 import {MessagesSquare} from 'lucide-react'
 import {Button, Card, Input, TextArea} from '@heroui/react'
-import {AlertBox} from '@renderer/ui/AlertBox'
+import {notify} from '@renderer/ui/ToastHost'
 import {SelectField} from '@renderer/ui/SelectField'
 import {ImAutomation} from '@renderer/features/communications/ImAutomation'
 type Capability = {available: boolean; reason: string}
@@ -69,9 +69,7 @@ export function CommunicationsPanel() {
   [text, setText] = useState(''),
   [instruction, setInstruction] = useState(''),
   [confirm, setConfirm] = useState(false),
-  [receipt, setReceipt] = useState(''),
   [busy, setBusy] = useState(false),
-  [error, setError] = useState(''),
   [processes, setProcesses] = useState<{pid: number; created: number; label: string}[]>([]),
   [probe, setProbe] = useState<{probe_id: string; account: string}>()
  const row = data?.connections.find(item => item.id === selected),
@@ -92,12 +90,11 @@ export function CommunicationsPanel() {
  }
  async function run(fn: () => Promise<unknown>) {
   setBusy(true)
-  setError('')
   try {
    await fn()
    await refresh()
   } catch (reason) {
-   setError(reason instanceof Error ? reason.message : String(reason))
+   notify.error(reason)
   } finally {
    setBusy(false)
   }
@@ -114,7 +111,6 @@ export function CommunicationsPanel() {
   setProbe(undefined)
   setText('')
   setConfirm(false)
-  setReceipt('')
  }, [selected])
  async function showLogin(next: Login) {
   setLogin(next)
@@ -144,7 +140,6 @@ export function CommunicationsPanel() {
  }
  return (
   <div className="panel-section communications-panel">
-   {error && <AlertBox>{error}</AlertBox>}
    {busy && <p role="status">正在处理所选操作…</p>}
    <Card className="knowledge-card">
     <div className="row">
@@ -508,15 +503,17 @@ export function CommunicationsPanel() {
              text,
              user_confirmed: true
             })
-            setReceipt(
+            const message =
              (result.state === 'sent'
               ? '服务已确认发送'
               : result.state === 'unknown'
                 ? '发送结果未知，请在手机核对，不自动重发'
                 : result.state) +
-              ' · 操作编号 ' +
-              result.operation_id
-            )
+             ' · 操作编号 ' +
+             result.operation_id
+            if (result.state === 'sent') notify.success(message, {timeout: 8000})
+            else if (result.state === 'unknown') notify.warning(message, {timeout: 10000})
+            else notify.info(message, {timeout: 8000})
             setConfirm(false)
            })
           }
@@ -525,7 +522,6 @@ export function CommunicationsPanel() {
          </Button>
         </>
        )}
-       {receipt && <p role="status">{receipt}</p>}
       </>
      )}
     </Card>

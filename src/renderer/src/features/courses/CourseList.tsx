@@ -4,7 +4,7 @@ import {useState} from 'react'
 import type {Course, ChatSession} from '@shared/types'
 import {BookMarked, ChevronDown, MessageSquare, Trash2} from 'lucide-react'
 import {courseLabel, courseYear, courseSubject, sortCoursesForNavigation} from '@shared/course-groups'
-import {AlertBox} from '@renderer/ui/AlertBox'
+import {notify} from '@renderer/ui/ToastHost'
 export function CourseList({
  courses,
  selected,
@@ -30,7 +30,6 @@ export function CourseList({
 }) {
  const [pendingSession, setPendingSession] = useState<ChatSession | null>(null)
  const [pending, setPending] = useState<Course | null>(null),
-  [error, setError] = useState(''),
   [deleting, setDeleting] = useState(false),
   [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
  return (
@@ -83,7 +82,6 @@ export function CourseList({
          isDisabled={busy}
          onClick={() => {
           setPending(c)
-          setError('')
          }}
         >
          <Trash2 />
@@ -112,7 +110,6 @@ export function CourseList({
              isDisabled={busy}
              onClick={() => {
               setPendingSession(s)
-              setError('')
              }}
             >
              <Trash2 />
@@ -139,13 +136,15 @@ export function CourseList({
      title={`删除「${pendingSession.title}」？`}
      confirmLabel="删除会话"
      busy={busy || deleting}
-     error={error}
      onCancel={() => setPendingSession(null)}
      onConfirm={() => {
       setDeleting(true)
       void removeSession(pendingSession.course_id, pendingSession.id)
-       .then(() => setPendingSession(null))
-       .catch(e => setError(e instanceof Error ? e.message : String(e)))
+       .then(() => {
+        setPendingSession(null)
+        notify.success('会话已删除')
+       })
+       .catch(e => notify.error(e, {title: '删除会话失败'}))
        .finally(() => setDeleting(false))
      }}
     >
@@ -157,13 +156,15 @@ export function CourseList({
      title={`删除「${pending.name}」？`}
      confirmLabel="删除课程"
      busy={busy || deleting}
-     error={error}
      onCancel={() => setPending(null)}
      onConfirm={() => {
       setDeleting(true)
       void remove(pending.id)
-       .then(() => setPending(null))
-       .catch(e => setError(e instanceof Error ? e.message : String(e)))
+       .then(() => {
+        setPending(null)
+        notify.success('课程已删除')
+       })
+       .catch(e => notify.error(e, {title: '删除课程失败'}))
        .finally(() => setDeleting(false))
      }}
     >

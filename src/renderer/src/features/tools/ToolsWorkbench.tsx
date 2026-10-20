@@ -4,7 +4,7 @@ import {WindowMenuButton, WindowPanel} from '@renderer/ui/WindowPanel'
 import ReactMarkdown from 'react-markdown'
 import {LearningRecords} from '@renderer/features/tools/LearningRecords'
 import {SavedLearningNotes} from '@renderer/features/tools/SavedLearningNotes'
-import {AlertBox} from '@renderer/ui/AlertBox'
+import {notify} from '@renderer/ui/ToastHost'
 import remarkGfm from 'remark-gfm'
 import type {Settings} from '@shared/types'
 function Result({text}: {text: string}) {
@@ -116,9 +116,7 @@ export function ToolsWorkbench({visible, close}: {visible: boolean; close: () =>
   [skills, setSkills] = useState<string[]>([]),
   [mcp, setMcp] = useState<string[]>([]),
   [flow, setFlow] = useState(false),
-  [error, setError] = useState(''),
-  [busy, setBusy] = useState(false),
-  [saved, setSaved] = useState('')
+  [busy, setBusy] = useState(false)
  const [retryConsent, setRetryConsent] = useState<string[]>([]),
   [settings, setSettings] = useState<Settings>(),
   [fulltextTargets, setFulltextTargets] = useState('')
@@ -133,13 +131,11 @@ export function ToolsWorkbench({visible, close}: {visible: boolean; close: () =>
  }
  async function run(fn: () => Promise<unknown>) {
   setBusy(true)
-  setError('')
-  setSaved('')
   try {
    await fn()
    await refresh()
   } catch (reason) {
-   setError(reason instanceof Error ? reason.message : String(reason))
+   notify.error(reason)
   } finally {
    setBusy(false)
   }
@@ -158,13 +154,19 @@ export function ToolsWorkbench({visible, close}: {visible: boolean; close: () =>
    (!data.tasks.some(task => task.status === 'running') && !data.workflows.some(task => task.status === 'running'))
   )
    return
-  const timer = setInterval(() => void refresh().catch(reason => setError(String(reason))), 2000)
+  const timer = setInterval(
+   () =>
+    void refresh().catch(reason =>
+     notify.error(reason, {title: '刷新研究任务失败', key: 'tools:refresh', dedupeWindow: 10000})
+    ),
+   2000
+  )
   return () => clearInterval(timer)
  }, [visible, data?.tasks.map(task => task.status).join(), data?.workflows.map(task => task.status).join()])
  useEffect(() => {
   void invoke<Settings>('settings:get')
    .then(setSettings)
-   .catch(reason => setError(reason instanceof Error ? reason.message : String(reason)))
+   .catch(reason => notify.error(reason, {title: '读取设置失败'}))
  }, [])
  const provider = settings?.searchProvider ?? 'duckduckgo'
  const toggle = (value: string, list: string[], set: (values: string[]) => void) =>
@@ -182,7 +184,12 @@ export function ToolsWorkbench({visible, close}: {visible: boolean; close: () =>
     </>
    }
    heading={tab}
-   subheading="使用梅酱当前连接的模型 · 在应用内完成操作"
+   subheading={
+    <>
+     使用梅酱当前连接的模型
+     <SettingsLink section="qwen">模型设置</SettingsLink>
+    </>
+   }
    menu={['研究与工作流', '学习记录', '我的笔记'].map(name => (
     <WindowMenuButton key={name} active={tab === name} onSelect={() => setTab(name)}>
      {name}
@@ -195,8 +202,6 @@ export function ToolsWorkbench({visible, close}: {visible: boolean; close: () =>
    }
    close={close}
   >
-   {error && <AlertBox>{error}</AlertBox>}
-   {saved && <p role="status">{saved}</p>}
    {tab === '研究与工作流' && data && (
     <>
      <Card className="knowledge-card">
@@ -291,7 +296,10 @@ export function ToolsWorkbench({visible, close}: {visible: boolean; close: () =>
       )}
       {!flow && (
        <>
-        <h4>本轮方法</h4>
+        <h4>
+         本轮方法
+         <SettingsLink section="methods">管理方法</SettingsLink>
+        </h4>
         {data.extensions.skills
          .filter(skill => skill.enabled)
          .map(skill => (
@@ -304,7 +312,10 @@ export function ToolsWorkbench({visible, close}: {visible: boolean; close: () =>
            {skill.name}
           </label>
          ))}
-        <h4>本轮外部工具</h4>
+        <h4>
+         本轮外部工具
+         <SettingsLink section="mcp">管理 MCP</SettingsLink>
+        </h4>
         {data.mcp.servers
          .filter(server => server.enabled)
          .flatMap(server =>
@@ -385,7 +396,7 @@ export function ToolsWorkbench({visible, close}: {visible: boolean; close: () =>
           setQuestion(task.question)
           setChosen([])
           setFlow(true)
-          setSaved('已载入原问题，请重新选择当前资料，再创建工作流')
+          notify.info('已载入原问题，请重新选择当前资料，再创建工作流')
          }}
         >
          用当前资料重建工作流
@@ -431,7 +442,10 @@ export function ToolsWorkbench({visible, close}: {visible: boolean; close: () =>
           void run(async () => {
            const path = await request<string>('workflow-export', {id: task.workflow_id})
            await invoke('library:reveal', {path})
-           setSaved(task.status === 'legacy_saved' ? '历史工作流已导出，来源仍待重新核验' : '工作流成果已保存并核验')
+           notify.success(
+            task.status === 'legacy_saved' ? '历史工作流已导出，来源仍待重新核验' : '工作流成果已保存并核验',
+            {description: path, timeout: 6000}
+           )
           })
          }
         >
@@ -453,7 +467,11 @@ export function ToolsWorkbench({visible, close}: {visible: boolean; close: () =>
          停止研究
         </Button>
        )}
-       {task.error_code && <AlertBox>{task.error_code}</AlertBox>}
+       {task.error_code && (
+        <p className="hint" role="alert">
+         {task.error_code}
+        </p>
+       )}
        {task.note && <Result text={task.note} />}
        {task.limitations && <p className="hint">{task.limitations}</p>}
        <details>
@@ -479,7 +497,7 @@ export function ToolsWorkbench({visible, close}: {visible: boolean; close: () =>
           void run(async () => {
            const path = await request<string>('agent-export', {id: task.task_id})
            await invoke('library:open-file', {path})
-           setSaved('已保存并核验研究 Markdown')
+           notify.success('已保存并核验研究 Markdown', {description: path, timeout: 6000})
           })
          }
         >

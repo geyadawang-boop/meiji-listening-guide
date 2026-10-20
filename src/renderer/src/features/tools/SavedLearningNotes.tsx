@@ -1,7 +1,7 @@
 import {Button, Card, Input, TextArea} from '@heroui/react'
 import {useEffect, useState} from 'react'
 import ReactMarkdown from 'react-markdown'
-import {AlertBox} from '@renderer/ui/AlertBox'
+import {notify} from '@renderer/ui/ToastHost'
 import {SelectField} from '@renderer/ui/SelectField'
 const request = <T,>(action: string, args: unknown = {}) => window.assistant.invoke<T>('tools:request', {action, args})
 const op = () => crypto.randomUUID().replaceAll('-', '')
@@ -18,8 +18,6 @@ export function SavedLearningNotes() {
   [query, setQuery] = useState(''),
   [state, setState] = useState('active'),
   [offset, setOffset] = useState<number | null>(0),
-  [error, setError] = useState(''),
-  [notice, setNotice] = useState(''),
   [busy, setBusy] = useState(false),
   [source, setSource] = useState<{status: string}>()
  async function list(start = 0) {
@@ -29,12 +27,10 @@ export function SavedLearningNotes() {
  }
  async function run(fn: () => Promise<unknown>) {
   setBusy(true)
-  setError('')
-  setNotice('')
   try {
    await fn()
   } catch (reason) {
-   setError(reason instanceof Error ? reason.message : String(reason))
+   notify.error(reason)
   } finally {
    setBusy(false)
   }
@@ -104,7 +100,7 @@ export function SavedLearningNotes() {
          setPreview(undefined)
          await list()
          await read(saved.receipt.note_id)
-         setNotice('已保存可编辑笔记')
+         notify.success('已保存可编辑笔记')
         })
        }
       >
@@ -142,9 +138,9 @@ export function SavedLearningNotes() {
       <Button
        variant="ghost"
        size="sm"
-       isIconOnly
        key={item.note_id}
        isDisabled={busy}
+       aria-label={`打开笔记 ${item.title}`}
        onClick={() => void run(() => read(item.note_id))}
       >
        {item.title} · {item.created_at}
@@ -188,7 +184,7 @@ export function SavedLearningNotes() {
           })
           await list()
           await read(saved.receipt.note_id)
-          setNotice('修订已保存，原版本保留')
+          notify.success('修订已保存，原版本保留')
          })
         }
        >
@@ -214,7 +210,7 @@ export function SavedLearningNotes() {
          void run(async () => {
           const path = await request<string>('note-export', {id: note.receipt.note_id})
           await window.assistant.invoke('library:reveal', {path})
-          setNotice('笔记 Markdown 已保存并核验')
+          notify.success('笔记 Markdown 已保存并核验')
          })
         }
        >
@@ -265,8 +261,6 @@ export function SavedLearningNotes() {
      </>
     )}
    </Card>
-   {notice && <p role="status">{notice}</p>}
-   {error && <AlertBox>{error}</AlertBox>}
   </>
  )
 }
