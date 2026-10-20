@@ -198,6 +198,15 @@ export class SettingsStore {
   this.value.browserOpen = open
   this.flush()
  }
+ // 缓存已读取的可用模型，避免聊天界面每次进入都重新请求服务端。
+ public cacheModels(models: string[]) {
+  const p = this.value.qwenProfile
+  if (!p) return
+  const merged = [...new Set([p.model, p.visionModel, ...models].filter((item): item is string => !!item))]
+  if (JSON.stringify(merged) === JSON.stringify(p.models || [])) return
+  this.value.qwenProfile = {...p, models: merged}
+  this.flush()
+ }
  public revealKey(id: string) {
   const p = this.value.qwenProfile
   if (id !== 'qwen' || !p?.encryptedKey) throw new Error('此千问配置尚未保存密钥')

@@ -29,6 +29,7 @@ export function createDesktopHandler(
   | 'identity'
   | 'job'
   | 'jobs'
+  | 'jobState'
   | 'libraryRoot'
   | 'root'
   | 'saveVideoPdf'
@@ -55,6 +56,7 @@ export function createDesktopHandler(
   identity,
   job,
   jobs,
+  jobState,
   libraryRoot,
   root,
   saveVideoPdf,
@@ -85,6 +87,7 @@ export function createDesktopHandler(
    'library:reveal',
    'library:delete',
    'cancel',
+   'job:current',
    'settings:get',
    'settings:models',
    'settings:probe',
@@ -316,6 +319,8 @@ export function createDesktopHandler(
     case 'cancel':
      for (const c of jobs.values()) c.abort()
      return true
+    case 'job:current':
+     return jobState()
     case 'settings:get':
      return settings.get()
     case 'appearance:get':
@@ -371,7 +376,9 @@ export function createDesktopHandler(
     case 'settings:models':
      return job('qwen-models', async () => {
       const profile = settings.draft(object.profile as any)
-      return new Api(settings, net.fetch.bind(net)).models(profile)
+      const models = await new Api(settings, net.fetch.bind(net)).models(profile)
+      if (object.persist === true) settings.cacheModels(models)
+      return models
      })
     case 'settings:probe':
      return job('test-qwen', async signal => {

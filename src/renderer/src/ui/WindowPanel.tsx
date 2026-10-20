@@ -7,6 +7,7 @@ export function WindowMenuButton({
  active = false,
  icon,
  title,
+ note,
  disabled,
  onSelect,
  children
@@ -14,6 +15,7 @@ export function WindowMenuButton({
  active?: boolean
  icon?: ReactNode
  title?: string
+ note?: ReactNode
  disabled?: boolean
  onSelect: () => void
  children: ReactNode
@@ -30,13 +32,14 @@ export function WindowMenuButton({
   >
    {icon}
    <span className="window-menu-item__label" title={title}>
-    {children}
+    <span className="window-menu-item__name">{children}</span>
+    {note ? <small className="window-menu-item__note">{note}</small> : null}
    </span>
   </Button>
  )
 }
 
-/** 整页窗口骨架：统一 220px 左菜单、内容区内边距与页头间距。 */
+/** 整页窗口骨架：统一 280px 左菜单（窄屏 240px）、内容区内边距与页头间距。 */
 export function WindowPanel({
  visible,
  label,
@@ -47,6 +50,7 @@ export function WindowPanel({
  subheading,
  actions,
  close,
+ backLabel = '返回课程对话',
  className,
  onDragOver,
  onDrop,
@@ -61,6 +65,7 @@ export function WindowPanel({
  subheading?: ReactNode
  actions?: ReactNode
  close: () => void
+ backLabel?: string
  className?: string
  onDragOver?: DragEventHandler<HTMLElement>
  onDrop?: DragEventHandler<HTMLElement>
@@ -83,7 +88,7 @@ export function WindowPanel({
     </ScrollShadow>
     <Button variant="ghost" size="sm" fullWidth className="window-panel__back" onPress={close}>
      <ArrowLeft size={16} aria-hidden="true" />
-     返回课程对话
+     {backLabel}
     </Button>
    </aside>
    <main className="learning-content">

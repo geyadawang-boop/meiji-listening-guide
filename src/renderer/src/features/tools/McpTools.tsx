@@ -1,6 +1,6 @@
-import {Button, Card, Input} from '@heroui/react'
+import {Button, Card, Checkbox, Input} from '@heroui/react'
 import {useEffect, useState} from 'react'
-import {AlertBox} from '@renderer/ui/AlertBox'
+import {notify} from '@renderer/ui/ToastHost'
 const invoke = <T,>(action: string, args?: unknown) => window.assistant.invoke<T>(action, args)
 const request = <T,>(action: string, args: unknown = {}) => invoke<T>('tools:request', {action, args})
 const op = () => crypto.randomUUID().replaceAll('-', '')
@@ -17,19 +17,17 @@ export function McpToolsPanel() {
  const [data, setData] = useState<Overview>(),
   [serverName, setServerName] = useState(''),
   [endpoint, setEndpoint] = useState(''),
-  [error, setError] = useState(''),
   [busy, setBusy] = useState(false)
  async function refresh() {
   setData(await request<Overview>('overview'))
  }
  async function run(fn: () => Promise<unknown>) {
   setBusy(true)
-  setError('')
   try {
    await fn()
    await refresh()
   } catch (reason) {
-   setError(reason instanceof Error ? reason.message : String(reason))
+   notify.error(reason)
   } finally {
    setBusy(false)
   }
@@ -54,7 +52,6 @@ export function McpToolsPanel() {
   })
  return (
   <div className="panel-section">
-   {error && <AlertBox>{error}</AlertBox>}
    {data && (
     <>
      <Card className="knowledge-card">
@@ -130,25 +127,29 @@ export function McpToolsPanel() {
        {server.tools.map(tool => (
         <details key={tool.name}>
          <summary>
-          <label className="media-check">
-           <input
-            type="checkbox"
-            disabled={busy || !tool.read_only_declared}
-            checked={server.allowed_tools.includes(tool.name)}
-            onChange={() =>
-             void run(() =>
-              editServer(
-               server,
-               server.allowed_tools.includes(tool.name)
-                ? server.allowed_tools.filter(name => name !== tool.name)
-                : [...server.allowed_tools, tool.name],
-               false
-              )
+          <Checkbox
+           className="media-check"
+           isSelected={server.allowed_tools.includes(tool.name)}
+           isDisabled={busy || !tool.read_only_declared}
+           onChange={() =>
+            void run(() =>
+             editServer(
+              server,
+              server.allowed_tools.includes(tool.name)
+               ? server.allowed_tools.filter(name => name !== tool.name)
+               : [...server.allowed_tools, tool.name],
+              false
              )
-            }
-           />
-           {tool.name} · {tool.read_only_declared ? '声明只读' : '未声明只读，禁用'}
-          </label>
+            )
+           }
+          >
+           <Checkbox.Content>
+            <Checkbox.Control>
+             <Checkbox.Indicator />
+            </Checkbox.Control>
+            {tool.name} · {tool.read_only_declared ? '声明只读' : '未声明只读，禁用'}
+           </Checkbox.Content>
+          </Checkbox>
          </summary>
          <p>{tool.description}</p>
          <pre>{JSON.stringify(tool.input_schema, null, 2)}</pre>

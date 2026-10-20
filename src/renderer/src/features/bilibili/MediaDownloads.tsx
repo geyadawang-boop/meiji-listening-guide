@@ -1,8 +1,9 @@
-import {Button, Card, Input} from '@heroui/react'
+import {Button, Card, Checkbox, Input} from '@heroui/react'
 import {useEffect, useState} from 'react'
 import type {MediaCatalog, MediaJob} from '@shared/media'
-import {AlertBox} from '@renderer/ui/AlertBox'
+import {notify} from '@renderer/ui/ToastHost'
 import {SelectField} from '@renderer/ui/SelectField'
+import {SettingsLink} from '@renderer/app/settings-navigation'
 const invoke = <T,>(action: string, args?: unknown) => window.assistant.invoke<T>(action, args)
 type Options = Record<string, string | number | boolean | null>
 type LoginProfile = {id: string; name: string; site: string; count: number}
@@ -68,8 +69,6 @@ export function MediaDownloads({visible}: {visible: boolean}) {
   [enums, setEnums] = useState<Record<string, (string | number)[]>>({}),
   [jobs, setJobs] = useState<MediaJob[]>([]),
   [busy, setBusy] = useState(false),
-  [error, setError] = useState(''),
-  [notice, setNotice] = useState(''),
   [confirmingProfile, setConfirmingProfile] = useState('')
  async function refresh() {
   setJobs(await invoke('media:list'))
@@ -78,7 +77,7 @@ export function MediaDownloads({visible}: {visible: boolean}) {
   setProfiles(await invoke('media:auth-list'))
  }
  useEffect(() => {
-  if (visible) void refreshProfiles().catch(reason => setError(String(reason)))
+  if (visible) void refreshProfiles().catch(reason => notify.error(reason, {title: '读取登录档案失败'}))
  }, [visible])
  useEffect(() => {
   if (!visible) return
@@ -90,26 +89,30 @@ export function MediaDownloads({visible}: {visible: boolean}) {
      setEnums({...value.enums, height: value.heights})
     }
    })
-   .catch(reason => !stopped && setError(String(reason)))
-  void refresh().catch(reason => !stopped && setError(String(reason)))
+   .catch(reason => !stopped && notify.error(reason, {title: '读取下载选项失败'}))
+  void refresh().catch(reason => !stopped && notify.error(reason, {title: '读取下载记录失败'}))
   return () => {
    stopped = true
   }
  }, [visible])
  useEffect(() => {
   if (!visible || !jobs.some(active)) return
-  const timer = setTimeout(() => void refresh().catch(reason => setError(String(reason))), 2000)
+  const timer = setTimeout(
+   () =>
+    void refresh().catch(reason =>
+     notify.error(reason, {title: '读取下载记录失败', key: 'media:refresh', dedupeWindow: 10000})
+    ),
+   2000
+  )
   return () => clearTimeout(timer)
  }, [visible, jobs])
  async function run(fn: () => Promise<void>) {
   setBusy(true)
-  setError('')
-  setNotice('')
   try {
    await fn()
    await refresh()
   } catch (reason) {
-   setError(reason instanceof Error ? reason.message : String(reason))
+   notify.error(reason)
   } finally {
    setBusy(false)
   }
@@ -130,15 +133,21 @@ export function MediaDownloads({visible}: {visible: boolean}) {
     failed.push(`${link}：${reason instanceof Error ? reason.message : String(reason)}`)
    }
   }
-  setNotice(`已加入 ${count} 个所选下载任务`)
-  if (failed.length) setError(failed.join('\n'))
+  if (count) notify.success(`已加入 ${count} 个所选下载任务`)
+  if (failed.length) notify.error(failed.join('\n'), {title: `${failed.length} 个任务加入失败`})
  }
  return (
   <Card className="knowledge-card" aria-label="媒体下载">
    <header>
     <div>
      <h3>媒体下载</h3>
-     <p className="hint">输入公开的视频网址，选择格式后保存到本地。需登录或受限的视频会显示站点错误，不打开网页。</p>
+     <p className="hint">
+      输入公开的视频网址，选择格式后保存到本地。需登录或受限的视频会显示站点错误，不打开网页。B 站账号请在{' '}
+      <SettingsLink section="bilibili">账号设置</SettingsLink> 中管理。
+     </p>
+     <p className="hint">
+      下载依赖本地媒体组件；组件缺失或版本不匹配时，请先 <SettingsLink section="runtime">检查运行组件</SettingsLink>。
+     </p>
     </div>
     <Button variant="ghost" size="sm" isDisabled={busy} onClick={() => void run(refresh)}>
      刷新下载记录
@@ -183,7 +192,7 @@ export function MediaDownloads({visible}: {visible: boolean}) {
          await refreshProfiles()
          setProfileName('')
          setProfileSite('')
-         setNotice('登录档案已在本机加密保存，使用前请在下方明确选择')
+         notify.success('登录档案已在本机加密保存，使用前请在下方明确选择', {timeout: 6000})
         }
        })
       }
@@ -206,15 +215,19 @@ export function MediaDownloads({visible}: {visible: boolean}) {
        ]}
       />
      </label>
-     <label className="media-check">
-      <input
-       type="checkbox"
-       disabled={busy}
-       checked={!!options.privacy}
-       onChange={event => set('privacy', event.target.checked)}
-      />
-      加密下载任务记录（媒体文件本身不加密）
-     </label>
+     <Checkbox
+      className="media-check"
+      isSelected={!!options.privacy}
+      isDisabled={busy}
+      onChange={checked => set('privacy', checked)}
+     >
+      <Checkbox.Content>
+       <Checkbox.Control>
+        <Checkbox.Indicator />
+       </Checkbox.Control>
+       加密下载任务记录（媒体文件本身不加密）
+      </Checkbox.Content>
+     </Checkbox>
     </div>
     {profiles.map(profile => (
      <div className="row" key={profile.id}>
@@ -263,19 +276,23 @@ export function MediaDownloads({visible}: {visible: boolean}) {
       setSelected([])
      }}
     />
-    <label className="media-switch">
-     <input
-      type="checkbox"
-      checked={playlist}
-      disabled={busy}
-      onChange={e => {
-       setPlaylist(e.target.checked)
-       setSource(null)
-       setSelected([])
-      }}
-     />
-     读取播放列表
-    </label>
+    <Checkbox
+     className="media-switch"
+     isSelected={playlist}
+     isDisabled={busy}
+     onChange={checked => {
+      setPlaylist(checked)
+      setSource(null)
+      setSelected([])
+     }}
+    >
+     <Checkbox.Content>
+      <Checkbox.Control>
+       <Checkbox.Indicator />
+      </Checkbox.Control>
+      读取播放列表
+     </Checkbox.Content>
+    </Checkbox>
     <Button
      variant="tertiary"
      size="sm"
@@ -299,17 +316,21 @@ export function MediaDownloads({visible}: {visible: boolean}) {
        <p className="hint">只下载勾选条目。{source.limited ? '目录只列出前 100 项。' : ''}</p>
        <div className="batch-options">
         {source.entries?.map(item => (
-         <label key={item.url}>
-          <input
-           type="checkbox"
-           disabled={busy}
-           checked={selected.includes(item.url)}
-           onChange={e =>
-            setSelected(e.target.checked ? [...selected, item.url] : selected.filter(link => link !== item.url))
-           }
-          />
-          {item.title}
-         </label>
+         <Checkbox
+          key={item.url}
+          isSelected={selected.includes(item.url)}
+          isDisabled={busy}
+          onChange={checked =>
+           setSelected(checked ? [...selected, item.url] : selected.filter(link => link !== item.url))
+          }
+         >
+          <Checkbox.Content>
+           <Checkbox.Control>
+            <Checkbox.Indicator />
+           </Checkbox.Control>
+           {item.title}
+          </Checkbox.Content>
+         </Checkbox>
         ))}
        </div>
       </>
@@ -321,10 +342,21 @@ export function MediaDownloads({visible}: {visible: boolean}) {
      )}
      <div className="media-options">
       {['height', 'audio_only', 'subtitle_only', 'subtitles', 'container', 'audio_format'].map(key => (
-       <label key={key}>
-        {labels[key]}
+       <div className="media-option" key={key}>
+        <span>{labels[key]}</span>
         {typeof options[key] === 'boolean' ? (
-         <input type="checkbox" checked={!!options[key]} disabled={busy} onChange={e => set(key, e.target.checked)} />
+         <Checkbox
+          isSelected={!!options[key]}
+          isDisabled={busy}
+          aria-label={labels[key]}
+          onChange={checked => set(key, checked)}
+         >
+          <Checkbox.Content>
+           <Checkbox.Control>
+            <Checkbox.Indicator />
+           </Checkbox.Control>
+          </Checkbox.Content>
+         </Checkbox>
         ) : (
          <SelectField
           label={labels[key]}
@@ -337,7 +369,7 @@ export function MediaDownloads({visible}: {visible: boolean}) {
           }))}
          />
         )}
-       </label>
+       </div>
       ))}
      </div>
      <details className="media-advanced">
@@ -348,10 +380,21 @@ export function MediaDownloads({visible}: {visible: boolean}) {
          key => !['height', 'audio_only', 'subtitle_only', 'subtitles', 'container', 'audio_format'].includes(key)
         )
         .map(key => (
-         <label key={key}>
-          {labels[key]}
+         <div className="media-option" key={key}>
+          <span>{labels[key]}</span>
           {typeof options[key] === 'boolean' ? (
-           <input type="checkbox" checked={!!options[key]} disabled={busy} onChange={e => set(key, e.target.checked)} />
+           <Checkbox
+            isSelected={!!options[key]}
+            isDisabled={busy}
+            aria-label={labels[key]}
+            onChange={checked => set(key, checked)}
+           >
+            <Checkbox.Content>
+             <Checkbox.Control>
+              <Checkbox.Indicator />
+             </Checkbox.Control>
+            </Checkbox.Content>
+           </Checkbox>
           ) : enums[key] ? (
            <SelectField
             label={labels[key]}
@@ -392,7 +435,7 @@ export function MediaDownloads({visible}: {visible: boolean}) {
             }
            />
           )}
-         </label>
+         </div>
         ))}
       </div>
       {source.formats?.length && (
@@ -418,12 +461,6 @@ export function MediaDownloads({visible}: {visible: boolean}) {
      </Button>
     </div>
    )}
-   {notice && (
-    <p className="learning-status" role="status">
-     {notice}
-    </p>
-   )}
-   {error && <AlertBox>{error}</AlertBox>}
    <div className="media-jobs">
     {jobs.map(job => (
      <article key={job.id}>

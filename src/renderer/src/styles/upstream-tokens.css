@@ -4,6 +4,7 @@
  --title-logo-filter: none;
  --shell-backdrop: #ffffff;
  --main-panel-corner-radius: 16px;
+ --capsule-radius: 999px;
  --rail-column-width: 51px;
  --side-panel-width: 328px;
  --side-panel-content-width: 328px;
@@ -50,6 +51,11 @@
  --field-disabled: #f3f3f3;
  --on-accent: #ffffff;
  --shadow-color: rgba(0, 0, 0, 0.14);
+ --study-highlight-focus: #ff9191;
+ --study-highlight-senior: #ffa9cf;
+ --study-highlight-teacher: #c29c70;
+ --study-highlight-ppt: #87c2ff;
+ --study-paper: #ffffff;
 }
 
 :root[data-theme="dark"] {

@@ -51,10 +51,11 @@ src/renderer/
 ```
 
 规则：
-- 一个 feature 一个目录，如 `features/chat`、`features/courses`、`features/knowledge`。
+- 一个 feature 一个目录，如 `features/chat`、`features/courses`、`features/knowledge`、`features/tasks`。
 - feature 之间不允许 import 对方页面组件；共享展示组件上移到 `ui/`，共享状态上移到 `app/` 的 provider。
   例外白名单（后续重构逐步消除）：`features/bilibili` 可引用 `features/video/SubtitleBatchRecords`；`features/{chat,study,settings}` 可引用 `features/identity` 的 Context/Avatar。
 - `App.tsx` 只做应用壳与组合；新功能不得继续往 App.tsx 堆状态（下一阶段已排期拆分）。
+- 跨页设置入口统一使用 `app/settings-navigation` 的 `SettingsLink` / `openSettings`，设置页通过 `initialSection` 直达分区；禁止在各页面复制设置控件。
 - 禁止新增内联样式（`style=`）；样式一律进 `styles/` 或 ui 组件类名。
 
 ### 2.3 共享层
@@ -88,16 +89,17 @@ src/renderer/
 
 - 颜色/圆角/阴影只能使用 `styles/upstream-tokens.css` 里的 CSS 变量；禁止硬编码色值（含 `#fff`、`rgba()`）。
 - 唯一主色为 `--blue`。禁止再引入“聊天蓝/设置蓝”等第二主色；域内强调色必须走令牌。
-- 浅色/深色都通过 `[data-theme="light|dark"]` 控制；主题三态（浅色/深色/跟随系统）一律使用 `ui/ThemePicker`（HeroUI `ToggleButtonGroup` 卡片选择器，位于 设置 → 界面与主题），自动模式由应用层解析系统偏好后仍写入 `data-theme`，CSS 内不得新增 `prefers-color-scheme` 分支；新样式必须两主题目检。
+- 浅色/深色都通过 `[data-theme="light|dark"]` 控制；主题三态（浅色/深色/跟随系统）一律使用 `ui/ThemePicker`（HeroUI `ToggleButtonGroup` 卡片选择器，位于 设置 → 外观与主题），自动模式由应用层解析系统偏好后仍写入 `data-theme`，CSS 内不得新增 `prefers-color-scheme` 分支；新样式必须两主题目检。
 
 ### 5.2 HeroUI 与 Tailwind
 
 - 组件体系为 HeroUI v3（`@heroui/react` + `@heroui/styles`）+ Tailwind 4；样式入口只有 `styles/tailwind.css`，按需选择性导入组件样式。
 - 样式层顺序固定：`@layer legacy, theme, base, components, utilities;`。legacy 为旧样式，只减不增；新样式走 HeroUI 组件或 utilities 层。`styles/` 文件固定为 5 个：`tailwind.css`（唯一样式入口）、`upstream-tokens.css`（调色板令牌）、`legacy.css`（待淘汰的产品级样式，只减不增）、`chat.css` / `panel.css`（components 层：聊天与窗口/侧栏覆盖）。
 - 交互控件使用 HeroUI React 组件（`Button`、`Input`、`TextArea`、`ToggleButtonGroup`、`Modal` 等）；表单控件禁止再写原生 `<input>`/`<textarea>`/`<select>`（下拉统一用 `ui/SelectField` 包装的 HeroUI `Select`）；弹窗统一通过 `ui/UiParts` 的 `Modal`（内部为 HeroUI `Modal`）；BEM 类只作为组件内部样式与形态覆盖（`@layer components`），不得与 React 组件在同一个控件上混写。
-- 整页功能窗口一律使用 `ui/WindowPanel.tsx` + `ui/WindowMenuButton`：统一 220px 左菜单、内容区 32/40 间距与页头节奏；禁止再手写 `learning-window` 壳。
+- 整页功能窗口一律使用 `ui/WindowPanel.tsx` + `ui/WindowMenuButton`：统一 280px 左菜单（窄屏 240px）、内容区 32/40 间距与页头节奏；禁止再手写 `learning-window` 壳。
 - 设置类界面统一挂在 `features/settings/SettingsHub`（左菜单分区）；新增设置项必须加为 Hub 的一个分区，禁止再往 rail 或侧栏加散装入口。
-- 二级功能窗口统一由 `app/AppWindows.tsx` 按 modal 状态挂载，禁止再往 `App.tsx` 内联整页窗口；确认弹窗统一用 `ui/ConfirmDialog`，提示消息统一用 `ui/AlertBox`（内部均为 HeroUI 组件，禁止新增 `className="alert"` 旧式提示）。
+- 二级功能窗口统一由 `app/AppWindows.tsx` 按 modal 状态挂载，禁止再往 `App.tsx` 内联整页窗口；确认弹窗统一用 `ui/ConfirmDialog`，临时错误/成功/提示统一用 `ui/ToastHost` 导出的 `notify`（HeroUI Toast，底部居中），禁止新增页内错误条或重新引入 `ui/AlertBox`；`role="alert"` 仅用于单条记录详情，忙碌/进度与结果路径继续用内联 `role="status"`。
+- `Toast.Provider` 只在 `main.tsx` 挂载一次；Toast 样式通过 `styles/tailwind.css` 按需导入，禁止在业务组件里另建 toast 容器。
 - HeroUI 语义变量（`--accent`、`--danger`、`--surface`、`--default` 等）统一在 `styles/tailwind.css` 映射到现有调色板，禁止在组件里另起色值。
 - 不允许 `!important`；不允许覆盖 HeroUI 组件内部结构；需要变体时用官方 variant/props。
 - 禁止裸标签选择器（`button {}`、`input {}` 等）；样式必须挂在类名上。

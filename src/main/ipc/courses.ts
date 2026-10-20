@@ -1,8 +1,10 @@
+import {isAbsolute} from 'node:path'
 import {z} from 'zod'
 import {ensureLibrary} from '@main/library/library'
 import {copyInto, importDocument, parseCourseware, serializeCoursewareSourceCache} from '@main/documents/documents'
 import {questionSchema} from '@shared/types'
 import {readTranscript} from '@main/documents/transcript'
+import {managedFile} from '@main/library/file-manager'
 import type {ApplicationContext} from '@main/app/context'
 import type {IpcHandler} from '@main/ipc/handler'
 export function createCoursesHandler(
@@ -12,6 +14,8 @@ export function createCoursesHandler(
  >
 ): IpcHandler {
  const {db, directory, flows, idSchema, job, jobs, libraryRoot, pick, root} = context
+ const resolveSource = (source: string) =>
+  isAbsolute(source) ? Promise.resolve(source) : managedFile(libraryRoot, source)
  return {
   actions: new Set([
    'courses',
@@ -112,8 +116,10 @@ export function createCoursesHandler(
     case 'lecture:create': {
      const course = courseId()
      db.course(course)
-     const source = z.string().min(1).parse(object.transcriptPath),
-      ppt = z.string().parse(object.pptPath || ''),
+     const transcriptInput = z.string().min(1).parse(object.transcriptPath),
+      pptInput = z.string().parse(object.pptPath || ''),
+      source = await resolveSource(transcriptInput),
+      ppt = pptInput ? await resolveSource(pptInput) : '',
       original = await readTranscript(source)
      const parsed = ppt ? await parseCourseware(ppt) : undefined
      if (parsed?.needsOcr) throw new Error('课件是扫描 PDF，请使用 PPTX 或文字 PDF')
@@ -131,7 +137,7 @@ export function createCoursesHandler(
     }
     case 'lecture:transcript': {
      const lecture = db.lecture(id()),
-      source = z.string().min(1).parse(object.path),
+      source = await resolveSource(z.string().min(1).parse(object.path)),
       original = await readTranscript(source),
       path = await copyInto(
        root,
@@ -151,7 +157,7 @@ export function createCoursesHandler(
     }
     case 'lecture:courseware': {
      const lecture = db.lecture(id()),
-      source = z.string().min(1).parse(object.path),
+      source = await resolveSource(z.string().min(1).parse(object.path)),
       parsed = await parseCourseware(source)
      if (parsed.needsOcr) throw new Error('课件是扫描件，需要先 OCR 为文本 PDF')
      const path = await copyInto(

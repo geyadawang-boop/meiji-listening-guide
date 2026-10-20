@@ -1,12 +1,10 @@
 import {Button} from '@heroui/react'
 import {useEffect, useState, useRef} from 'react'
-import {AlertBox} from '@renderer/ui/AlertBox'
+import {notify} from '@renderer/ui/ToastHost'
 import type {RuntimeStatus} from '@shared/runtime'
 export function RuntimePanel() {
  const [data, setData] = useState<RuntimeStatus>(),
-  [error, setError] = useState(''),
-  [busy, setBusy] = useState(false),
-  [notice, setNotice] = useState('')
+  [busy, setBusy] = useState(false)
  const [refreshing, setRefreshing] = useState(false),
   generation = useRef(0)
  const [platform, setPlatform] = useState<string>()
@@ -24,10 +22,9 @@ export function RuntimePanel() {
    const result = await window.assistant.invoke<RuntimeStatus>('runtime:status')
    if (current === generation.current) {
     setData(result)
-    setError('')
    }
   } catch (error) {
-   if (current === generation.current) setError(String(error))
+   if (current === generation.current) notify.error(error, {title: '读取组件状态失败'})
   } finally {
    if (current === generation.current) setRefreshing(false)
   }
@@ -40,26 +37,25 @@ export function RuntimePanel() {
  }, [])
  async function install(id: string) {
   if (!isWindows) {
-   setError('运行组件目前仅支持 Windows，无法在当前平台安装。')
+   notify.warning('运行组件目前仅支持 Windows，无法在当前平台安装。')
    return
   }
   setBusy(true)
-  setError('')
   try {
    const result = await window.assistant.invoke('runtime:install', {id})
    if (result) {
     await refresh()
-    setNotice('组件已校验并安装，请重启软件后使用。')
+    notify.success('组件已校验并安装，请重启软件后使用。')
    }
   } catch (e) {
-   setError(String(e))
+   notify.error(e, {title: '安装组件失败'})
   } finally {
    setBusy(false)
   }
  }
  return (
-  <section aria-label="应用与运行组件">
-   <h3>应用与运行组件</h3>
+  <section aria-label="运行组件">
+   <h3>运行组件</h3>
    <p>摘云 {data?.version || ''}</p>
    <p className="hint">完整包可离线使用。轻量包可选择同版本组件文件夹安装；不会自动下载或更改你的资料。</p>
    {platform !== undefined && !isWindows && (
@@ -67,32 +63,31 @@ export function RuntimePanel() {
      运行组件目前仅支持 Windows；此平台不可安装 Windows 专属组件。
     </p>
    )}
-   {error && <AlertBox>{error}</AlertBox>}
    {data?.reason && (
     <p className="hint" role="status">
      {data.reason}
     </p>
    )}
-   {notice && <p role="status">{notice}</p>}
    {data?.components.map(c => (
-    <article className="knowledge-item" key={c.id}>
-     <strong>{c.label}</strong>
-     <span>
-      {' '}
-      · {(c.bytes / 1048576).toFixed(1)} MiB ·{' '}
-      {c.validation === 'verified'
-       ? '已校验'
-       : c.validation === 'invalid'
-         ? '校验失败'
-         : c.validation === 'unsupported_target'
-           ? '目标不支持'
-           : c.validation === 'missing'
-             ? '文件缺失'
-             : c.installed
-               ? '已安装'
-               : '未安装'}
-     </span>
-     {c.reason && <p className="hint">{c.reason}</p>}
+    <article className="runtime-component" key={c.id}>
+     <div className="runtime-component__copy">
+      <strong>{c.label}</strong>
+      <span>
+       {(c.bytes / 1048576).toFixed(1)} MiB ·{' '}
+       {c.validation === 'verified'
+        ? '已校验'
+        : c.validation === 'invalid'
+          ? '校验失败'
+          : c.validation === 'unsupported_target'
+            ? '目标不支持'
+            : c.validation === 'missing'
+              ? '文件缺失'
+              : c.installed
+                ? '已安装'
+                : '未安装'}
+      </span>
+      {c.reason && <p className="hint">{c.reason}</p>}
+     </div>
      <Button
       variant="tertiary"
       size="sm"
@@ -103,7 +98,13 @@ export function RuntimePanel() {
      </Button>
     </article>
    ))}
-   <Button variant="tertiary" size="sm" isDisabled={busy || refreshing} onClick={() => void refresh()}>
+   <Button
+    className="runtime-refresh"
+    variant="tertiary"
+    size="sm"
+    isDisabled={busy || refreshing}
+    onClick={() => void refresh()}
+   >
     {refreshing ? '正在校验组件…' : '刷新组件状态'}
    </Button>
   </section>

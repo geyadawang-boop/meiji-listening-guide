@@ -87,12 +87,13 @@ export class Zhiyun {
   })
   if ([401, 403].includes(response.status)) throw new Error('请先登录智云课堂，再重试')
   if (!response.ok) throw new Error(`智云课堂暂时无法访问（${response.status}）`)
-  const loginPage = /text\/html/i.test(response.headers.get('content-type') || '')
-  if (loginPage) throw new Error('智云课堂返回了登录页，请先登录')
+  const text = await response.text()
   let data: any
   try {
-   data = await response.json()
+   data = JSON.parse(text)
   } catch {
+   if (/text\/html/i.test(response.headers.get('content-type') || '') || /^\s*</.test(text))
+    throw new Error('智云课堂返回了登录页，请先登录')
    throw new Error('智云课堂响应格式异常，请稍后重试')
   }
   if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('智云课堂响应格式异常，请稍后重试')

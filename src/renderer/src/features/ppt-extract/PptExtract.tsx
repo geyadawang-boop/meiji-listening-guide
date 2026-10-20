@@ -1,8 +1,9 @@
-import {Button, Input, TextArea} from '@heroui/react'
+import {Button, Checkbox, Input, TextArea} from '@heroui/react'
 import type {LibraryFile} from '@shared/types'
 import {useEffect, useRef, useState} from 'react'
 import {defaultPptExtractPrompt, type PptExtractReview, type PptExtractPage} from '@shared/ppt-extract'
-import {AlertBox} from '@renderer/ui/AlertBox'
+import {notify} from '@renderer/ui/ToastHost'
+import {SettingsLink} from '@renderer/app/settings-navigation'
 const invoke = <T,>(action: string, args?: unknown) => window.assistant.invoke<T>(action, args)
 export function PptExtractPanel({
  visible,
@@ -19,7 +20,6 @@ export function PptExtractPanel({
   [prompt, setPrompt] = useState(defaultPptExtractPrompt),
   [review, setReview] = useState<PptExtractReview | null>(null),
   [busy, setBusy] = useState(false),
-  [error, setError] = useState(''),
   [progress, setProgress] = useState(''),
   [saved, setSaved] = useState<{
    path: string
@@ -38,13 +38,13 @@ export function PptExtractPanel({
   )
  }
  useEffect(() => {
-  if (visible) void refresh().catch(e => setError(String(e)))
+  if (visible) void refresh().catch(e => notify.error(e, {title: '读取 PPT 文件失败'}))
  }, [visible, courseName])
  async function openFile(path: string, reveal = false) {
   try {
    await invoke(reveal ? 'library:reveal' : 'library:open-file', {path})
   } catch (e) {
-   setError(e instanceof Error ? e.message : String(e))
+   notify.error(e, {title: '打开文件失败'})
   }
  }
  const working = useRef(false)
@@ -59,11 +59,10 @@ export function PptExtractPanel({
   if (working.current) return
   working.current = true
   setBusy(true)
-  setError('')
   try {
    await fn()
   } catch (e) {
-   setError(e instanceof Error ? e.message : String(e))
+   notify.error(e)
   } finally {
    working.current = false
    setBusy(false)
@@ -74,7 +73,6 @@ export function PptExtractPanel({
   setSourceDeleted(false)
   setReview(null)
   setSaved(null)
-  setError('')
   setProgress('')
  }
  function change(page: number, value: Partial<PptExtractPage>) {
@@ -157,13 +155,14 @@ export function PptExtractPanel({
      )}
     </div>
     {sourceDeleted && <p className="hint">原始 PPT 已删除。现有预览可以调整并再次导出；重新分析请另选 PPT。</p>}
-    <p className="hint">保存到：{courseName || '未分类资料'}。</p>
+    <p className="hint">
+     保存到：{courseName || '未分类资料'}。 <SettingsLink section="qwen">视觉模型设置</SettingsLink>
+    </p>
     <p className="hint">
      整份 PPT 在一个新对话中分析。支持每页一张图片的 PPTX，结果保存到 PPT 资料文件夹；PDF
      保存并检查成功后自动删除对应的原始 PPT。按原页序导出一份 PDF，每页保留裁剪后的尺寸。
     </p>
    </div>
-   {error && <AlertBox>{error}</AlertBox>}
    {progress && <p aria-live="polite">{progress}</p>}
    {saved && (
     <footer>
@@ -216,6 +215,8 @@ export function PptExtractPanel({
          setSourceDeleted(result.sourceDeleted)
          await refresh()
          setProgress('导出完成')
+         notify.success('PPT 已截取并导出', {description: result.path, timeout: 6000})
+         if (result.cleanupWarning) notify.warning(result.cleanupWarning, {timeout: 6000})
         })
        }
       >
@@ -229,16 +230,19 @@ export function PptExtractPanel({
         h = c.bottom - c.top
        return (
         <article key={p.page} className={p.keep ? '' : 'removed'}>
-         <label>
-          <input
-           type="checkbox"
-           aria-label={`保留第 ${p.page} 页`}
-           checked={p.keep}
-           disabled={busy || !p.preview}
-           onChange={e => change(p.page, {keep: e.target.checked})}
-          />
-          第 {p.page} 页 · {p.keep ? '保留' : '删除'}
-         </label>
+         <Checkbox
+          isSelected={p.keep}
+          isDisabled={busy || !p.preview}
+          aria-label={`保留第 ${p.page} 页`}
+          onChange={checked => change(p.page, {keep: checked})}
+         >
+          <Checkbox.Content>
+           <Checkbox.Control>
+            <Checkbox.Indicator />
+           </Checkbox.Control>
+           第 {p.page} 页 · {p.keep ? '保留' : '删除'}
+          </Checkbox.Content>
+         </Checkbox>
          <div className="ppt-extract-preview" style={{aspectRatio: p.height ? (p.width * w) / (p.height * h) : 16 / 9}}>
           {p.preview ? (
            <img

@@ -2,7 +2,7 @@ import {Button} from '@heroui/react'
 import {ConfirmDialog} from '@renderer/ui/ConfirmDialog'
 import {useState} from 'react'
 import type {Lecture} from '@shared/types'
-import {AlertBox} from '@renderer/ui/AlertBox'
+import {notify} from '@renderer/ui/ToastHost'
 import {CalendarDays, ChevronDown, Trash2} from 'lucide-react'
 export function LecturePicker({
  lectures,
@@ -21,7 +21,6 @@ export function LecturePicker({
 }) {
  const [open, setOpen] = useState(false),
   [pending, setPending] = useState<Lecture | null>(null),
-  [error, setError] = useState(''),
   [deleting, setDeleting] = useState(false)
  const selected = lectures.find(l => l.id === value)
  return (
@@ -53,23 +52,22 @@ export function LecturePicker({
          <Button
           variant="ghost"
           size="sm"
-          isIconOnly
-          aria-selected={l.id === value}
+          className="lecture-choice-main"
+          aria-current={l.id === value ? 'true' : undefined}
           onClick={() => {
            select(l.id)
            setOpen(false)
           }}
          >
           <CalendarDays />
-          <span>
-           <strong>{l.title}</strong>
-           <small>{l.status}</small>
-          </span>
+          <strong>{l.title}</strong>
+          <small className="lecture-choice-status">{l.status}</small>
          </Button>
          <Button
-          variant="danger-soft"
+          variant="ghost"
           size="sm"
           isIconOnly
+          className="lecture-choice-delete"
           aria-label={`删除课次 ${l.title}`}
           onClick={() => {
            setPending(l)
@@ -93,13 +91,15 @@ export function LecturePicker({
      title={`删除「${pending.title}」？`}
      confirmLabel="删除课次"
      busy={deleting || busy}
-     error={error}
      onCancel={() => setPending(null)}
      onConfirm={() => {
       setDeleting(true)
       void remove(pending.id)
-       .then(() => setPending(null))
-       .catch(e => setError(String(e)))
+       .then(() => {
+        setPending(null)
+        notify.success('课次已删除')
+       })
+       .catch(e => notify.error(e, {title: '删除课次失败'}))
        .finally(() => setDeleting(false))
      }}
     >

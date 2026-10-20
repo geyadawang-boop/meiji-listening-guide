@@ -9,23 +9,34 @@
 @import "tw-animate-css";
 @import "@heroui/styles/base" layer(base);
 @import "@heroui/styles/themes/default" layer(theme);
+@import "@heroui/styles/components/autocomplete.css" layer(components);
 @import "@heroui/styles/components/button.css" layer(components);
 @import "@heroui/styles/components/alert.css" layer(components);
 @import "@heroui/styles/components/card.css" layer(components);
+@import "@heroui/styles/components/checkbox.css" layer(components);
 @import "@heroui/styles/components/chip.css" layer(components);
 @import "@heroui/styles/components/close-button.css" layer(components);
+@import "@heroui/styles/components/date-field.css" layer(components);
+@import "@heroui/styles/components/date-input-group.css" layer(components);
+@import "@heroui/styles/components/disclosure.css" layer(components);
 @import "@heroui/styles/components/input.css" layer(components);
 @import "@heroui/styles/components/input-group.css" layer(components);
 @import "@heroui/styles/components/kbd.css" layer(components);
 @import "@heroui/styles/components/list-box.css" layer(components);
 @import "@heroui/styles/components/list-box-item.css" layer(components);
 @import "@heroui/styles/components/modal.css" layer(components);
+@import "@heroui/styles/components/number-field.css" layer(components);
 @import "@heroui/styles/components/popover.css" layer(components);
+@import "@heroui/styles/components/progress-bar.css" layer(components);
 @import "@heroui/styles/components/scroll-shadow.css" layer(components);
+@import "@heroui/styles/components/search-field.css" layer(components);
 @import "@heroui/styles/components/select.css" layer(components);
 @import "@heroui/styles/components/slider.css" layer(components);
+@import "@heroui/styles/components/spinner.css" layer(components);
 @import "@heroui/styles/components/surface.css" layer(components);
+@import "@heroui/styles/components/tabs.css" layer(components);
 @import "@heroui/styles/components/textarea.css" layer(components);
+@import "@heroui/styles/components/toast.css" layer(components);
 @import "@heroui/styles/components/toggle-button.css" layer(components);
 @import "@heroui/styles/components/toggle-button-group.css" layer(components);
 @import "@heroui/styles/components/tooltip.css" layer(components);
@@ -93,5 +104,40 @@
 @layer components {
  .button {
   border-radius: var(--radius-lg);
+ }
+ .textarea {
+  min-height: 120px;
+  resize: vertical;
+  line-height: 1.6;
+ }
+ .autocomplete__trigger > button:not(.autocomplete__clear-button) {
+  appearance: none;
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 0;
+  width: 1.75rem;
+  height: auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: inherit;
+  cursor: pointer;
+ }
+ .autocomplete__trigger > button:not(.autocomplete__clear-button):hover {
+  background: transparent;
+ }
+ .autocomplete__trigger > button:not(.autocomplete__clear-button):focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+  border-radius: var(--radius-sm);
+ }
+ .toast {
+  border-radius: var(--radius-lg);
+ }
+ .toast__description {
+  white-space: pre-line;
  }
 }

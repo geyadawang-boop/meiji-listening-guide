@@ -11,7 +11,7 @@
 .knowledge-card .row {
  align-items: flex-end;
 }
-.knowledge-card label {
+.knowledge-card label:not(.checkbox__content) {
  display: flex;
  flex-direction: column;
  gap: 6px;
@@ -128,30 +128,12 @@
  gap: 9px;
  margin: 14px 0;
 }
-.batch-options label {
- display: flex;
- flex-direction: row;
- align-items: flex-start;
- gap: 10px;
+.batch-options > .checkbox {
  padding: 9px 12px;
  border-radius: 10px;
  background: var(--surface-subtle);
  font-size: 13px;
  line-height: 1.6;
-}
-.batch-options input,
-.batch-mode-options input {
- width: auto;
- flex: none;
- accent-color: var(--blue);
-}
-.batch-mode-options label {
- display: flex;
- flex-direction: row;
- align-items: center;
- gap: 8px;
- flex: none;
- font-size: 13px;
 }
 .batch-item {
  padding: 12px 0;
@@ -198,15 +180,11 @@
  gap: 16px;
  margin: 20px 0;
 }
-.media-options label {
+.media-options > .media-option,
+.media-options > label {
  display: flex;
  flex-direction: column;
  gap: 8px;
-}
-.media-options input[type="checkbox"],
-.media-switch input {
- width: auto;
- accent-color: var(--blue);
 }
 .media-switch {
  display: flex;
@@ -251,7 +229,6 @@
 }
 .knowledge-card textarea {
  width: 100%;
- min-height: 120px;
  resize: vertical;
  box-sizing: border-box;
 }
@@ -265,18 +242,12 @@
  overflow-wrap: anywhere;
 }
 
-.knowledge-card label.media-check {
+.knowledge-card .media-check {
  flex-direction: row;
  align-items: flex-start;
  gap: 10px;
  margin: 10px 0;
  flex: none;
-}
-.knowledge-card .media-check input[type="checkbox"] {
- width: auto;
- flex: none;
- accent-color: var(--blue);
- margin-top: 6px;
 }
 .bili-login-qr {
  width: 180px;
@@ -293,22 +264,13 @@
  overflow-wrap: anywhere;
 }
 
-.media-options label.media-switch,
-.knowledge-card .row > label.media-switch {
+.knowledge-card .row > .media-switch {
  display: flex;
  flex-direction: row;
  align-items: center;
  justify-content: flex-start;
  gap: 8px;
  flex: none;
-}
-.media-options .media-switch input[type="checkbox"] {
- margin: 0;
- flex: none;
-}
-.media-options label.media-switch {
- align-self: center;
- white-space: normal;
 }
 
 .bili-browse-grid {
@@ -330,93 +292,6 @@
 }
 .bili-browse-grid .row {
  gap: 8px;
-}
-
-/* ===== study.css ===== */
-.study-menu label {
- display: block;
- margin: 12px 0;
-}
-.study-menu label input:not([type="checkbox"]),
-.study-menu label select,
-.study-menu textarea {
- width: 100%;
- margin-top: 6px;
-}
-.study-menu textarea {
- min-height: 120px;
-}
-.study-menu small {
- display: block;
- overflow-wrap: anywhere;
- color: var(--muted);
- margin: 8px 0;
-}
-.study-menu > button {
- margin: 5px 4px;
-}
-.study-menu .row {
- gap: 10px;
-}
-.study-menu .row label {
- min-width: 0;
- flex: 1;
-}
-.study-legend {
- display: grid;
- grid-template-columns: 1fr 1fr;
- gap: 10px;
- margin: 16px 0;
-}
-.study-legend span {
- font-size: 13px;
-}
-.study-legend i {
- display: inline-block;
- width: 16px;
- height: 12px;
- border-radius: 4px;
- margin-right: 8px;
-}
-.textbook-preview {
- position: relative;
- width: 100%;
- user-select: none;
- cursor: crosshair;
- line-height: 0;
- box-shadow: 0 4px 24px #0001;
-}
-.textbook-preview img {
- width: 100%;
- display: block;
- pointer-events: none;
-}
-.textbook-preview span {
- position: absolute;
- background: #fbb5c26b;
- border: 1px solid #d17498;
- pointer-events: none;
-}
-.highlight-review {
- padding: 20px;
- margin-top: 24px;
- border: 1px solid var(--line);
- border-radius: 18px;
-}
-.highlight-review > label {
- display: flex;
- gap: 12px;
- padding: 12px;
- border-bottom: 1px solid var(--line);
-}
-.highlight-review strong {
- display: block;
- margin: 7px 0;
-}
-.study-empty {
- padding: 100px 20px;
- text-align: center;
- color: var(--muted);
 }
 
 /* ===== style.css ===== */
@@ -479,7 +354,7 @@ textarea {
  resize: vertical;
  line-height: 1.6;
 }
-label {
+label:not(.checkbox__content) {
  display: block;
  font-size: 13px;
  font-weight: 500;
@@ -532,7 +407,7 @@ a {
  overflow: hidden;
 }
 .sidebar {
- width: 228px;
+ width: 280px;
  flex: none;
  background: var(--list);
  border-right: 1px solid var(--line);
@@ -647,7 +522,7 @@ a {
  gap: 8px;
  flex-wrap: wrap;
 }
-.tabs span {
+.agent-tabs span {
  font-size: 10px;
  margin-left: 5px;
  padding: 2px 5px;
@@ -664,20 +539,20 @@ a {
  flex: 1;
  max-width: 420px;
 }
-.tabs {
+.agent-tabs {
  display: flex;
  border-bottom: 1px solid var(--line-strong);
  gap: 20px;
  margin-bottom: 18px;
 }
-.tabs button {
+.agent-tabs button {
  border: 0;
  background: transparent;
  border-radius: 0;
  padding: 12px 0;
  color: var(--muted);
 }
-.tabs button.active {
+.agent-tabs button.active {
  border-bottom: 2px solid var(--blue);
  color: var(--text);
  font-weight: 600;
@@ -691,36 +566,8 @@ a {
  flex-wrap: wrap;
  margin-bottom: 16px;
 }
-.progress {
- border: 1px solid var(--line-strong);
- background: var(--surface-subtle);
- padding: 12px 14px;
- border-radius: 8px;
- display: flex;
- gap: 8px;
- align-items: center;
- flex-wrap: wrap;
- font-size: 12px;
- margin-bottom: 18px;
-}
-.progress > span:first-child {
- color: var(--blue);
-}
-.progress button {
- padding: 4px 8px;
- margin-left: auto;
-}
-.progress.failed,
 .warning {
  color: #cf4b48;
-}
-.pulse {
- animation: pulse 1s infinite;
-}
-@keyframes pulse {
- 50% {
-  opacity: 0.25;
- }
 }
 .empty {
  display: flex;
@@ -797,13 +644,11 @@ a {
 .srt-editor,
 .prompt-editor {
  width: 100%;
- min-height: 250px;
  font-family: Consolas, "Microsoft YaHei", monospace;
  font-size: 12px;
  margin-bottom: 12px;
 }
 .prompt-editor {
- min-height: 360px;
  margin-top: 14px;
 }
 .notes h3,
@@ -971,9 +816,6 @@ a {
  font-size: 11px;
  padding: 6px 8px;
 }
-.question-card form textarea {
- min-height: 100px;
-}
 ::-webkit-scrollbar {
  width: 7px;
  height: 7px;
@@ -984,7 +826,7 @@ a {
 }
 @media (max-width: 1200px) {
  .sidebar {
-  width: 190px;
+  width: 240px;
   padding: 24px 12px;
  }
  .workspace {
@@ -1000,7 +842,7 @@ a {
 
 /* ===== model-desktop.css ===== */
 .app > .sidebar {
- width: 260px;
+ width: 280px;
  padding: 18px 16px;
 }
 .sidebar .brand-mark {
@@ -1015,9 +857,9 @@ a {
 .sidebar .brand small {
  display: none;
 }
-@media (max-width: 1450px) {
+@media (max-width: 1100px) {
  .app > .sidebar {
-  width: 230px;
+  width: 240px;
  }
 }
 
@@ -1372,7 +1214,7 @@ a {
  background: var(--active);
  border-color: var(--blue);
 }
-.answer-option input {
+.answer-option > input {
  width: 15px;
  accent-color: var(--blue);
  flex: none;
@@ -1567,7 +1409,6 @@ a {
  font-weight: 600;
 }
 .identity-editor textarea {
- min-height: 260px;
  resize: vertical;
  font-weight: 400;
  line-height: 1.7;
@@ -1640,17 +1481,6 @@ a {
  width: 100%;
  margin-top: 10px;
 }
-.appearance-scope {
- display: flex;
- gap: 10px;
-}
-.appearance-scope button {
- flex: 1;
-}
-.appearance-scope button.selected {
- background: var(--active);
- border-color: var(--blue);
-}
 .appearance-course {
  display: flex;
  align-items: center;
@@ -1666,13 +1496,13 @@ a {
  gap: 8px;
  flex-wrap: wrap;
 }
-.appearance-editor label {
+.appearance-editor label:not(.checkbox__content) {
  display: flex;
  flex-direction: column;
  gap: 6px;
  margin-bottom: 14px;
 }
-.appearance-editor label.appearance-check {
+.appearance-editor .appearance-check {
  flex-direction: row;
  align-items: center;
  gap: 10px;
@@ -1729,48 +1559,6 @@ a {
 }
 .workspace.wallpaper-workspace > .chat-wallpaper {
  z-index: -1;
-}
-.chat-styled .agent-thread {
- max-width: var(--chat-width);
-}
-.chat-styled .message-agent {
- font-size: var(--chat-font);
- line-height: var(--chat-line);
- margin-bottom: var(--chat-gap);
- grid-template-columns: var(--chat-avatar-size) minmax(0, 1fr);
-}
-.chat-styled .message-agent.mine {
- grid-template-columns: minmax(0, 1fr) var(--chat-avatar-size);
-}
-.chat-styled .chat-avatar {
- width: var(--chat-avatar-size);
- height: var(--chat-avatar-size);
- border-radius: var(--chat-avatar-radius);
-}
-.chat-styled .chat-author {
- min-height: var(--chat-avatar-size);
-}
-.chat-styled .chat-bubble p {
- line-height: var(--chat-line);
-}
-.chat-styled .message-agent.mine .chat-bubble {
- border-radius: var(--chat-bubble-radius);
- background: var(--appearance-user-bg);
- color: var(--text);
-}
-.chat-styled[data-bubbles="true"] .message-agent.theirs .chat-bubble {
- border-radius: var(--chat-bubble-radius);
- padding: 16px 20px;
- background: color-mix(in srgb, var(--appearance-accent) 8%, var(--surface-raised));
- color: var(--text);
-}
-.chat-styled[data-names="false"] .chat-author {
- visibility: hidden;
- height: var(--chat-avatar-size);
- margin-bottom: 8px;
-}
-.chat-styled .agent-composer {
- border-color: color-mix(in srgb, var(--appearance-accent) 35%, var(--line-strong));
 }
 @media (max-width: 1100px) {
  .appearance-editor {
@@ -1942,14 +1730,13 @@ a {
 .ppt-extract-form {
  max-width: 1050px;
 }
-.ppt-extract-form label {
+.ppt-extract-form label:not(.checkbox__content) {
  display: block;
  margin: 20px 0;
 }
 .ppt-extract-form textarea {
  display: block;
  width: 100%;
- min-height: 110px;
  margin-top: 12px;
  line-height: 1.7;
 }
@@ -1977,15 +1764,11 @@ a {
 .ppt-extract-grid article.removed {
  border-style: dashed;
 }
-.ppt-extract-grid article > label {
+.ppt-extract-grid article > .checkbox {
  display: flex;
  align-items: center;
  gap: 10px;
  margin-bottom: 12px;
-}
-.ppt-extract-grid input[type="checkbox"] {
- width: auto;
- accent-color: var(--blue);
 }
 .ppt-extract-preview {
  position: relative;
@@ -2058,11 +1841,6 @@ a {
 }
 .video-ppt-page .ppt-extract-form input {
  width: 100%;
-}
-.video-ppt-page .ppt-extract-summary label {
- display: flex;
- align-items: center;
- gap: 8px;
 }
 .video-options {
  display: grid;
@@ -2138,7 +1916,6 @@ a {
 }
 .video-option-body textarea {
  margin: 0 0 14px;
- min-height: 150px;
  font-size: 14px;
 }
 @media (prefers-reduced-motion: reduce) {
@@ -2190,7 +1967,7 @@ a {
  display: grid;
  gap: 6px;
 }
-.video-ppt-page .video-course-list label {
+.video-ppt-page .video-course-list .checkbox {
  display: flex;
  align-items: center;
  gap: 12px;
@@ -2200,16 +1977,10 @@ a {
  cursor: pointer;
  border: 1px solid transparent;
 }
-.video-course-list label:hover,
-.video-course-list label.selected {
+.video-course-list .checkbox:hover,
+.video-course-list .checkbox.selected {
  background: color-mix(in srgb, var(--blue) 8%, transparent);
  border-color: color-mix(in srgb, var(--blue) 22%, transparent);
-}
-.video-ppt-page .video-course-list input[type="checkbox"] {
- width: 16px;
- height: 16px;
- flex-shrink: 0;
- accent-color: var(--blue);
 }
 .video-course-number {
  font-size: 12px;
