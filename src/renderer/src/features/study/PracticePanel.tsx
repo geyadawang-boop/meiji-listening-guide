@@ -1,10 +1,10 @@
-import {Button, Input} from '@heroui/react'
+import {Button, Checkbox, Input} from '@heroui/react'
 import {useState} from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type {PracticeSet, PracticeQuestion} from '@shared/types'
 import {questionOptions} from '@shared/practice'
-import {AlertBox} from '@renderer/ui/AlertBox'
+import {notify} from '@renderer/ui/ToastHost'
 import {StudyIcon} from '@renderer/ui/StudyIcon'
 import {IdentityAvatar} from '@renderer/features/identity/Identity'
 type Group = 'past' | 'extended' | 'generated'
@@ -46,19 +46,17 @@ function Question({
  const [draft, setDraft] = useState(q.attempt?.response || ''),
   [open, setOpen] = useState(false),
   [showAnswer, setShowAnswer] = useState(!questionOptions(q.stem).length || !!q.attempt),
-  [error, setError] = useState(''),
   [pending, setPending] = useState(false)
  const options = questionOptions(q.stem),
   multiple = /多选|不定项/.test(q.type),
   selected = draft.split(','),
   stem = options.length ? q.stem.split(/\n\s*A[.、．)）:：]/)[0] : q.stem
  async function run(fn: () => Promise<void>) {
-  setError('')
   setPending(true)
   try {
    await fn()
   } catch (e) {
-   setError(e instanceof Error ? e.message : String(e))
+   notify.error(e)
   } finally {
    setPending(false)
   }
@@ -86,28 +84,42 @@ function Question({
    {!!options.length && (
     <>
      <div className="answer-options" role="group" aria-label="选择答案">
-      {options.map(o => (
-       <label className={'answer-option ' + (selected.includes(o.key) ? 'selected' : '')} key={o.key}>
-        <Input
-         type={multiple ? 'checkbox' : 'radio'}
-         name={group + index}
-         value={o.key}
-         disabled={pending || !!q.attempt}
-         checked={selected.includes(o.key)}
-         onChange={e =>
+      {options.map(o =>
+       multiple ? (
+        <Checkbox
+         className={'answer-option ' + (selected.includes(o.key) ? 'selected' : '')}
+         key={o.key}
+         isSelected={selected.includes(o.key)}
+         isDisabled={pending || !!q.attempt}
+         onChange={checked =>
           setDraft(
-           multiple
-            ? (e.target.checked ? [...selected.filter(Boolean), o.key] : selected.filter(k => k !== o.key))
-               .sort()
-               .join(',')
-            : o.key
+           (checked ? [...selected.filter(Boolean), o.key] : selected.filter(k => k !== o.key)).sort().join(',')
           )
          }
-        />
-        <span className="option-letter">{o.key}</span>
-        <span>{o.text}</span>
-       </label>
-      ))}
+        >
+         <Checkbox.Content>
+          <Checkbox.Control>
+           <Checkbox.Indicator />
+          </Checkbox.Control>
+          <span className="option-letter">{o.key}</span>
+          <span>{o.text}</span>
+         </Checkbox.Content>
+        </Checkbox>
+       ) : (
+        <label className={'answer-option ' + (selected.includes(o.key) ? 'selected' : '')} key={o.key}>
+         <Input
+          type="radio"
+          name={group + index}
+          value={o.key}
+          disabled={pending || !!q.attempt}
+          checked={selected.includes(o.key)}
+          onChange={() => setDraft(o.key)}
+         />
+         <span className="option-letter">{o.key}</span>
+         <span>{o.text}</span>
+        </label>
+       )
+      )}
      </div>
      <label className="choice-response-label">
       输入你的选项
@@ -169,7 +181,7 @@ function Question({
       </Button>
      ))}
     {!!options.length && (
-     <Button variant="ghost" size="sm" isIconOnly aria-expanded={showAnswer} onClick={() => setShowAnswer(!showAnswer)}>
+     <Button variant="ghost" size="sm" aria-expanded={showAnswer} onClick={() => setShowAnswer(!showAnswer)}>
       <StudyIcon name="eye" />
       {showAnswer ? '隐藏答案' : '显示答案'}
      </Button>
@@ -227,7 +239,6 @@ function Question({
      <p className="hint">本课关联依据：{q.reason}</p>
     </div>
    )}
-   {error && <AlertBox>{error}</AlertBox>}
   </article>
  )
 }

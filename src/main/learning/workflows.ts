@@ -129,7 +129,8 @@ export class Workflows {
  }
  async transcribe(lectureId: string, signal?: AbortSignal) {
   const lecture = this.store.lecture(lectureId),
-   report = (stage: string, message: string) => this.progress({lectureId, stage, message})
+   report = (stage: string, message: string, part?: number, total?: number) =>
+    this.progress({lectureId, stage, message, ...(part !== undefined && total !== undefined ? {part, total} : {})})
   if (!lecture.transcript_path) throw new Error('请先为本课次导入智云语音识别原文')
   if (!lecture.ppt_path) throw new Error('请先关联本课次的 PPT/课件，再校订字幕')
   this.store.status(lectureId, '校订中')
@@ -190,13 +191,17 @@ export class Workflows {
     result = checkpoint?.fingerprint === fingerprint ? checkpoint.segments : []
    if (result.length) report('继续校订', `已恢复 ${result.length}/${source.segments.length} 条，从未完成的批次继续`)
    // Bound each request so long lectures can resume without an unbounded context.
-   const batchSize = 30
+   const batchSize = 30,
+    batchCount = Math.ceil(source.segments.length / batchSize)
    for (let i = result.length; i < source.segments.length; i += batchSize) {
     signal?.throwIfAborted()
-    const block = source.segments.slice(i, i + batchSize)
+    const block = source.segments.slice(i, i + batchSize),
+     batch = Math.floor(i / batchSize) + 1
     report(
      '校订字幕',
-     '结合原文与课件校订 ' + (i + 1) + '–' + (i + block.length) + ' / ' + source.segments.length + ' 条'
+     `字幕批次 ${batch}/${batchCount} · 结合原文与课件校订 ${i + 1}–${i + block.length} / ${source.segments.length} 条`,
+     batch,
+     batchCount
     )
     const validate = (v: unknown) => {
      const rows = schema.parse(v)
@@ -212,15 +217,23 @@ export class Workflows {
       courseware.images,
       ppt,
       block.map(s => s.text).join('\n') + '\n' + lectureContext.map(s => s.text).join('\n'),
-      Math.floor(i / batchSize),
-      Math.ceil(source.segments.length / batchSize)
+      batch - 1,
+      batchCount
      ),
-     images = selection.images
+     images = selection.images,
+     pages = [
+      ...new Set(images.map(image => /第\s*(\d+)\s*页/.exec(image.label)?.[1]).filter((page): page is string => !!page))
+     ].sort((a, b) => Number(a) - Number(b))
     const batchLimitations = [...modelLimitations, ...selection.omissions]
     if (images.length)
-     report('结合课件页面', `字幕批次 ${Math.floor(i / batchSize) + 1} 附带 ${images.length} 张本地择取的页面原图`)
+     report(
+      '结合课件页面',
+      `字幕批次 ${batch}/${batchCount} · ${pages.length ? `第 ${pages.join('、')} 页 · ` : ''}${images.length} 张嵌入图 · 正在请求视觉模型`,
+      batch,
+      batchCount
+     )
     if (selection.omissions.length)
-     report('课件图片受限', `字幕批次 ${Math.floor(i / batchSize) + 1}：${selection.omissions.join('；')}`)
+     report('课件图片受限', `字幕批次 ${batch}/${batchCount}：${selection.omissions.join('；')}`, batch, batchCount)
     for (let attempt = 0; attempt < 3; attempt++) {
      try {
       corrected = await this.api.json(
@@ -242,7 +255,12 @@ export class Workflows {
      } catch (error) {
       if (signal?.aborted) throw error
       if (attempt === 2 || !isRetryableApiError(error)) throw error
-      report('连接重试', `当前批次连接中断，自动重试 ${attempt + 1}/2；已保存 ${result.length} 条`)
+      report(
+       '连接重试',
+       `字幕批次 ${batch}/${batchCount} · 当前批次连接中断，自动重试 ${attempt + 1}/2；已保存 ${result.length} 条`,
+       batch,
+       batchCount
+      )
       await delay(attempt === 0 ? 1000 : 3000, undefined, {signal})
      }
     }
@@ -258,7 +276,12 @@ export class Workflows {
      }))
     )
     this.store.saveCorrectionBatch(lectureId, fingerprint, source.segments.length, result)
-    report('片段完成', `已保存 ${result.length}/${source.segments.length} 条；可随时中断后继续`)
+    report(
+     '片段完成',
+     `字幕批次 ${batch}/${batchCount} · 已保存 ${result.length}/${source.segments.length} 条；可随时中断后继续`,
+     batch,
+     batchCount
+    )
    }
    const folder = join(this.store.root, 'courses', lecture.course_id, 'transcript-results', lectureId)
    await mkdir(folder, {recursive: true})

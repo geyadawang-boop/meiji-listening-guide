@@ -1,6 +1,6 @@
 import type {BrowserWindow, Session} from 'electron'
 import type {ZodString} from 'zod'
-import type {EventPayload} from '@shared/types'
+import type {EventPayload, JobState} from '@shared/types'
 import type {VideoSeries} from '@shared/video-ppt'
 import type {RuntimeComponents} from '@main/app/runtime-components'
 import type {Store} from '@main/storage/db'
@@ -70,6 +70,7 @@ export type ApplicationContext = {
  identity: IdentityStore
  job: <T>(key: string, fn: (signal: AbortSignal) => Promise<T>) => Promise<T>
  jobs: Map<string, AbortController>
+ jobState: () => JobState | null
  knowledge: KnowledgeBase
  libraryRoot: string
  media: MediaBackend

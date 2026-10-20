@@ -2,7 +2,7 @@ import {Button} from '@heroui/react'
 import {ConfirmDialog} from '@renderer/ui/ConfirmDialog'
 import {useState} from 'react'
 import type {Lecture} from '@shared/types'
-import {AlertBox} from '@renderer/ui/AlertBox'
+import {notify} from '@renderer/ui/ToastHost'
 import {CalendarDays, ChevronDown, Trash2} from 'lucide-react'
 export function LecturePicker({
  lectures,
@@ -21,7 +21,6 @@ export function LecturePicker({
 }) {
  const [open, setOpen] = useState(false),
   [pending, setPending] = useState<Lecture | null>(null),
-  [error, setError] = useState(''),
   [deleting, setDeleting] = useState(false)
  const selected = lectures.find(l => l.id === value)
  return (
@@ -92,13 +91,15 @@ export function LecturePicker({
      title={`删除「${pending.title}」？`}
      confirmLabel="删除课次"
      busy={deleting || busy}
-     error={error}
      onCancel={() => setPending(null)}
      onConfirm={() => {
       setDeleting(true)
       void remove(pending.id)
-       .then(() => setPending(null))
-       .catch(e => setError(String(e)))
+       .then(() => {
+        setPending(null)
+        notify.success('课次已删除')
+       })
+       .catch(e => notify.error(e, {title: '删除课次失败'}))
        .finally(() => setDeleting(false))
      }}
     >

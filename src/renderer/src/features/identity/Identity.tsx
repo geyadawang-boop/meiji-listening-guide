@@ -3,7 +3,7 @@ import {createContext, useContext, useState} from 'react'
 import {defaultIdentity, type Identity} from '@shared/identity'
 import buddy from '@renderer/assets/mei-avatar.png'
 import lian from '@renderer/assets/lian-avatar.jpg'
-import {AlertBox} from '@renderer/ui/AlertBox'
+import {notify} from '@renderer/ui/ToastHost'
 export const IdentityContext = createContext<Identity>(defaultIdentity)
 export function IdentityAvatar({role}: {role: 'user' | 'assistant'}) {
  const identity = useContext(IdentityContext),
@@ -30,20 +30,16 @@ export function IdentityEditor({
 }) {
  const [value, setValue] = useState(initial),
   [selected, setSelected] = useState<'user' | 'assistant'>('assistant'),
-  [busy, setBusy] = useState(false),
-  [error, setError] = useState(''),
-  [saved, setSaved] = useState(false)
+  [busy, setBusy] = useState(false)
  function update(next: Partial<Identity>) {
   setValue(v => ({...v, ...next}))
-  setSaved(false)
  }
  async function chooseAvatar() {
-  setError('')
   try {
    const data = await window.assistant.invoke<string | null>('identity:avatar')
    if (data) update(selected === 'user' ? {userAvatar: data} : {assistantAvatar: data})
   } catch (e) {
-   setError(e instanceof Error ? e.message : String(e))
+   notify.error(e, {title: '读取头像失败'})
   }
  }
  return (
@@ -51,10 +47,10 @@ export function IdentityEditor({
    <section
     className={'identity-editor' + (embedded ? ' identity-editor--embedded' : '')}
     role={embedded ? undefined : 'dialog'}
-    aria-label="角色与头像"
+    aria-label="身份与角色"
    >
     <aside>
-     <h2>角色与头像</h2>
+     <h2>身份与角色</h2>
      {(['user', 'assistant'] as const).map(role => (
       <button key={role} className={selected === role ? 'selected' : ''} onClick={() => setSelected(role)}>
        <span className="identity-list-avatar">
@@ -71,10 +67,9 @@ export function IdentityEditor({
      onSubmit={e => {
       e.preventDefault()
       setBusy(true)
-      setError('')
       void save(value)
-       .then(() => setSaved(true))
-       .catch(e => setError(e instanceof Error ? e.message : String(e)))
+       .then(() => notify.success('角色设定已保存'))
+       .catch(e => notify.error(e, {title: '保存角色设定失败'}))
        .finally(() => setBusy(false))
      }}
     >
@@ -95,7 +90,7 @@ export function IdentityEditor({
       <div className="identity-large-avatar">
        <IdentityAvatar role={selected} />
       </div>
-      <div>
+      <div className="row">
        <Button variant="tertiary" size="sm" type="button" isDisabled={busy} onClick={() => void chooseAvatar()}>
         更换头像
        </Button>
@@ -122,7 +117,7 @@ export function IdentityEditor({
      </label>
      {selected === 'assistant' && (
       <label>
-       角色设定
+       助手角色设定
        <TextArea
         aria-label="助手角色设定"
         maxLength={12000}
@@ -132,10 +127,7 @@ export function IdentityEditor({
        />
       </label>
      )}
-     <footer>
-      {error && <AlertBox>{error}</AlertBox>}
-      {saved && <p role="status">已保存</p>}
-     </footer>
+     <footer />
     </form>
    </section>
   </IdentityContext.Provider>

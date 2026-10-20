@@ -3,8 +3,8 @@ import {useEffect, useMemo, useRef, useState} from 'react'
 import type {ZhiyunCourse, ZhiyunLesson} from '@shared/types'
 import {WindowMenuButton, WindowPanel} from '@renderer/ui/WindowPanel'
 import {SelectField} from '@renderer/ui/SelectField'
-import {AlertBox} from '@renderer/ui/AlertBox'
-import {ZhiyunLoginPanel} from '@renderer/features/zhiyun/ZhiyunLogin'
+import {notify} from '@renderer/ui/ToastHost'
+import {useSettingsNavigation} from '@renderer/app/settings-navigation'
 const invoke = <T,>(action: string, args?: unknown) => window.assistant.invoke<T>(action, args)
 const courseLabel = (course: ZhiyunCourse) => [course.title, course.teacher, course.term].filter(Boolean).join(' · ')
 const courseKey = (course: Pick<ZhiyunCourse, 'title' | 'teacher'>) => course.title + '\u0000' + course.teacher
@@ -20,7 +20,7 @@ export function ZhiyunImporter({
  localCourseId: string
  imported: (lectureId: string, courseId: string) => Promise<void>
 }) {
- const [view, setView] = useState<'search' | 'login'>('search')
+ const settings = useSettingsNavigation()
  const [keyword, setKeyword] = useState(''),
   [courses, setCourses] = useState<ZhiyunCourse[]>([]),
   [course, setCourse] = useState<ZhiyunCourse | null>(null),
@@ -29,7 +29,6 @@ export function ZhiyunImporter({
  const [searching, setSearching] = useState(false),
   [lessonsLoading, setLessonsLoading] = useState(false),
   [exporting, setExporting] = useState(false),
-  [error, setError] = useState(''),
   [progress, setProgress] = useState(''),
   [saved, setSaved] = useState(''),
   [page, setPage] = useState(1),
@@ -57,7 +56,6 @@ export function ZhiyunImporter({
   const request = ++lessonRequest.current
   setCourse(value)
   setLessonsLoading(true)
-  setError('')
   setProgress('')
   try {
    const rows = await requestLessons(value.id)
@@ -69,7 +67,7 @@ export function ZhiyunImporter({
    if (request !== lessonRequest.current) return null
    setLessons([])
    setSubId('')
-   setError(e instanceof Error ? e.message : String(e))
+   notify.error(e, {title: '读取课次失败'})
    return null
   } finally {
    if (request === lessonRequest.current) setLessonsLoading(false)
@@ -96,7 +94,6 @@ export function ZhiyunImporter({
  const activeGroup = course ? groups.find(group => group.key === courseKey(course)) : undefined
  async function search(next = 1) {
   setSearching(true)
-  setError('')
   if (next === 1) {
    setCourse(null)
    setLessons([])
@@ -134,7 +131,7 @@ export function ZhiyunImporter({
    setHasMore(result.hasMore)
    if (!result.courses.length && next === 1) setProgress('没有找到课程，请换一个名称搜索')
   } catch (e) {
-   setError(e instanceof Error ? e.message : String(e))
+   notify.error(e, {title: '搜索智云课程失败'})
   } finally {
    setSearching(false)
   }
@@ -142,7 +139,6 @@ export function ZhiyunImporter({
  async function exportResource(kind: 'transcript' | 'ppt') {
   if (!course || !subId || exporting || lessonsLoading) return
   setExporting(true)
-  setError('')
   setSaved('')
   setProgress(kind === 'transcript' ? '正在准备语音识别原文…' : '正在准备 PPT…')
   try {
@@ -157,9 +153,10 @@ export function ZhiyunImporter({
     setSaved(result.path)
     await imported(result.lectureId, result.courseId)
     setProgress('导出并关联课次完成')
+    notify.success('智云资源已导出并关联课次', {description: result.path, timeout: 6000})
    } else setProgress('已取消导出')
   } catch (e) {
-   setError(e instanceof Error ? e.message : String(e))
+   notify.error(e, {title: '导出智云资源失败'})
   } finally {
    setExporting(false)
   }
@@ -169,10 +166,10 @@ export function ZhiyunImporter({
  return (
   <WindowPanel
    visible={visible}
-   label="智云课堂"
-   title="智云课堂"
-   description="搜索智云课程，导出语音原文与课件。"
-   heading="智云课堂"
+   label="智云导入"
+   title="智云导入"
+   description="搜索智云课程，导出语音原文与课件；登录在设置中完成。"
+   heading="智云导入"
    subheading={
     lessonsLoading
      ? course
@@ -203,102 +200,91 @@ export function ZhiyunImporter({
     </>
    }
    actions={
-    view === 'login' ? (
-     <Button variant="ghost" size="sm" onClick={() => setView('search')}>
-      返回搜索与导出
-     </Button>
-    ) : (
-     <Button variant="tertiary" size="sm" isDisabled={locked} onClick={() => setView('login')}>
-      登录智云课堂
-     </Button>
-    )
+    <Button variant="tertiary" size="sm" isDisabled={locked} onClick={() => settings.open('zhiyun')}>
+     登录智云课堂
+    </Button>
    }
    close={close}
   >
-   {visible && view === 'login' ? (
-    <ZhiyunLoginPanel />
-   ) : (
-    <div className="panel-section">
-     <form
-      className="panel-inline-form"
-      onSubmit={e => {
-       e.preventDefault()
-       if (!searching) void search()
-      }}
-     >
-      <Input
-       aria-label="搜索智云课程"
-       placeholder="搜索课程名称，或粘贴智云课程链接"
-       value={keyword}
-       disabled={locked}
-       onChange={e => setKeyword(e.target.value)}
-      />
-      <Button type="submit" variant="tertiary" size="sm" isDisabled={locked || !keyword.trim()}>
-       搜索
-      </Button>
-     </form>
-     {error && <AlertBox>{error}</AlertBox>}
-     <div className="row zhiyun-picks">
-      {activeGroup && activeGroup.terms.length > 1 && (
-       <label>
-        选择学期
-        <SelectField
-         label="选择智云学期"
-         placeholder="选择学期"
-         value={course?.id || ''}
-         isDisabled={locked}
-         onChange={next => {
-          const value = activeGroup.terms.find(t => t.id === next)
-          if (value && value.id !== course?.id) void loadLessons(value)
-         }}
-         options={activeGroup.terms.map(t => ({
-          value: t.id,
-          label: t.term || '未标学期'
-         }))}
-        />
-       </label>
-      )}
+   <div className="panel-section">
+    <form
+     className="panel-inline-form"
+     onSubmit={e => {
+      e.preventDefault()
+      if (!searching) void search()
+     }}
+    >
+     <Input
+      aria-label="搜索智云课程"
+      placeholder="搜索课程名称，或粘贴智云课程链接"
+      value={keyword}
+      disabled={locked}
+      onChange={e => setKeyword(e.target.value)}
+     />
+     <Button type="submit" variant="tertiary" size="sm" isDisabled={locked || !keyword.trim()}>
+      搜索
+     </Button>
+    </form>
+    <div className="row zhiyun-picks">
+     {activeGroup && activeGroup.terms.length > 1 && (
       <label>
-       选择课次
+       选择学期
        <SelectField
-        label="选择智云课次"
-        placeholder="选择具体课次"
-        value={subId}
-        isDisabled={locked || !lessons.length}
-        onChange={next => setSubId(next)}
-        options={[
-         {value: '', label: '选择具体课次'},
-         ...lessons.map(row => ({
-          value: row.id,
-          label: row.title + (row.teacher ? ' · ' + row.teacher : '')
-         }))
-        ]}
+        label="选择智云学期"
+        placeholder="选择学期"
+        value={course?.id || ''}
+        isDisabled={locked}
+        onChange={next => {
+         const value = activeGroup.terms.find(t => t.id === next)
+         if (value && value.id !== course?.id) void loadLessons(value)
+        }}
+        options={activeGroup.terms.map(t => ({
+         value: t.id,
+         label: t.term || '未标学期'
+        }))}
        />
       </label>
-     </div>
-     {course && !lessons.length && !lessonsLoading && !searching && <p className="hint">本课程暂无可读取的课次</p>}
-     <div className="row">
-      <Button
-       variant="primary"
-       size="sm"
-       isDisabled={locked || !lesson}
-       onClick={() => void exportResource('transcript')}
-      >
-       导出语音识别-原文
-      </Button>
-      <Button variant="tertiary" size="sm" isDisabled={locked || !lesson} onClick={() => void exportResource('ppt')}>
-       导出 PPT
-      </Button>
-      {exporting && (
-       <Button variant="ghost" size="sm" onClick={() => void invoke('cancel')}>
-        取消导出
-       </Button>
-      )}
-     </div>
-     <p className="hint">原文保存到“语音原文”，课件保存到“PPT”；自动关联同一课次。</p>
-     {saved && <Input aria-label="智云资源保存路径" readOnly value={saved} />}
+     )}
+     <label>
+      选择课次
+      <SelectField
+       label="选择智云课次"
+       placeholder="选择具体课次"
+       value={subId}
+       isDisabled={locked || !lessons.length}
+       onChange={next => setSubId(next)}
+       options={[
+        {value: '', label: '选择具体课次'},
+        ...lessons.map(row => ({
+         value: row.id,
+         label: row.title + (row.teacher ? ' · ' + row.teacher : '')
+        }))
+       ]}
+      />
+     </label>
     </div>
-   )}
+    {course && !lessons.length && !lessonsLoading && !searching && <p className="hint">本课程暂无可读取的课次</p>}
+    <div className="row">
+     <Button
+      variant="primary"
+      size="sm"
+      isDisabled={locked || !lesson}
+      onClick={() => void exportResource('transcript')}
+     >
+      导出语音识别-原文
+     </Button>
+     <Button variant="tertiary" size="sm" isDisabled={locked || !lesson} onClick={() => void exportResource('ppt')}>
+      导出 PPT
+     </Button>
+     {exporting && (
+      <Button variant="ghost" size="sm" onClick={() => void invoke('cancel')}>
+       取消导出
+      </Button>
+     )}
+    </div>
+    <p className="hint">原文保存到“语音原文”，课件保存到“PPT”；自动关联同一课次。</p>
+    {saved && <Input aria-label="智云资源保存路径" readOnly value={saved} />}
+   </div>
   </WindowPanel>
  )
 }

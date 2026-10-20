@@ -1,8 +1,9 @@
 import {Button, Card, Disclosure, Input} from '@heroui/react'
 import {useEffect, useState} from 'react'
 import type {KnowledgeEntry} from '@shared/knowledge'
-import {AlertBox} from '@renderer/ui/AlertBox'
+import {notify} from '@renderer/ui/ToastHost'
 import {SelectField} from '@renderer/ui/SelectField'
+import {SettingsLink} from '@renderer/app/settings-navigation'
 const invoke = <T,>(action: string, args?: unknown) => window.assistant.invoke<T>(action, args)
 type Selection = {
  type: string
@@ -27,22 +28,18 @@ export function KnowledgeClassification({entries, refresh}: {entries: KnowledgeE
  const [options, setOptions] = useState<Record<string, string[]>>({}),
   [draft, setDraft] = useState<Draft | null>(null),
   [id, setId] = useState(''),
-  [busy, setBusy] = useState(false),
-  [error, setError] = useState(''),
-  [notice, setNotice] = useState('')
+  [busy, setBusy] = useState(false)
  useEffect(() => {
   void invoke<Record<string, string[]>>('knowledge:classification-options')
    .then(setOptions)
-   .catch(reason => setError(String(reason)))
+   .catch(reason => notify.error(reason, {title: '读取分类选项失败'}))
  }, [])
  async function run(fn: () => Promise<void>) {
   setBusy(true)
-  setError('')
-  setNotice('')
   try {
    await fn()
   } catch (reason) {
-   setError(reason instanceof Error ? reason.message : String(reason))
+   notify.error(reason)
   } finally {
    setBusy(false)
   }
@@ -63,7 +60,8 @@ export function KnowledgeClassification({entries, refresh}: {entries: KnowledgeE
     <Disclosure.Content>
      <Disclosure.Body className="knowledge-classification-body">
       <p className="hint">
-       按类型、主题、难度、时长和语言整理资料。模型建议使用实际资料文字，保存前可修改；来源改变会拒绝旧草稿。
+       按类型、主题、难度、时长和语言整理资料。模型建议使用实际资料文字，保存前可修改；来源改变会拒绝旧草稿。{' '}
+       <SettingsLink section="qwen">模型设置</SettingsLink>
       </p>
       <div className="row">
        <SelectField
@@ -92,7 +90,7 @@ export function KnowledgeClassification({entries, refresh}: {entries: KnowledgeE
         onClick={() =>
          void run(async () => {
           setDraft(await invoke('knowledge:classification-suggest', {id}))
-          setNotice('建议已生成，请核对后保存')
+          notify.info('建议已生成，请核对后保存')
          })
         }
        >
@@ -157,19 +155,13 @@ export function KnowledgeClassification({entries, refresh}: {entries: KnowledgeE
            await invoke('knowledge:classification-save', {token: draft.token, selection: value})
            await refresh()
            setDraft(null)
-           setNotice('分类已保存')
+           notify.success('分类已保存')
           })
          }
         >
          保存内容分类
         </Button>
        </>
-      )}
-      {error && <AlertBox>{error}</AlertBox>}
-      {notice && (
-       <p role="status" className="learning-status">
-        {notice}
-       </p>
       )}
      </Disclosure.Body>
     </Disclosure.Content>

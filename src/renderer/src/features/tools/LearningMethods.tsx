@@ -1,6 +1,6 @@
-import {Button, Card, Input, TextArea} from '@heroui/react'
+import {Button, Card, Checkbox, Input, TextArea} from '@heroui/react'
 import {useEffect, useState} from 'react'
-import {AlertBox} from '@renderer/ui/AlertBox'
+import {notify} from '@renderer/ui/ToastHost'
 const invoke = <T,>(action: string, args?: unknown) => window.assistant.invoke<T>(action, args)
 const request = <T,>(action: string, args: unknown = {}) => invoke<T>('tools:request', {action, args})
 const op = () => crypto.randomUUID().replaceAll('-', '')
@@ -21,21 +21,17 @@ export function LearningMethodsPanel() {
   [editing, setEditing] = useState<string | null>(null),
   [rules, setRules] = useState(''),
   [rulesEnabled, setRulesEnabled] = useState(false),
-  [error, setError] = useState(''),
-  [saved, setSaved] = useState(''),
   [busy, setBusy] = useState(false)
  async function refresh() {
   setData(await request<Overview>('overview'))
  }
  async function run(fn: () => Promise<unknown>) {
   setBusy(true)
-  setError('')
-  setSaved('')
   try {
    await fn()
    await refresh()
   } catch (reason) {
-   setError(reason instanceof Error ? reason.message : String(reason))
+   notify.error(reason)
   } finally {
    setBusy(false)
   }
@@ -49,29 +45,8 @@ export function LearningMethodsPanel() {
   request('extension-change', {op: op(), revision: data!.extensions.revision, change})
  return (
   <div className="panel-section">
-   {error && <AlertBox>{error}</AlertBox>}
-   {saved && <p role="status">{saved}</p>}
    {data && (
     <>
-     <Button
-      variant="tertiary"
-      size="sm"
-      isDisabled={busy}
-      onClick={() =>
-       void run(async () => {
-        const value = await invoke<{name: string; description: string; body: string} | null>('tools:skill-open')
-        if (value) {
-         setEditing(null)
-         setSkillName(value.name)
-         setDescription(value.description)
-         setBody(value.body)
-         setSaved('方法已读入，请核对后点击保存方法')
-        }
-       })
-      }
-     >
-      导入 Skill.md
-     </Button>
      <Card className="knowledge-card">
       <h3>固定学习要求</h3>
       <Button
@@ -82,13 +57,17 @@ export function LearningMethodsPanel() {
         setRulesEnabled(data.extensions.standing_instructions.enabled)
        }}
       >
-       读取现有要求
+       读取已保存要求
       </Button>
       <TextArea aria-label="固定学习要求" maxLength={4000} value={rules} onChange={e => setRules(e.target.value)} />
-      <label className="media-check">
-       <input type="checkbox" checked={rulesEnabled} onChange={e => setRulesEnabled(e.target.checked)} />
-       在后续任务中启用
-      </label>
+      <Checkbox className="media-check" isSelected={rulesEnabled} onChange={setRulesEnabled}>
+       <Checkbox.Content>
+        <Checkbox.Control>
+         <Checkbox.Indicator />
+        </Checkbox.Control>
+        在后续任务中启用
+       </Checkbox.Content>
+      </Checkbox>
       <Button
        variant="tertiary"
        size="sm"
@@ -99,7 +78,27 @@ export function LearningMethodsPanel() {
       </Button>
      </Card>
      <Card className="knowledge-card">
-      <h3>{editing ? '编辑学习方法' : '添加学习方法（Skill）'}</h3>
+      <h3>{editing ? '编辑学习方法' : '添加学习方法'}</h3>
+      <p className="hint">可从 Skill.md 导入，或手动填写名称、说明与步骤。</p>
+      <Button
+       variant="tertiary"
+       size="sm"
+       isDisabled={busy}
+       onClick={() =>
+        void run(async () => {
+         const value = await invoke<{name: string; description: string; body: string} | null>('tools:skill-open')
+         if (value) {
+          setEditing(null)
+          setSkillName(value.name)
+          setDescription(value.description)
+          setBody(value.body)
+          notify.info('方法已读入，请核对后点击保存方法')
+         }
+        })
+       }
+      >
+       导入 Skill.md
+      </Button>
       <Input
        aria-label="方法名称"
        placeholder="英文短名，例如 compare-sources"
@@ -186,18 +185,23 @@ export function LearningMethodsPanel() {
      <Card className="knowledge-card">
       <h3>内置工具组</h3>
       {data.extensions.plugins.map(plugin => (
-       <label className="media-check" key={plugin.id}>
-        <input
-         type="checkbox"
-         disabled={busy}
-         checked={plugin.enabled}
-         onChange={() => void run(() => editExtension({kind: 'plugin', id: plugin.id, enabled: !plugin.enabled}))}
-        />
-        <span>
-         {plugin.name}
-         <small>{plugin.description}</small>
-        </span>
-       </label>
+       <Checkbox
+        className="media-check"
+        key={plugin.id}
+        isSelected={plugin.enabled}
+        isDisabled={busy}
+        onChange={() => void run(() => editExtension({kind: 'plugin', id: plugin.id, enabled: !plugin.enabled}))}
+       >
+        <Checkbox.Content>
+         <Checkbox.Control>
+          <Checkbox.Indicator />
+         </Checkbox.Control>
+         <span>
+          {plugin.name}
+          <small>{plugin.description}</small>
+         </span>
+        </Checkbox.Content>
+       </Checkbox>
       ))}
      </Card>
     </>
