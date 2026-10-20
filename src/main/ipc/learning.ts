@@ -44,7 +44,9 @@ export function createLearningHandler(
     courseId = () => z.string().uuid().parse(object.courseId)
    switch (action) {
     case 'subtitles:generate':
-     return job('lecture:' + id(), signal => flows.transcribe(id(), signal))
+     return job('lecture:' + id(), signal =>
+      flows.transcribe(id(), signal, z.enum(['quality', 'balanced', 'text']).default('quality').parse(object.mode))
+     )
     case 'subtitles:save':
      db.saveSubtitles(id(), parseSrt(z.string().parse(object.srt)))
      return db.lectureDetail(id())

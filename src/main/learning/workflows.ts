@@ -24,6 +24,14 @@ import {
  serializeCoursewareSourceCache
 } from '@main/documents/documents'
 import {readTranscript} from '@main/documents/transcript'
+import type {CorrectionMode} from '@shared/correction'
+import {
+ correctionContext,
+ planCorrection,
+ runCorrectionBatches,
+ validCorrectionPrefix,
+ validateCorrectionRows
+} from './correction'
 import {prepareAnswer, type AnswerDependencies} from '@main/learning/practice-answer'
 export class Workflows {
  constructor(
@@ -47,65 +55,6 @@ export class Workflows {
     )
    }
  }
- private coursewareImages(
-  images: {label: string; url: string}[],
-  ppt: string,
-  context: string,
-  batchIndex: number,
-  batchCount: number
- ) {
-  if (!images.length) return {images: [] as {label: string; url: string}[], omissions: [] as string[]}
-  const pages = new Map<number, string>()
-  for (const match of ppt.matchAll(/\[第\s*(\d+)\s*页\]\n([\s\S]*?)(?=\n\s*\[第\s*\d+\s*页\]|$)/g))
-   pages.set(Number(match[1]), match[2])
-  const grams = (value: string) => {
-   const normalized = value.toLowerCase().replace(/[^\p{Script=Han}a-z0-9]+/giu, ' '),
-    tokens = new Set<string>()
-   for (const term of normalized.split(/\s+/).filter(Boolean)) {
-    if (/[\p{Script=Han}]/u.test(term)) {
-     for (let size of [2, 3]) for (let i = 0; i + size <= term.length; i++) tokens.add(term.slice(i, i + size))
-    } else if (term.length > 1) tokens.add(term)
-   }
-   return tokens
-  }
-  const query = grams(context),
-   ranked = images
-    .map((image, index) => {
-     const page = Number(/第\s*(\d+)\s*页/.exec(image.label)?.[1]),
-      tokens = grams(pages.get(page) || image.label)
-     let score = 0
-     for (const token of tokens) if (query.has(token)) score++
-     return {image, index, score, bytes: Buffer.byteLength(image.url, 'utf8')}
-    })
-    .sort((a, b) => b.score - a.score || a.index - b.index)
-  const chosen = ranked.filter(item => item.score > 0).slice(0, 3)
-  if (!chosen.length) {
-   const center = Math.min(
-    images.length - 1,
-    Math.floor(((batchIndex + 0.5) * images.length) / Math.max(1, batchCount))
-   )
-   chosen.push(...ranked.slice(Math.max(0, center - 1), center + 2))
-  }
-  const result: {label: string; url: string}[] = [],
-   omissions: string[] = []
-  let bytes = 0
-  for (const item of chosen.sort((a, b) => a.index - b.index)) {
-   const page = /第\s*(\d+)\s*页/.exec(item.image.label)?.[1] || '?'
-   if (item.bytes > 900_000) {
-    omissions.push(`第 ${page} 页嵌入图片因单张请求预算 ${item.bytes}/900000 字节超限，未附加`)
-    continue
-   }
-   if (bytes + item.bytes > 1_800_000) {
-    omissions.push(
-     `第 ${page} 页嵌入图片因本批剩余请求预算 ${1_800_000 - bytes} 字节不足（图片 ${item.bytes} 字节），未附加`
-    )
-    continue
-   }
-   result.push(item.image)
-   bytes += item.bytes
-  }
-  return {images: result, omissions}
- }
  async splitExam(courseId: string, fileId: string, signal?: AbortSignal) {
   const file = this.store.detail(courseId).files.find(f => f.id === fileId && f.kind === 'past_exam')
   if (!file) throw new Error('请选择历年卷资料')
@@ -127,7 +76,7 @@ export class Workflows {
   this.store.replaceQuestions(courseId, fileId, result)
   return result
  }
- async transcribe(lectureId: string, signal?: AbortSignal) {
+ async transcribe(lectureId: string, signal?: AbortSignal, mode: CorrectionMode = 'quality') {
   const lecture = this.store.lecture(lectureId),
    report = (stage: string, message: string) => this.progress({lectureId, stage, message})
   if (!lecture.transcript_path) throw new Error('请先为本课次导入智云语音识别原文')
@@ -136,7 +85,8 @@ export class Workflows {
   try {
    const source = await readTranscript(lecture.transcript_path)
    report('准备资料', '准备语音原文与课件，一起交给模型校订')
-   const prompt = this.settings.prompt('correction')
+   const prompt = this.settings.prompt('correction'),
+    profile = this.settings.profile()
    const hash = createHash('sha256').update(
     JSON.stringify({
      engine: 'qwen',
@@ -175,91 +125,132 @@ export class Workflows {
        courseware.omissions
       )
    const modelLimitations = [...new Set(limitations)]
-   const extracted = ppt.slice(0, 24000)
-   if (ppt.length > extracted.length) {
-    modelLimitations.push('课件文字超过 24,000 字，本次只发送开头部分。')
-    report('课件文字受限', '课件文字超过 24,000 字；本次只发送开头部分')
-   }
    if (!preserveCached) this.store.db.prepare('UPDATE lectures SET ppt_text=? WHERE id=?').run(storedPpt, lectureId)
    hash.update(JSON.stringify({coursewareText: selectedText, limitations}))
+   // Keep the original fingerprint for the default visual policy and existing checkpoints.
+   if (mode !== 'quality') hash.update(JSON.stringify({correctionMode: mode}))
    const fingerprint = hash.digest('hex'),
     checkpoint = this.store.correctionCheckpoint(lectureId)
-   const schema = z.array(
-     z.object({id: z.number().int(), text: z.string().min(1), uncertain: z.boolean(), reason: z.string()})
-    ),
-    result = checkpoint?.fingerprint === fingerprint ? checkpoint.segments : []
+   const result =
+    checkpoint?.fingerprint === fingerprint &&
+    checkpoint.total === source.segments.length &&
+    validCorrectionPrefix(checkpoint.segments, source.segments)
+     ? [...checkpoint.segments]
+     : []
    if (result.length) report('继续校订', `已恢复 ${result.length}/${source.segments.length} 条，从未完成的批次继续`)
-   // Bound each request so long lectures can resume without an unbounded context.
-   const batchSize = 30
-   for (let i = result.length; i < source.segments.length; i += batchSize) {
-    signal?.throwIfAborted()
-    const block = source.segments.slice(i, i + batchSize)
+   else if (checkpoint) report('重新校订', '资料、模式或断点校验发生变化，本次重新校订；旧断点将在首批成功后替换')
+   const models =
+     mode === 'text' || !courseware.images.length ? [profile.model] : [profile.model, profile.visionModel || ''],
+    outputBudget = Math.min(...models.map(model => profile.parameters?.[model]?.maxTokens ?? 8192)),
+    batches = planCorrection(source.segments, result.length, outputBudget),
+    contextFor = correctionContext(ppt, courseware.images),
+    started = Date.now(),
+    resumed = result.length
+   let retries = 0,
+    cooldownUntil = 0
+   report(
+    '校订计划',
+    `${mode === 'quality' ? '视觉优先' : mode === 'balanced' ? '均衡' : '快速文字'}；${batches.length} 批，最多 2 批并发；输出预算按模型设置或保守默认估算`
+   )
+   const active = new Map<number, string>()
+   const heartbeat = setInterval(() => {
+    if (!active.size) return
     report(
      '校订字幕',
-     '结合原文与课件校订 ' + (i + 1) + '–' + (i + block.length) + ' / ' + source.segments.length + ' 条'
+     `${[...active.values()].join('；')}；已保存 ${result.length}/${source.segments.length} 条；累计 ${Math.round((Date.now() - started) / 1000)} 秒；重试 ${retries}`
     )
-    const validate = (v: unknown) => {
-     const rows = schema.parse(v)
-     if (rows.length !== block.length || rows.some((row, j) => row.id !== i + j))
-      throw new Error('校订结果缺少原文或次序变化，已拒绝保存')
-     return rows
-    }
-    let corrected: ReturnType<typeof validate> | undefined
-    const lectureContext = source.segments
-     .slice(Math.max(0, i - 30), Math.min(source.segments.length, i + block.length + 30))
-     .map((s, j) => ({id: Math.max(0, i - 30) + j, text: s.text}))
-    const selection = this.coursewareImages(
-      courseware.images,
-      ppt,
-      block.map(s => s.text).join('\n') + '\n' + lectureContext.map(s => s.text).join('\n'),
-      Math.floor(i / batchSize),
-      Math.ceil(source.segments.length / batchSize)
-     ),
-     images = selection.images
-    const batchLimitations = [...modelLimitations, ...selection.omissions]
-    if (images.length)
-     report('结合课件页面', `字幕批次 ${Math.floor(i / batchSize) + 1} 附带 ${images.length} 张本地择取的页面原图`)
-    if (selection.omissions.length)
-     report('课件图片受限', `字幕批次 ${Math.floor(i / batchSize) + 1}：${selection.omissions.join('；')}`)
-    for (let attempt = 0; attempt < 3; attempt++) {
-     try {
-      corrected = await this.api.json(
-       prompt,
-       {
-        courseware: extracted,
-        coursewareLimitations: batchLimitations,
-        lectureContext,
-        instructions:
-         '结合课件文字、附加页面图片与相邻原文理解当前批次。扫描 PDF 或没有提取到的图表内容不可猜测；limitations 说明未附加的页面及原因。rows 是必须逐条返回的记录；lectureContext 仅作局部上下文，不要额外返回。',
-        rows: block.map((s, j) => ({id: i + j, text: s.text}))
-       },
-       validate,
-       signal,
-       undefined,
-       images.length ? {images} : undefined
+   }, 10000)
+   try {
+    await runCorrectionBatches(
+     batches,
+     async (batch, index, batchSignal) => {
+      const {start: i, rows: block} = batch,
+       context = contextFor(batch, source.segments, mode),
+       images = context.images,
+       model = images.length ? profile.visionModel?.trim() || '' : profile.model,
+       batchStarted = Date.now()
+      const validate = (value: unknown) => validateCorrectionRows(value, batch)
+      active.set(index, `批次 ${index + 1}/${batches.length}，模型 ${model}，图片 ${images.length}`)
+      try {
+       for (let attempt = 0; attempt < 3; attempt++) {
+        batchSignal.throwIfAborted()
+        while (cooldownUntil > Date.now()) await delay(cooldownUntil - Date.now(), undefined, {signal: batchSignal})
+        report(
+         '校订字幕',
+         `批次 ${index + 1}/${batches.length}，${i + 1}–${i + block.length} 条；模型 ${model}；图片 ${images.length}；重试 ${retries}；累计 ${Math.round((Date.now() - started) / 1000)} 秒`
+        )
+        try {
+         const corrected = await this.api.json(
+          prompt,
+          {
+           courseware: context.courseware,
+           coursewareLimitations: [...modelLimitations, ...context.omissions],
+           lectureContext: context.lectureContext,
+           instructions:
+            '结合择取的课件文字、图片和相邻原文校订。课件不是完整内容；无依据的图表、公式不可猜测。rows 必须逐条同序返回，lectureContext 不返回。未修改且无疑点时 reason 为空字符串；修改或不确定时保留简短依据。不得改变否定、术语、公式与考试语气。',
+           rows: block.map((s, j) => ({id: i + j, text: s.text}))
+          },
+          validate,
+          batchSignal,
+          undefined,
+          {
+           images,
+           profile: {...profile, apiKey: profile.key},
+           onRetry: () => {
+            retries++
+            report('格式重试', `批次 ${index + 1} 输出格式未通过校验，重试一次；累计重试 ${retries}`)
+           }
+          }
+         )
+         batchSignal.throwIfAborted()
+         report(
+          '批次返回',
+          `批次 ${index + 1}，模型 ${model}，图片 ${images.length}，耗时 ${Math.round((Date.now() - batchStarted) / 1000)} 秒；等待按原文顺序保存`
+         )
+         return corrected.map((row, j) => ({
+          ...block[j],
+          text: row.text,
+          originalText: block[j].text,
+          uncertain: row.uncertain,
+          reason: row.reason
+         }))
+        } catch (error) {
+         if (batchSignal.aborted || attempt === 2 || !isRetryableApiError(error)) throw error
+         retries++
+         const retryAfter = (error as Error & {retryAfterMs?: number}).retryAfterMs || 0
+         if (retryAfter > 300000) throw new Error('服务要求等待超过 5 分钟，已暂停校订，请稍后从断点继续')
+         const waitMs = Math.max(attempt === 0 ? 1000 : 3000, retryAfter)
+         cooldownUntil = Math.max(cooldownUntil, Date.now() + waitMs)
+         report(
+          '连接重试',
+          `批次 ${index + 1} 暂停 ${Math.ceil(waitMs / 1000)} 秒后重试 ${attempt + 1}/2；累计重试 ${retries}；已保存 ${result.length} 条`
+         )
+         await delay(waitMs, undefined, {signal: batchSignal})
+        }
+       }
+       throw new Error('当前批次未返回校订结果')
+      } finally {
+       active.delete(index)
+      }
+     },
+     corrected => {
+      const next = [...result, ...corrected]
+      this.store.saveCorrectionBatch(lectureId, fingerprint, source.segments.length, next)
+      result.push(...corrected)
+      const elapsed = (Date.now() - started) / 1000,
+       completed = result.length - resumed,
+       eta = completed ? Math.round((elapsed * (source.segments.length - result.length)) / completed) : 0
+      report(
+       '片段完成',
+       `已保存 ${result.length}/${source.segments.length} 条；累计 ${Math.round(elapsed)} 秒，预计剩余约 ${eta} 秒（仅按本次速度估算）；重试 ${retries}；可中断后继续`
       )
-      break
-     } catch (error) {
-      if (signal?.aborted) throw error
-      if (attempt === 2 || !isRetryableApiError(error)) throw error
-      report('连接重试', `当前批次连接中断，自动重试 ${attempt + 1}/2；已保存 ${result.length} 条`)
-      await delay(attempt === 0 ? 1000 : 3000, undefined, {signal})
-     }
-    }
-    signal?.throwIfAborted()
-    if (!corrected) throw new Error('当前批次未返回校订结果')
-    result.push(
-     ...corrected.map((row, j) => ({
-      ...block[j],
-      text: row.text,
-      originalText: block[j].text,
-      uncertain: row.uncertain,
-      reason: row.reason
-     }))
+     },
+     signal
     )
-    this.store.saveCorrectionBatch(lectureId, fingerprint, source.segments.length, result)
-    report('片段完成', `已保存 ${result.length}/${source.segments.length} 条；可随时中断后继续`)
+   } finally {
+    clearInterval(heartbeat)
    }
+   signal?.throwIfAborted()
    const folder = join(this.store.root, 'courses', lecture.course_id, 'transcript-results', lectureId)
    await mkdir(folder, {recursive: true})
    await writeFile(join(folder, '校订字幕.srt'), toSrt(result), 'utf8')

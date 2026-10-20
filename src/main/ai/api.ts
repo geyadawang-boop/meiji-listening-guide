@@ -1,5 +1,6 @@
 import type {Profile} from '@shared/types'
 import type {SettingsStore} from '@main/config/settings'
+import {setTimeout as delay} from 'node:timers/promises'
 export interface FileInput {
  filename: string
  file_data: string
@@ -45,9 +46,18 @@ async function requestError(response: Response, nativeFile: boolean, hasFile: bo
    else if (/model|模型/i.test(detail)) hint = '服务端拒绝了当前模型，请核对模型名与接口是否匹配'
   } catch {}
  }
- return new Error(
+ const error = new Error(
   `API 请求失败（HTTP ${response.status}），${hint || '请检查地址、接口格式、模型、密钥或配额'}${nativeFile ? '；PPT 原文件上传需要服务商支持 Responses 文件输入' : hasFile ? '；此任务需要服务商与模型支持 PDF 文件输入' : ''}`
  )
+ const retryAfter = response.headers.get('retry-after')
+ if (retryAfter) {
+  const milliseconds = /^\d+(?:\.\d+)?$/.test(retryAfter)
+   ? Number(retryAfter) * 1000
+   : Date.parse(retryAfter) - Date.now()
+  if (Number.isFinite(milliseconds) && milliseconds > 0)
+   Object.assign(error, {retryAfterMs: Math.min(milliseconds, 2_147_483_647)})
+ }
+ return error
 }
 export async function readSse(body: ReadableStream<Uint8Array>, onText: (text: string) => void): Promise<string> {
  const reader = body.getReader(),
@@ -123,7 +133,7 @@ export class Api {
   onText?: (text: string) => void,
   signal?: AbortSignal,
   draft?: Profile,
-  options?: {images?: {label: string; url: string}[]}
+  options?: {images?: {label: string; url: string}[]; onRetry?: () => void; profile?: Profile}
  ): Promise<string> {
   signal?.throwIfAborted()
   const p = draft ? this.settings.draft(draft) : this.settings.profile(),
@@ -259,7 +269,7 @@ export class Api {
   validate: (data: unknown) => T,
   signal?: AbortSignal,
   file?: FileInput,
-  options?: {images?: {label: string; url: string}[]}
+  options?: {images?: {label: string; url: string}[]; onRetry?: () => void; profile?: Profile}
  ): Promise<T> {
   let feedback = ''
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -277,7 +287,7 @@ export class Api {
     ],
     undefined,
     signal,
-    undefined,
+    options?.profile,
     options
    )
    try {
@@ -290,7 +300,8 @@ export class Api {
     if (signal?.aborted) throw error
     if (attempt === 1) throw error
     feedback = '\n上次输出未通过格式校验。请严格返回指定结构的合法 JSON，不加说明。'
-    await new Promise(r => setTimeout(r, 1500))
+    options?.onRetry?.()
+    await delay(1500, undefined, {signal})
    }
   }
   throw new Error('结构化输出失败')
