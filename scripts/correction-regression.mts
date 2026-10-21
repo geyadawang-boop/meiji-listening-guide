@@ -14,8 +14,15 @@ await build({
  platform: 'node',
  format: 'esm'
 })
-const {planCorrection, correctionContext, validCorrectionPrefix, validateCorrectionRows, runCorrectionBatches} =
- await import(pathToFileURL(join(directory, 'correction.mjs')).href)
+const {
+ planCorrection,
+ correctionContext,
+ correctionNeedsVision,
+ validCorrectionPrefix,
+ validateCorrectionRows,
+ runCorrectionBatches,
+ resumableCorrection
+} = await import(pathToFileURL(join(directory, 'correction.mjs')).href)
 await build({
  entryPoints: [resolve('src/main/ai/api.ts')],
  outfile: join(directory, 'api.mjs'),
@@ -64,7 +71,10 @@ test('adaptive batches cover all 911 rows and improve request count with bounded
  }
  assert.ok(planCorrection(rows, 0, 2048).length > planned.length)
  assert.throws(() => planCorrection([{...rows[0], text: '长'.repeat(6001)}], 0), /原文未截断/)
- assert.throws(() => planCorrection(rows, 0, 1), /输出上限/)
+ const singleton = planCorrection([{...rows[0], text: '长'.repeat(1500)}], 0, 1024)
+ assert.equal(singleton.length, 1)
+ assert.equal(singleton[0].rows.length, 1)
+ assert.equal(planCorrection(rows.slice(0, 3), 0, 1).length, 3)
 })
 
 test('resume starts at exact persisted prefix, including an old 30-row boundary', () => {
@@ -83,6 +93,20 @@ test('resume starts at exact persisted prefix, including an old 30-row boundary'
  assert.equal(validCorrectionPrefix([{...saved[0], start: 9}], rows), false)
  assert.equal(validCorrectionPrefix([{...saved[0], originalText: 'changed source'}], rows), false)
  assert.equal(validCorrectionPrefix([saved[1], saved[0]], rows), false)
+})
+
+test('resumable checkpoint requires fingerprint, total and prefix to match', () => {
+ const rows = source(4),
+  saved = corrected(rows.slice(0, 2)),
+  fingerprint = 'current'
+ assert.deepEqual(resumableCorrection({fingerprint, total: 4, segments: saved}, fingerprint, rows), saved)
+ assert.equal(resumableCorrection({fingerprint: 'old', total: 4, segments: saved}, fingerprint, rows), undefined)
+ assert.equal(resumableCorrection({fingerprint, total: 5, segments: saved}, fingerprint, rows), undefined)
+ assert.equal(
+  resumableCorrection({fingerprint, total: 4, segments: [{...saved[0], start: 9}]}, fingerprint, rows),
+  undefined
+ )
+ assert.equal(resumableCorrection(undefined, fingerprint, rows), undefined)
 })
 
 test('strict response ids reject missing, duplicate, reordered, extra and malformed rows', () => {
@@ -257,6 +281,17 @@ test('only explicit quality policy attaches unmatched images; all policies enfor
   images.slice(0, 3).map(image => ({...image, url: 'x'.repeat(700000)}))
  )(batch, rows, 'quality')
  assert.equal(total.images.length, 2)
+})
+
+test('vision requirement follows selected image context', () => {
+ const image = {label: '第 1 页', url: 'data:image/png;base64,AAAA'},
+  withImage = {courseware: '', lectureContext: [], images: [image], omissions: []},
+  withoutImage = {courseware: '', lectureContext: [], images: [], omissions: []}
+ assert.equal(correctionNeedsVision([withImage], ''), true)
+ assert.equal(correctionNeedsVision([withImage], '  '), true)
+ assert.equal(correctionNeedsVision([withImage], 'vision-model'), false)
+ assert.equal(correctionNeedsVision([withImage, withoutImage], ''), true)
+ assert.equal(correctionNeedsVision([withoutImage], ''), false)
 })
 
 test('API freezes actual model/output settings and preserves Retry-After without leaking response body', async () => {

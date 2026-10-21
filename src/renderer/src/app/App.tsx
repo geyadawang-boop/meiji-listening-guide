@@ -485,7 +485,8 @@ export default function App() {
    key={lecture.lecture.id}
    lectureId={lecture.lecture.id}
    disabled={busy || !!missingSource}
-   label={lecture.correction ? '继续校订字幕' : lecture.segments.length ? '重新校订字幕' : '原文 + PPT 校订字幕'}
+   hasCheckpoint={!!lecture.correction}
+   hasSegments={lecture.segments.length > 0}
    run={mode => void task(() => generate('subtitles:generate', mode))}
   />
  )

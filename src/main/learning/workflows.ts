@@ -9,7 +9,8 @@ import {
  type LectureNotes,
  type Progress,
  type PracticeSet,
- type PracticeQuestion
+ type PracticeQuestion,
+ type Segment
 } from '@shared/types'
 import {parseSrt, toSrt, time, verifyNotes, keywordCandidates} from '@shared/srt'
 import {Store} from '@main/storage/db'
@@ -27,9 +28,10 @@ import {readTranscript} from '@main/documents/transcript'
 import type {CorrectionMode} from '@shared/correction'
 import {
  correctionContext,
+ correctionNeedsVision,
  planCorrection,
+ resumableCorrection,
  runCorrectionBatches,
- validCorrectionPrefix,
  validateCorrectionRows
 } from './correction'
 import {prepareAnswer, type AnswerDependencies} from '@main/learning/practice-answer'
@@ -83,8 +85,11 @@ export class Workflows {
   if (!lecture.transcript_path) throw new Error('请先为本课次导入智云语音识别原文')
   if (!lecture.ppt_path) throw new Error('请先关联本课次的 PPT/课件，再校订字幕')
   this.store.status(lectureId, '校订中')
+  let sourceSegments: Segment[] = [],
+   fingerprint = ''
   try {
    const source = await readTranscript(lecture.transcript_path)
+   sourceSegments = source.segments
    report('准备资料', '准备语音原文与课件，一起交给模型校订')
    const prompt = this.settings.prompt('correction'),
     profile = this.settings.profile()
@@ -130,23 +135,22 @@ export class Workflows {
    hash.update(JSON.stringify({coursewareText: selectedText, limitations}))
    // Keep the original fingerprint for the default visual policy and existing checkpoints.
    if (mode !== 'quality') hash.update(JSON.stringify({correctionMode: mode}))
-   const fingerprint = hash.digest('hex'),
-    checkpoint = this.store.correctionCheckpoint(lectureId)
-   const result =
-    checkpoint?.fingerprint === fingerprint &&
-    checkpoint.total === source.segments.length &&
-    validCorrectionPrefix(checkpoint.segments, source.segments)
-     ? [...checkpoint.segments]
-     : []
-   if (result.length) report('继续校订', `已恢复 ${result.length}/${source.segments.length} 条，从未完成的批次继续`)
+   fingerprint = hash.digest('hex')
+   const checkpoint = this.store.correctionCheckpoint(lectureId),
+    resumable = resumableCorrection(checkpoint, fingerprint, sourceSegments),
+    result = resumable ? [...resumable] : []
+   if (result.length) report('继续校订', `已恢复 ${result.length}/${sourceSegments.length} 条，从未完成的批次继续`)
    else if (checkpoint) report('重新校订', '资料、模式或断点校验发生变化，本次重新校订；旧断点将在首批成功后替换')
    const models =
      mode === 'text' || !courseware.images.length ? [profile.model] : [profile.model, profile.visionModel || ''],
     outputBudget = Math.min(...models.map(model => profile.parameters?.[model]?.maxTokens ?? 8192)),
-    batches = planCorrection(source.segments, result.length, outputBudget),
+    batches = planCorrection(sourceSegments, result.length, outputBudget),
     contextFor = correctionContext(ppt, courseware.images),
+    contexts = batches.map(batch => contextFor(batch, sourceSegments, mode)),
     started = Date.now(),
     resumed = result.length
+   if (correctionNeedsVision(contexts, profile.visionModel))
+    throw new Error('当前课件含嵌入图片，所选校订策略需要视觉模型。请先在设置中选择视觉模型，或改用“快速文字”策略。')
    let retries = 0,
     cooldownUntil = 0
    report(
@@ -166,7 +170,7 @@ export class Workflows {
      batches,
      async (batch, index, batchSignal) => {
       const {start: i, rows: block} = batch,
-       context = contextFor(batch, source.segments, mode),
+       context = contexts[index],
        images = context.images,
        model = images.length ? profile.visionModel?.trim() || '' : profile.model,
        batchStarted = Date.now()
@@ -245,16 +249,16 @@ export class Workflows {
      },
      corrected => {
       const next = [...result, ...corrected]
-      this.store.saveCorrectionBatch(lectureId, fingerprint, source.segments.length, next)
+      this.store.saveCorrectionBatch(lectureId, fingerprint, sourceSegments.length, next)
       result.push(...corrected)
       const elapsed = (Date.now() - started) / 1000,
        completed = result.length - resumed,
-       eta = completed ? Math.round((elapsed * (source.segments.length - result.length)) / completed) : 0
+       eta = completed ? Math.round((elapsed * (sourceSegments.length - result.length)) / completed) : 0
       report(
        '片段完成',
-       `已保存 ${result.length}/${source.segments.length} 条；累计 ${Math.round(elapsed)} 秒，预计剩余约 ${eta} 秒（仅按本次速度估算）；重试 ${retries}；可中断后继续`,
+       `已保存 ${result.length}/${sourceSegments.length} 条；累计 ${Math.round(elapsed)} 秒，预计剩余约 ${eta} 秒（仅按本次速度估算）；重试 ${retries}；可中断后继续`,
        result.length,
-       source.segments.length
+       sourceSegments.length
       )
      },
      signal
@@ -273,11 +277,19 @@ export class Workflows {
    report('完成', '原文与 PPT 校订完成；疑点及原文已保留' + (source.estimated ? '，时间为估算' : '，保留原文时间点'))
    return this.store.lectureDetail(lectureId)
   } catch (error) {
-   const saved = this.store.correctionCheckpoint(lectureId)
-   this.store.status(lectureId, saved ? '校订未完成，可继续' : signal?.aborted ? '已取消' : '需核对')
-   if (saved && !signal?.aborted)
+   const saved = this.store.correctionCheckpoint(lectureId),
+    resumable = fingerprint ? resumableCorrection(saved, fingerprint, sourceSegments) : undefined
+   this.store.status(
+    lectureId,
+    resumable ? (signal?.aborted ? '已取消，可继续' : '校订未完成，可继续') : signal?.aborted ? '已取消' : '需核对'
+   )
+   if (resumable && !signal?.aborted)
     throw new Error(
-     `已保存 ${saved.segments.length}/${saved.total} 条，点击继续校订可从断点恢复。${error instanceof Error ? error.message : '当前批次失败'}`
+     `已保存 ${resumable.length}/${sourceSegments.length} 条，点击继续校订可从断点恢复。${error instanceof Error ? error.message : '当前批次失败'}`
+    )
+   if (saved && !resumable && fingerprint && !signal?.aborted)
+    throw new Error(
+     `${error instanceof Error ? error.message : '当前批次失败'} 旧断点与当前资料或策略不匹配，本次没有可恢复的进度。`
     )
    throw error
   }
