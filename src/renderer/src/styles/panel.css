@@ -879,6 +879,10 @@
  background: transparent;
  border-radius: 0;
 }
+.app-logo {
+ display: block;
+ height: auto;
+}
 /* 文件选择：资料库下拉在上，外部导入在下。 */
 .file-picker-library {
  margin-bottom: 8px;
