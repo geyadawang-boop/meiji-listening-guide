@@ -36,8 +36,9 @@ export function planCorrection(segments: Segment[], start: number, outputTokens 
     chars = JSON.stringify(row.text).length
    // Conservative estimate (not a tokenizer): reserve JSON, text changes and short reasons.
    const estimate = Math.ceil(Buffer.byteLength(JSON.stringify(row.text), 'utf8') / 2) + 96
-   if (estimate + 2 > budget || chars > 6000)
-    throw new Error(`第 ${i + 1} 条原文超出单批预算，请提高模型输出上限或拆分过长原文后重试；原文未截断`)
+   if (chars > 6000) throw new Error(`第 ${i + 1} 条原文超过 6000 字符单批输入预算，请拆分过长原文后重试；原文未截断`)
+   // A single row that exceeds the estimated output budget still gets its own batch;
+   // aborting the whole lecture during planning is worse than letting the request try.
    if (batch.rows.length && (output + estimate > budget || input + chars > 6000)) break
    batch.rows.push(row)
    input += chars
@@ -64,6 +65,29 @@ export function validCorrectionPrefix(saved: Segment[], source: Segment[]) {
     typeof row.reason === 'string'
   )
  )
+}
+
+export interface CorrectionCheckpoint {
+ fingerprint: string
+ total: number
+ segments: Segment[]
+}
+
+export function resumableCorrection(
+ checkpoint: CorrectionCheckpoint | undefined,
+ fingerprint: string,
+ source: Segment[]
+) {
+ return checkpoint &&
+  checkpoint.fingerprint === fingerprint &&
+  checkpoint.total === source.length &&
+  validCorrectionPrefix(checkpoint.segments, source)
+  ? checkpoint.segments
+  : undefined
+}
+
+export function correctionNeedsVision(contexts: {images: {label: string; url: string}[]}[], visionModel?: string) {
+ return contexts.some(context => context.images.length > 0) && !visionModel?.trim()
 }
 
 const grams = (value: string) => {
